@@ -214,6 +214,12 @@ private:
 			if (_rc.y >= s.y || _rc.x >= s.x)
 			{
 				auto trc = _rc - s;
+
+				if (ot)
+				{
+					ot->x = _pos.x;
+					ot->y = _pos.y;
+				}
 				if (trc.x < minbn && trc.y < minbn)
 				{
 					isfull = true;
@@ -240,11 +246,6 @@ private:
 						n.w = _rc.y;
 						set_rect(n);
 					}
-				}
-				if (ot)
-				{
-					ot->x = _pos.x;
-					ot->y = _pos.y;
 				}
 			}
 			return ret;
