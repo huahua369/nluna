@@ -177,7 +177,7 @@ private:
 	class box_node :public Res
 	{
 	public:
-		glm::ivec2 _rc, _pos;
+		glm::ivec2 _pos, _size;
 		value_type* _value = nullptr;
 		bool isfull = false;
 		static const int minbn = 6;
@@ -185,7 +185,7 @@ private:
 		box_node()
 		{
 		}
-		box_node(glm::ivec4 rc, value_type* img) :_rc({ rc.z,rc.w }), _pos({ rc.x,rc.y }), _value(img)
+		box_node(glm::ivec4 rc, value_type* img) :_size({ rc.z,rc.w }), _pos({ rc.x,rc.y }), _value(img)
 		{
 		}
 		~box_node()
@@ -202,7 +202,7 @@ private:
 			return isfull;
 		}
 		// 查询是否有空闲块、分割空闲块
-		box_node* find_split_put(const glm::ivec2& s, glm::ivec2* ot)
+		box_node* find_split_put(glm::ivec2 s, glm::ivec2* ot)
 		{
 			box_node* ret = nullptr;
 			glm::ivec4 n;
@@ -211,10 +211,11 @@ private:
 			{
 				ot->x = -1;
 			}
-			if (_rc.y >= s.y || _rc.x >= s.x)
+			if (_size.y >= s.y && _size.x >= s.x)
 			{
-				auto trc = _rc - s;
-
+				// 保存偶数对齐
+				if (s.y % 2) s.y++;
+				auto trc = _size - s;
 				if (ot)
 				{
 					ot->x = _pos.x;
@@ -232,9 +233,10 @@ private:
 					// 判断是否需要向下分割
 					if (_pos.x == 0)
 					{
-						glm::ivec4 nexts = { 0,_pos.y + s.y,_rc.x,trc.y };
+						glm::ivec4 nexts = { 0, _pos.y + s.y, _size.x, trc.y };
 						set_rect(nexts);
 						n.w = s.y;
+
 						if (n.z >= minbn)
 						{
 							//创建右边空闲块
@@ -243,7 +245,7 @@ private:
 					}
 					else
 					{
-						n.w = _rc.y;
+						n.w = _size.y;
 						set_rect(n);
 					}
 				}
@@ -252,8 +254,8 @@ private:
 		}
 		void set_rect(const glm::ivec4& rt)
 		{
-			_rc.x = rt.z;
-			_rc.y = rt.w;
+			_size.x = rt.z;
+			_size.y = rt.w;
 			_pos.x = rt.x;
 			_pos.y = rt.y;
 		}
@@ -379,7 +381,7 @@ private:
 		}
 		if (issort)
 		{
-			_data_free.sort([](box_node* f1, box_node* f2) { return f1->_rc < f2->_rc; });
+			_data_free.sort([](box_node* f1, box_node* f2) { return f1->_size < f2->_size; });
 		}
 	}
 public:
