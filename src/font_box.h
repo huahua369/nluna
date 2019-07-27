@@ -26,7 +26,7 @@
 	_box.clear();
 	*/
 #ifndef __Image__h__
-
+#define __Image__h__
 #if 1
 #ifdef _HAS_SHARED_MUTEX
 #define HSM
@@ -93,324 +93,326 @@ namespace glm {
 	}
 };
 #endif
-class Res
-{
-public:
-	int _type = 0;
-	int64_t _inc_ = 0;
-	std::string _name;
-public:
-	Res()
-	{
-	}
-
-	virtual ~Res()
-	{
-	}
-
-	static void destroy(Res* p)
-	{
-		if (p)
-		{
-			p->release();
-		}
-	}
-
-	void release()
-	{
-		if (--_inc_ < 0)
-		{
-			delete this;
-		}
-	}
-
-	int64_t addRef()
-	{
-		return ++_inc_;
-	}
-	void set_name(const std::string& n)
-	{
-		_name = n;
-	}
-private:
-
-};
-
-class Image :public Res
-{
-public:
-	struct copy_image {
-		void operator()(Image* dst, Image* src, const glm::ivec4& src_rect, const glm::ivec4& dest_rect)
-		{
-			dst->copy_value(src, src_rect, dest_rect);
-		}
-	};
-	struct create_size {
-		Image* operator()(int w, int h) { return create_null(w, h); }
-	};
-public:
-	int width, height;
-public:
-	static Image* create_null(int w, int h)
-	{
-		Image* p = nullptr;
-		return p;
-	}
-	void copy_value(Image* src, const glm::ivec4& src_rect, const glm::ivec4& dest_rect)
-	{
-
-	}
-	void clear()
-	{
-
-	}
-};
-#endif
-template<class _Ty = Image, class pr_copy_value = _Ty::copy_image, class pr_create = _Ty::create_size>
-class FontBox :public Res
-{
-public:
-	using value_type =_Ty;
-	pr_copy_value value_copy;
-	pr_create value_create;
-private:
-	class box_node :public Res
+namespace hz {
+	class Res
 	{
 	public:
-		glm::ivec2 _pos, _size;
-		value_type* _value = nullptr;
-		bool isfull = false;
-		static const int minbn = 6;
+		int _type = 0;
+		int64_t _inc_ = 0;
+		std::string _name;
 	public:
-		box_node()
+		Res()
 		{
 		}
-		box_node(glm::ivec4 rc, value_type* img) :_size({ rc.z,rc.w }), _pos({ rc.x,rc.y }), _value(img)
+
+		virtual ~Res()
 		{
 		}
-		~box_node()
+
+		static void destroy(Res* p)
 		{
-		}
-		static box_node* create(glm::ivec4 rc, value_type* img)
-		{
-			box_node* p = new box_node(rc, img);
-			return p;
-		}
-	public:
-		bool is_full()
-		{
-			return isfull;
-		}
-		// 查询是否有空闲块、分割空闲块
-		box_node* find_split_put(glm::ivec2 s, glm::ivec2* ot)
-		{
-			box_node* ret = nullptr;
-			glm::ivec4 n;
-			std::set<glm::ivec4> newrc;
-			if (ot)
+			if (p)
 			{
-				ot->x = -1;
+				p->release();
 			}
-			if (_size.y >= s.y && _size.x >= s.x)
-			{
-				// 保存偶数对齐
-				if (s.y % 2) s.y++;
-				auto trc = _size - s;
-				if (ot)
-				{
-					ot->x = _pos.x;
-					ot->y = _pos.y;
-				}
-				if (trc.x < minbn && trc.y < minbn)
-				{
-					isfull = true;
-				}
-				else
-				{
-					n.x = _pos.x + s.x;
-					n.y = _pos.y;
-					n.z = trc.x;
-					// 判断是否需要向下分割
-					if (_pos.x == 0)
-					{
-						glm::ivec4 nexts = { 0, _pos.y + s.y, _size.x, trc.y };
-						set_rect(nexts);
-						n.w = s.y;
-
-						if (n.z >= minbn)
-						{
-							//创建右边空闲块
-							ret = create(n, _value);
-						}
-					}
-					else
-					{
-						n.w = _size.y;
-						set_rect(n);
-					}
-				}
-			}
-			return ret;
 		}
-		void set_rect(const glm::ivec4& rt)
+
+		void release()
 		{
-			_size.x = rt.z;
-			_size.y = rt.w;
-			_pos.x = rt.x;
-			_pos.y = rt.y;
+			if (--_inc_ < 0)
+			{
+				delete this;
+			}
+		}
+
+		int64_t addRef()
+		{
+			return ++_inc_;
+		}
+		void set_name(const std::string& n)
+		{
+			_name = n;
 		}
 	private:
 
 	};
-	//空闲表
-	std::list<box_node*> _data_free;
-	std::set<value_type*> _box;
 
-	glm::ivec2 _defmax = { 1024,1024 };
-	LockS _lock;
-public:
-	FontBox()
+	class Image :public Res
 	{
-	}
-	~FontBox()
-	{
-		LOCK_W(_lock);
-		for (auto it : _box)
+	public:
+		struct copy_image {
+			void operator()(Image* dst, Image* src, const glm::ivec4& src_rect, const glm::ivec4& dest_rect)
+			{
+				dst->copy_value(src, src_rect, dest_rect);
+			}
+		};
+		struct create_size {
+			Image* operator()(int w, int h) { return create_null(w, h); }
+		};
+	public:
+		int width, height;
+	public:
+		static Image* create_null(int w, int h)
 		{
-			value_type::destroy(it);
+			Image* p = nullptr;
+			return p;
 		}
-	}
-public:
-	// todo把一个图像矩形装箱返回位置
-	glm::ivec4 push(value_type* img, value_type** oi)
-	{
-		glm::ivec4 rs = { 0,0,img->width,img->height };// img->_prc;
-		glm::ivec4 ret = { -1,-1,rs.z,rs.w };
-		glm::ivec2 s = { rs.z,rs.w };
-
-		if (rs.z > _defmax.x || rs.w > _defmax.y)//|| (size.y > (_maxsize.y - _height)))
+		void copy_value(Image* src, const glm::ivec4& src_rect, const glm::ivec4& dest_rect)
 		{
+
+		}
+		void clear()
+		{
+
+		}
+	};
+#endif
+	template<class _Ty = Image, class pr_copy_value = _Ty::copy_image, class pr_create = _Ty::create_size>
+	class FontBox :public Res
+	{
+	public:
+		using value_type =_Ty;
+		pr_copy_value value_copy;
+		pr_create value_create;
+	private:
+		class box_node :public Res
+		{
+		public:
+			glm::ivec2 _pos, _size;
+			value_type* _value = nullptr;
+			bool isfull = false;
+			static const int minbn = 6;
+		public:
+			box_node()
+			{
+			}
+			box_node(glm::ivec4 rc, value_type* img) :_size({ rc.z,rc.w }), _pos({ rc.x,rc.y }), _value(img)
+			{
+			}
+			~box_node()
+			{
+			}
+			static box_node* create(glm::ivec4 rc, value_type* img)
+			{
+				box_node* p = new box_node(rc, img);
+				return p;
+			}
+		public:
+			bool is_full()
+			{
+				return isfull;
+			}
+			// 查询是否有空闲块、分割空闲块
+			box_node* find_split_put(glm::ivec2 s, glm::ivec2* ot)
+			{
+				box_node* ret = nullptr;
+				glm::ivec4 n;
+				std::set<glm::ivec4> newrc;
+				if (ot)
+				{
+					ot->x = -1;
+				}
+				if (_size.y >= s.y && _size.x >= s.x)
+				{
+					// 保存偶数对齐
+					if (s.y % 2) s.y++;
+					auto trc = _size - s;
+					if (ot)
+					{
+						ot->x = _pos.x;
+						ot->y = _pos.y;
+					}
+					if (trc.x < minbn && trc.y < minbn)
+					{
+						isfull = true;
+					}
+					else
+					{
+						n.x = _pos.x + s.x;
+						n.y = _pos.y;
+						n.z = trc.x;
+						// 判断是否需要向下分割
+						if (_pos.x == 0)
+						{
+							glm::ivec4 nexts = { 0, _pos.y + s.y, _size.x, trc.y };
+							set_rect(nexts);
+							n.w = s.y;
+
+							if (n.z >= minbn)
+							{
+								//创建右边空闲块
+								ret = create(n, _value);
+							}
+						}
+						else
+						{
+							n.w = _size.y;
+							set_rect(n);
+						}
+					}
+				}
+				return ret;
+			}
+			void set_rect(const glm::ivec4& rt)
+			{
+				_size.x = rt.z;
+				_size.y = rt.w;
+				_pos.x = rt.x;
+				_pos.y = rt.y;
+			}
+		private:
+
+		};
+		//空闲表
+		std::list<box_node*> _data_free;
+		std::set<value_type*> _box;
+
+		glm::ivec2 _defmax = { 1024,1024 };
+		LockS _lock;
+	public:
+		FontBox()
+		{
+		}
+		~FontBox()
+		{
+			LOCK_W(_lock);
+			for (auto it : _box)
+			{
+				value_type::destroy(it);
+			}
+		}
+	public:
+		// todo把一个图像矩形装箱返回位置
+		glm::ivec4 push(value_type* img, value_type** oi)
+		{
+			glm::ivec4 rs = { 0,0,img->width,img->height };// img->_prc;
+			glm::ivec4 ret = { -1,-1,rs.z,rs.w };
+			glm::ivec2 s = { rs.z,rs.w };
+
+			if (rs.z > _defmax.x || rs.w > _defmax.y)//|| (size.y > (_maxsize.y - _height)))
+			{
+				return ret;
+			}
+			bool no_put = find_put(s, rs, img, ret, oi);
+			if (no_put)
+			{
+				push_box();
+				find_put(s, rs, img, ret, oi);
+			}
 			return ret;
 		}
-		bool no_put = find_put(s, rs, img, ret, oi);
-		if (no_put)
+	private:
+		bool find_put(const glm::ivec2& s, const glm::ivec4& rs, value_type* img, glm::ivec4& ret, value_type** oi)
 		{
-			push_box();
-			find_put(s, rs, img, ret, oi);
-		}
-		return ret;
-	}
-private:
-	bool find_put(const glm::ivec2& s, const glm::ivec4& rs, value_type* img, glm::ivec4& ret, value_type** oi)
-	{
-		LOCK_W(_lock);
-		std::vector<box_node*> addtem, full;
-		glm::ivec2 pos;
-		bool no_put = true;
-		//查找合适的位置
-		for (auto it : _data_free)
-		{
-			auto nbn = it->find_split_put(s, &pos);
-			if (pos.x >= 0 && (pos.y >= 0))
+			LOCK_W(_lock);
+			std::vector<box_node*> addtem, full;
+			glm::ivec2 pos;
+			bool no_put = true;
+			//查找合适的位置
+			for (auto it : _data_free)
 			{
-				ret.x = pos.x;
-				ret.y = pos.y;
-				if (img && img->width > 0 && img->height > 0)
+				auto nbn = it->find_split_put(s, &pos);
+				if (pos.x >= 0 && (pos.y >= 0))
 				{
-					value_copy(it->_value, img, rs, ret);
-					if (oi)
+					ret.x = pos.x;
+					ret.y = pos.y;
+					if (img && img->width > 0 && img->height > 0)
 					{
-						*oi = it->_value;
+						value_copy(it->_value, img, rs, ret);
+						if (oi)
+						{
+							*oi = it->_value;
+						}
 					}
+					if (nbn)
+					{
+						addtem.push_back(nbn);
+					}
+					if (it->is_full())
+					{
+						full.push_back(it);
+					}
+					no_put = false;
+					break;
 				}
 				if (nbn)
 				{
-					addtem.push_back(nbn);
+					printf("error\n");
+					throw "find_put";
 				}
-				if (it->is_full())
+			}
+			if (addtem.size() || full.size())
+			{
+				for (auto it : full)
 				{
-					full.push_back(it);
+					_data_free.remove(it);
+					box_node::destroy(it);
 				}
-				no_put = false;
-				break;
+				for (auto it : addtem)
+				{
+					push_box_free(it, false);
+				}
+				push_box_free(0, true);
 			}
-			if (nbn)
-			{
-				printf("error\n");
-				throw "find_put";
-			}
+			return no_put;
 		}
-		if (addtem.size() || full.size())
+	public:
+		void clear()
 		{
-			for (auto it : full)
+			LOCK_W(_lock);
+			for (auto it : _data_free)
 			{
-				_data_free.remove(it);
 				box_node::destroy(it);
 			}
-			for (auto it : addtem)
-			{
-				push_box_free(it, false);
-			}
-			push_box_free(0, true);
-		}
-		return no_put;
-	}
-public:
-	void clear()
-	{
-		LOCK_W(_lock);
-		for (auto it : _data_free)
-		{
-			box_node::destroy(it);
-		}
-		_data_free.clear();
-		glm::ivec4 rc = { 0,0,_defmax };
-		for (auto it : _box)
-		{
-			it->clear();
-			auto p = box_node::create(rc, it);
-			_data_free.push_back(p);
-		}
-	}
-private:
-	void push_box_free(box_node* p, bool issort)
-	{
-		if (p)
-		{
-			_data_free.push_back(p);
-		}
-		if (issort)
-		{
-			_data_free.sort([](box_node* f1, box_node* f2) { return f1->_size < f2->_size; });
-		}
-	}
-public:
-	void set_defmax(const glm::ivec2& dm)
-	{
-		LOCK_W(_lock);
-		if (dm.x > 0 && dm.y > 0)
-			_defmax = dm;
-	}
-	glm::ivec2 get_defmax()
-	{
-		LOCK_R(_lock);
-		return _defmax;
-	}
-
-	// 增加空白箱子
-	void push_box()
-	{
-		LOCK_W(_lock);
-		auto p = value_create(_defmax.x, _defmax.y);
-		if (p)
-		{
-			_box.insert(p);
+			_data_free.clear();
 			glm::ivec4 rc = { 0,0,_defmax };
-			auto pf = box_node::create(rc, p);
-			push_box_free(pf, true);
+			for (auto it : _box)
+			{
+				it->clear();
+				auto p = box_node::create(rc, it);
+				_data_free.push_back(p);
+			}
 		}
-	}
-private:
-};
+	private:
+		void push_box_free(box_node* p, bool issort)
+		{
+			if (p)
+			{
+				_data_free.push_back(p);
+			}
+			if (issort)
+			{
+				_data_free.sort([](box_node* f1, box_node* f2) { return f1->_size < f2->_size; });
+			}
+		}
+	public:
+		void set_defmax(const glm::ivec2& dm)
+		{
+			LOCK_W(_lock);
+			if (dm.x > 0 && dm.y > 0)
+				_defmax = dm;
+		}
+		glm::ivec2 get_defmax()
+		{
+			LOCK_R(_lock);
+			return _defmax;
+		}
 
+		// 增加空白箱子
+		void push_box()
+		{
+			LOCK_W(_lock);
+			auto p = value_create(_defmax.x, _defmax.y);
+			if (p)
+			{
+				_box.insert(p);
+				glm::ivec4 rc = { 0,0,_defmax };
+				auto pf = box_node::create(rc, p);
+				push_box_free(pf, true);
+			}
+		}
+	private:
+	};
+}
+//!hz
 #endif // !__font_box_h__

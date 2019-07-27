@@ -125,7 +125,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\font_box.h" />
+    <ClInclude Include="..\src\tools\font.h" />
+    <ClInclude Include="..\src\tools\image_packer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\test.cpp" />
