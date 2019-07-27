@@ -1,4 +1,4 @@
 # nluna
 ## Overview
-nluna is a renderer,
+nluna public domain (or MIT licensed) libraries.
 by [nluna](https://www.nluna.com/).
