@@ -50,8 +50,19 @@ void test_font(int w = 512, int h = 512)
 	hz::Image* cav = hz::Image::create_null(512, 128);
 	load_font(&fts);
 	auto nsimsun = fts.get_font(u8"新宋体");
-	auto decd = nsimsun->new_SBitDecoder();
-	nsimsun->get_glyph_bitmap(u8"新宋体，你好！", 12, decd);
+	auto rfont = nsimsun;
+
+	double dpi = 96;
+	double fns = 13.0 * dpi / 72.0;
+	std::string str = u8R"({有物混成)";
+	glm::ivec4 ot; std::string bittem;
+	hz::Fonts::Bitmap bitmap[1] = {};
+	const char* t = str.c_str();
+	const char* t1 = t, * t2;
+	unsigned int wcp = 0;
+	t = hz::Fonts::get_u8_last(t, &wcp);
+	int gidx = nsimsun->get_glyph_index(wcp, &rfont);
+	auto bit = rfont->get_glyph_image(gidx, fns, &ot, &bittem, bitmap, true);
 	return;
 }
 int main()

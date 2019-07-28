@@ -275,6 +275,7 @@ namespace hz {
 			unsigned int    rows;
 			unsigned int    width;
 			int             pitch;
+			double			advance;
 			int             bit_depth;
 			unsigned char* buffer;
 			unsigned int	capacity = 0;
@@ -845,7 +846,7 @@ namespace hz {
 				return stbtt_GetGlyphKernAdvance(&font->font, glyph1, glyph2);
 			}
 
-			static char* get_character(font_impl* font, unsigned int ch, float pxh, glm::ivec4* ot, std::string* out)
+			static char* get_glyph_bitmap(font_impl* font, int gidx, double height, glm::ivec4* ot, std::string* out, double* advance)
 			{
 				//int i, j, baseline, ch = 0;
 				int baseline;
@@ -853,14 +854,18 @@ namespace hz {
 				int descent;
 				int linegap;
 				//float xpos = 2; // leave a little padding in case the character extends left
-				float scale = stbtt_ScaleForPixelHeight(&font->font, pxh);
+				float scale = stbtt_ScaleForPixelHeight(&font->font, height);
 				stbtt_GetFontVMetrics(&font->font, &ascent, &descent, &linegap);
 				baseline = (int)(ascent * scale);
-				int advance, lsb, x0, y0, x1, y1;
-				float shiftX = 0.0f;
-				float shiftY = 0.0f;
-				stbtt_GetCodepointHMetrics(&font->font, ch, &advance, &lsb);
-				stbtt_GetCodepointBitmapBoxSubpixel(&font->font, ch, scale, scale, shiftX, shiftY, &x0, &y0, &x1, &y1);
+				int advancei, lsb, x0, y0, x1, y1;
+				float shift_x = 0.0f;
+				float shift_y = 0.0f;
+				//stbtt_GetCodepointHMetrics(&font->font, ch, &advance, &lsb);
+				stbtt_GetGlyphHMetrics(&font->font, gidx, &advancei, &lsb);
+				//stbtt_GetCodepointBitmapBoxSubpixel(&font->font, ch, scale, scale, shiftX, shiftY, &x0, &y0, &x1, &y1);
+				stbtt_GetGlyphBitmapBoxSubpixel(&font->font, gidx, scale, scale, shift_x, shift_y, &x0, &y0, &x1, &y1);
+				double adv = advancei * scale;
+				*advance = adv;
 				ot->x = x0;
 				ot->y = -y0;
 				ot->z = x1 - x0;
@@ -871,32 +876,16 @@ namespace hz {
 					out->resize(pcs);
 				}
 				char* pxs = out->data();
-				stbtt_MakeCodepointBitmapSubpixel(&font->font,
+				memset(pxs, 0, out->size());
+				stbtt_MakeGlyphBitmapSubpixel(&font->font,
 					(unsigned char*)pxs,
 					x1 - x0,
 					y1 - y0,
 					x1 - x0, // screen width ( stride )
 					scale, scale,
-					shiftX, shiftY, // shift x, shift y 
-					ch);
-				int pad = 2, gx = 0, gy = 0;
-				auto glyph = new Glyph();
-				glyph->codepoint = ch;
-				glyph->size = pxh;
-				glyph->blur = 0;
-				glyph->next = 0;
-				glyph->x0 = (short)ot->x;
-				glyph->y0 = (short)ot->y;
-				glyph->x1 = (short)(glyph->x0 + ot->z);
-				glyph->y1 = (short)(glyph->y0 + ot->w);
-				glyph->xadv = (short)(scale * advance * 10.0f);
-				glyph->xoff = (short)(x0 - pad);
-				glyph->yoff = (short)(y0 - pad);
-				int dirtyRect[4] = {};
-				dirtyRect[0] = mini(dirtyRect[0], glyph->x0);
-				dirtyRect[1] = mini(dirtyRect[1], glyph->y0);
-				dirtyRect[2] = maxi(dirtyRect[2], glyph->x1);
-				dirtyRect[3] = maxi(dirtyRect[3], glyph->y1);
+					shift_x, shift_y, // shift x, shift y 
+					gidx);
+
 				return pxs;
 			}
 		public:
@@ -908,7 +897,7 @@ namespace hz {
 			}
 #if 1
 
-			static uint16_t ttUSHORT(uint8_t* p) { return p[0] * 256 + p[1]; }
+			static uint16_t ttUSHORT(uint8_t * p) { return p[0] * 256 + p[1]; }
 			static uint16_t ttSHORT(uint8_t* p) { return p[0] * 256 + p[1]; }
 			static uint32_t ttULONG(uint8_t* p) { return (p[0] << 24) + (p[1] << 16) + (p[2] << 8) + p[3]; }
 			static int ttLONG(uint8_t* p) { return (p[0] << 24) + (p[1] << 16) + (p[2] << 8) + p[3]; }
@@ -1234,6 +1223,9 @@ namespace hz {
 
 				uint32_t _strike_index = 0;
 				tt_info* _face = 0;
+
+				// 是否在回收状态
+				int _recycle = 0;
 			public:
 				SBitDecoder()
 				{
@@ -1322,8 +1314,9 @@ namespace hz {
 			//int lut[256];
 			std::vector<tt_info*> fallbacks;
 
-			std::map<int, Glyph*> _lut;
+			std::unordered_map<int, Glyph*> _lut;
 			LockS _lock;
+
 		private:
 #ifndef _FONT_NO_BITMAP
 
@@ -1336,6 +1329,8 @@ namespace hz {
 			std::vector<std::vector<IndexSubTableArray>> _index_sub_table;
 			std::unordered_map<uint8_t, uint32_t> _msidx_table;
 			std::set<SBitDecoder*> _dec_table;
+			std::queue<SBitDecoder*> _free_dec;
+			LockS _sbit_lock;
 #endif // !_FONT_NO_BITMAP
 
 		public:
@@ -1472,15 +1467,15 @@ namespace hz {
 			}
 		public:
 
-			int get_glyph_index(const char* codepoint, tt_info** renderFont)
+			int get_glyph_index_u8(const char* u8str, tt_info** renderFont)
 			{
 				// Create a new glyph or rasterize bitmap data for a cached glyph.
-				int g = font_dev::get_glyph_index(&font, codepoint);
+				int g = font_dev::get_glyph_index(&font, u8str);
 				// Try to find the glyph in fallback fonts.
 				if (g == 0) {
 					for (auto it : fallbacks)
 					{
-						int fallbackIndex = font_dev::get_glyph_index(&it->font, codepoint);
+						int fallbackIndex = font_dev::get_glyph_index(&it->font, u8str);
 						if (fallbackIndex != 0) {
 							g = fallbackIndex;
 							*renderFont = it;
@@ -1490,9 +1485,13 @@ namespace hz {
 					// It is possible that we did not find a fallback glyph.
 					// In that case the glyph index 'g' is 0, and we'll proceed below and cache empty glyph.
 				}
+				else
+				{
+					*renderFont = this;
+				}
 				return g;
 			}
-			int get_glyph_index(int codepoint, tt_info** renderFont)
+			int get_glyph_index(unsigned int codepoint, tt_info** renderFont)
 			{
 				// Create a new glyph or rasterize bitmap data for a cached glyph.
 				int g = font_dev::getGlyphIndex(&font, codepoint);
@@ -1509,6 +1508,10 @@ namespace hz {
 					}
 					// It is possible that we did not find a fallback glyph.
 					// In that case the glyph index 'g' is 0, and we'll proceed below and cache empty glyph.
+				}
+				else
+				{
+					*renderFont = this;
 				}
 				return g;
 			}
@@ -1803,10 +1806,8 @@ namespace hz {
 					uint32_t  gindex = stb_font::ttUSHORT(p); p += 2;
 					char  dx = *p; p++;
 					char  dy = *p; p++;
-
-
 					/* NB: a recursive call */
-					//error = get_index(gindex, x_pos + dx, y_pos + dy);
+					error = get_index(decoder, gindex, x_pos + dx, y_pos + dy);
 					if (error)
 						break;
 				}
@@ -1982,12 +1983,16 @@ namespace hz {
 			}
 
 			// 获取一个字体索引的位图
-			static int get_index(SBitDecoder* decoder, unsigned int glyph_index, unsigned int size_idx, int x_pos, int y_pos)
+			static int get_index(SBitDecoder* decoder, unsigned int glyph_index, int x_pos, int y_pos)
 			{
 				uint32_t image_start = 0, image_end = 0, image_offset = 0;
 				uint32_t   start, end, index_format, image_format;
 				uint8_t* p = decoder->p, * p_limit = decoder->p_limit;
 				auto it = decoder->get_image_offset(glyph_index);
+				if (!it)
+				{
+					return 0;
+				}
 				start = it->firstGlyphIndex;
 				end = it->lastGlyphIndex;
 				image_offset = it->additionalOffsetToIndexSubtable;
@@ -2223,25 +2228,57 @@ namespace hz {
 			{
 				return &_msidx_table;
 			}
+
+			// 创建sbit解码器
 			SBitDecoder* new_SBitDecoder()
 			{
-				auto p = new SBitDecoder();
-				_dec_table.insert(p);
+				SBitDecoder* p = nullptr;
+				LOCK_W(_sbit_lock);
+#ifndef NO_SBIT_RECYCLE
+				if (_free_dec.size())
+				{
+					p = _free_dec.front();
+					_free_dec.pop();
+					p->_recycle = 0;
+				}
+				else
+#endif // !NO_SBIT_RECYCLE
+				{
+					p = new SBitDecoder();
+					_dec_table.insert(p);
+				}
 				return p;
+			}
+			// 回收
+			void recycle(SBitDecoder* p)
+			{
+				if (p)
+				{
+					LOCK_W(_sbit_lock);
+					// 不是自己的不回收
+					auto it = _dec_table.find(p);
+					if (it != _dec_table.end() && p->_recycle == 0)
+					{
+#ifndef NO_SBIT_RECYCLE
+						p->_recycle = 1;
+						_free_dec.push(p);
+#else
+						_dec_table.erase(p);
+						delete p;
+#endif
+					}
+
+				}
 			}
 			void destroy_all_dec()
 			{
+				LOCK_W(_sbit_lock);
 				for (auto it : _dec_table)
 					if (it)delete it;
 				_dec_table.clear();
 			}
-			void destroy_SBitDecoder(SBitDecoder* p)
-			{
-				if (p)
-					delete p;
-			}
 			// 传空白的解码指针
-			int get_glyph_bitmap(std::string str, int height, SBitDecoder* decoder)
+			int get_glyph_bitmap_test(std::string str, int height, SBitDecoder* decoder)
 			{
 				font_impl_info* font_i = &font;
 				Bitmap* bitmap = 0;
@@ -2268,7 +2305,7 @@ namespace hz {
 					BigGlyphMetrics* metrics = decoder->metrics;
 					if (gidx)
 					{
-						if (get_index(decoder, gidx, 5, x_pos, y_pos))
+						if (get_index(decoder, gidx, x_pos, y_pos))
 						{
 							// 灰度图转RGBA
 							img.copy_to_image((unsigned char*)bitmap->buffer, bitmap->pitch, { x + metrics->horiBearingX, y + metrics->horiAdvance - metrics->horiBearingY, bitmap->width, bitmap->rows }, 0xff0080ff, 1, 0);
@@ -2279,7 +2316,89 @@ namespace hz {
 				img.saveImage("test_bitmap.png");
 				return 1;
 			}
+			// 传空白的解码指针
+			int get_glyph_bitmap(int gidx, int height, glm::ivec4* ot, std::string* out, Bitmap* out_bitmap)
+			{
+				Bitmap* bitmap = 0;
+				int x_pos = 0, y_pos = 0, ret = 0;
+				int sidx = get_sidx(height);
+				if (sidx < 0)
+				{
+					return 0;
+				}
+				int x = 10, y = 10;
+				SBitDecoder* decoder = new_SBitDecoder();
+				decoder->init(this, sidx);
+				bitmap = decoder->bitmap;
+				BigGlyphMetrics* metrics = decoder->metrics;
+
+				if (get_index(decoder, gidx, x_pos, y_pos))
+				{
+					out->resize(bitmap->rows * (uint32_t)bitmap->pitch);
+					memcpy(out->data(), bitmap->buffer, out->size());
+					ot->x = metrics->horiBearingX;
+					ot->y = metrics->horiBearingY;
+					auto ha = metrics->horiAdvance;
+					bitmap->advance = std::max(metrics->horiAdvance, metrics->vertAdvance);
+					ot->z = bitmap->width;
+					ot->w = bitmap->rows;
+					if (out_bitmap)
+					{
+						*out_bitmap = *bitmap;
+					}
+					ret = 1;
+					// 灰度图转RGBA
+					//img.copy_to_image((unsigned char*)bitmap->buffer, bitmap->pitch,
+					//	{ x + metrics->horiBearingX, y + metrics->horiAdvance - metrics->horiBearingY, bitmap->width, bitmap->rows },
+					//	0xff0080ff, 1, 0);
+				}
+				else
+				{
+					ret = 0;
+				}
+				recycle(decoder);
+				return ret;
+			}
 #endif  // !_FONT_NO_BITMAP
+			/*
+			输入
+			int gidx			字符索引号
+			double height		期望高度
+			bool first_bitmap	是否优先查找位图字体
+			输出
+			glm::ivec4* ot		x,y,z=width,w=height
+			std::string* out	输出缓存区
+			Bitmap* bitmap		输出位图信息
+			返回1成功
+			*/
+			int get_glyph_image(int gidx, double height, glm::ivec4* ot, std::string* out, Bitmap* bitmap, bool first_bitmap)
+			{
+				int ret = 0;
+				if (gidx > 0)
+				{
+#ifndef _FONT_NO_BITMAP
+					if (first_bitmap)
+					{
+						ret = get_glyph_bitmap(gidx, height, ot, out, bitmap);
+					}
+#endif
+					if (!ret)
+					{
+						double advance = height;
+						font_dev::get_glyph_bitmap(&font, gidx, height, ot, out, &advance);
+						if (bitmap)
+						{
+							bitmap->buffer = (unsigned char*)out->data();
+							bitmap->width = bitmap->pitch = ot->z;
+							bitmap->rows = ot->w;
+							bitmap->advance = advance;
+							bitmap->pixel_mode = PX_GRAY;
+							ret = 1;
+						}
+					}
+				}
+				return ret;
+			}
 		private:
 
 		};
@@ -2574,13 +2693,12 @@ namespace hz {
 		{
 			return get_glyph(font, font_dev::get_u8_to_u16(codepoint), isize, iblur, bitmapOption);
 		}
-		char* get_glyph(tt_info* font, unsigned int codepoint, float isize, glm::ivec4* ot, std::string* out)
+		char* get_glyph(tt_info* font, unsigned int codepoint, float height, glm::ivec4* ot, std::string* out)
 		{
 			int i, g, advance, lsb, x0, y0, x1, y1, gw, gh, gx = 0, gy = 0, x, y;
 			float scale;
 			Glyph* glyph = NULL;
 			unsigned int h;
-			float size = isize; // 10.0f;
 			int pad, added;
 			unsigned char* bdst;
 			unsigned char* dst;
@@ -2593,8 +2711,9 @@ namespace hz {
 			{
 				return nullptr;
 			}
-
-			return font_dev::get_character(&renderFont->font, codepoint, isize, ot, out);
+			g = font->get_glyph_index(codepoint, &renderFont);
+			double adv;
+			return font_dev::get_glyph_bitmap(&renderFont->font, g, height, ot, out, &adv);
 		}
 		Glyph* get_glyph(tt_info* font, unsigned int codepoint, short isize, short iblur, int bitmapOption = FONS_GLYPH_BITMAP_REQUIRED)
 		{
