@@ -56,7 +56,10 @@ PostScript信息 所有图元的PostScript FontInfo目录项和PostScript名
 PCLT	PCL 5数据 HP PCL 5Printer Language 的字体信息：字体数、宽度、x高度、风格、记号集等等
 OS/2	OS/2和Windows特有的规格 TrueType字体所需的规格集
 
+Apple官方TrueType字体标准https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6.html#Overview
 
+微软官方TrueType字体标准https://www.microsoft.com/en-us/Typography/SpecificationsOverview.aspx
+---------------------
 */
 
 class font_hs
@@ -83,6 +86,7 @@ namespace std {
 	};
 }
 namespace hz {
+
 	class font_att :public Res
 	{
 	public:
@@ -270,6 +274,18 @@ namespace hz {
 			unsigned int offset; //From beginning of header.
 			unsigned int logicalLength;
 		}sfnt_header;
+		typedef struct post_header_
+		{
+			int32_t	format;//	Format of this table
+			int32_t	italicAngle;	//Italic angle in degrees
+			int16_t	underlinePosition;	//Underline position
+			int16_t	underlineThickness;	//Underline thickness
+			uint32_t	isFixedPitch;	//Font is monospaced; set to 1 if the font is monospaced and 0 otherwise(N.B., to maintain compatibility with older versions of the TrueType spec, accept any non - zero value as meaning that the font is monospaced)
+			uint32_t	minMemType42;	//Minimum memory usage when a TrueType font is downloaded as a Type 42 font
+			uint32_t	maxMemType42;	//Maximum memory usage when a TrueType font is downloaded as a Type 42 font
+			uint32_t	minMemType1;	//Minimum memory usage when a TrueType font is downloaded as a Type 1 font
+			uint32_t	maxMemType1;
+		}post_header;
 		typedef struct  Bitmap_
 		{
 			unsigned int    rows;
@@ -562,12 +578,12 @@ namespace hz {
 		{
 		public:
 			unsigned int codepoint = 0;
-			int index;
+			int index = 0;
 			Glyph* next = 0;
-			short size, blur;
-			short x0, y0, x1, y1;
-			short xadv, xoff, yoff;
-			unsigned int _width, _height;
+			short size = 0, blur = 0;
+			short x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+			short xadv = 0, xoff = 0, yoff = 0;
+			unsigned int _width = 0, _height = 0;
 			std::vector<unsigned char> bitmap;
 		public:
 			Glyph()
@@ -577,7 +593,7 @@ namespace hz {
 			~Glyph()
 			{
 			}
-			unsigned char* resize_bitmap(int w, int h)
+			unsigned char* resize_bitmap(int64_t w, int64_t h)
 			{
 				size_t s = w * h;
 				if (s != bitmap.size())
@@ -779,6 +795,11 @@ namespace hz {
 			{
 				stbtt_GetFontVMetrics(&font->font, ascent, descent, lineGap);
 			}
+			static void getFontHMetrics(font_impl* font, int glyph, int* advance, int* lsb)
+			{
+				stbtt_GetGlyphHMetrics(&font->font, glyph, advance, lsb);
+				return;
+			}
 
 			static float getPixelHeightScale(font_impl* font, float size)
 			{
@@ -864,7 +885,7 @@ namespace hz {
 				stbtt_GetGlyphHMetrics(&font->font, gidx, &advancei, &lsb);
 				//stbtt_GetCodepointBitmapBoxSubpixel(&font->font, ch, scale, scale, shiftX, shiftY, &x0, &y0, &x1, &y1);
 				stbtt_GetGlyphBitmapBoxSubpixel(&font->font, gidx, scale, scale, shift_x, shift_y, &x0, &y0, &x1, &y1);
-				double adv = advancei * scale;
+				double adv = (double)advancei * scale;
 				*advance = adv;
 				ot->x = x0;
 				ot->y = -y0;
@@ -975,8 +996,8 @@ namespace hz {
 			class eblc_h
 			{
 			public:
-				uint16_t majorVersion, minorVersion;
-				uint32_t numSizes;
+				uint16_t majorVersion = 0, minorVersion = 0;
+				uint32_t numSizes = 0;
 			public:
 				eblc_h()
 				{
@@ -1299,6 +1320,8 @@ namespace hz {
 
 			font_impl_info font;
 			std::string name;
+			int isFixedPitch;
+			int postFixedPitch, charFixedPitch;
 			bool is_copy = true;
 			std::vector<unsigned char*> _vdata;
 			unsigned char* data = 0;
@@ -1316,7 +1339,61 @@ namespace hz {
 
 			std::unordered_map<int, Glyph*> _lut;
 			LockS _lock;
-
+		private:
+			/*
+				图像缓存表
+				字体		key: uint64_t：字符utf16(int32)、字高font_height（字号*dpi/72）{unsigned short 1-1638}、模糊大小(unsigned char)
+			*/
+			class ft_item
+			{
+			public:
+				Image* _image = nullptr;
+				char32_t _unicode_codepoint = 0;
+				// 缓存位置xy, 字符图像zw(width,height)
+				glm::ivec4 _rect;
+				// 基线偏移
+				glm::ivec2 _baseline;
+				// 步进，等宽字体一般会英文相同、中文相同
+				double _advance = 0.0;
+				unsigned char _blue_size = 0;
+			public:
+				ft_item()
+				{
+				}
+				~ft_item()
+				{
+				}
+				void set_it(char32_t codepoint, Image* img, const glm::ivec4& rect, const glm::ivec2& baseline, double advance)
+				{
+					_unicode_codepoint = codepoint;
+					_image = img;
+					_rect = rect;
+					_baseline = baseline;
+					_advance = advance;
+				}
+				void set_it(const ft_item& fit)
+				{
+					*this = fit;
+				}
+			private:
+			};
+			union ft_key_s
+			{
+				uint64_t u = 0;
+				struct
+				{
+					char32_t unicode_codepoint;
+					unsigned short font_dpi;
+					// 字号支持 1-255
+					unsigned char font_size;
+					// 模糊大小支持 0-255
+					unsigned char blue_size;
+				}v;
+			};
+			// 查询表
+			std::unordered_map<uint64_t, ft_item*> _cache_table;
+			// 数据表
+			std::vector<ft_item> _ft_item_data;
 		private:
 #ifndef _FONT_NO_BITMAP
 
@@ -1466,6 +1543,66 @@ namespace hz {
 				}
 			}
 		public:
+			/*
+			缓存操作
+
+			字符utf16(int32)、字号{unsigned short 1-1638}、模糊大小(unsigned short)
+			// 缓存位置xy, 字符图像zw(width,height)
+			// 基线偏移
+			*/
+			void push_cache(ft_key_s* key, Image* img, const glm::ivec4& rect, const glm::ivec2& baseline, double advance)
+			{
+				if (!key || !key->u || key->v.unicode_codepoint || key->v.font_size)
+				{
+					return;
+				}
+				LOCK_W(_lock);
+				int fkss = sizeof(ft_key_s);
+				ft_item* p = _cache_table[key->u];
+				if (!p)
+				{
+					p = get_ftit(1);
+					_cache_table[key->u] = p;
+				}
+				p->set_it(key->v.unicode_codepoint, img, rect, baseline, advance);
+			}
+			// 批量插入
+			void push_cache(ft_key_s* key, ft_item* ps, size_t n)
+			{
+				if (!key || !key->u || key->v.font_size || !ps || !n)
+				{
+					return;
+				}
+				LOCK_W(_lock);
+				for (size_t i = 0; i < n; i++)
+				{
+					auto& it = ps[i];
+					key->v.unicode_codepoint = it._unicode_codepoint;
+					ft_item* p = _cache_table[key->u];
+					if (!p)
+					{
+						p = get_ftit(1);
+						_cache_table[key->u] = p;
+					}
+					p->set_it(it);
+				}
+			}
+			void clear_cache()
+			{
+				LOCK_W(_lock);
+				_ft_item_data.clear();
+				_cache_table.clear();
+			}
+			ft_item* get_ftit(int n)
+			{
+				ft_item* p = 0;
+				size_t idx = _ft_item_data.size();
+				_ft_item_data.resize(idx + n);
+				p = _ft_item_data.data() + idx;
+				return p;
+			}
+
+		public:
 
 			int get_glyph_index_u8(const char* u8str, tt_info** renderFont)
 			{
@@ -1514,6 +1651,47 @@ namespace hz {
 					*renderFont = this;
 				}
 				return g;
+			}
+		public:
+			void init_post_table()
+			{
+				font_impl_info* font_i = &font;
+				const stbtt_fontinfo* ft = &font_i->font;
+				sfnt_header* post_table = get_tag(font_i, TAG_POST);
+				if (!post_table)
+				{
+					post_table = get_tag(font_i, TAG_post);
+				}
+				uint8_t* fc = ft->data;
+				if (post_table)
+				{
+					uint8_t* p = fc + post_table->offset;
+					post_header post = {};
+
+					post.format = stb_font::ttSHORT(p); p += 4;
+					post.italicAngle = stb_font::ttSHORT(p); p += 4;
+					post.underlinePosition = stb_font::ttSHORT(p); p += 2;
+					post.underlineThickness = stb_font::ttSHORT(p); p += 2;
+					post.isFixedPitch = stb_font::ttULONG(p); p += 4;
+					post.minMemType42 = stb_font::ttULONG(p); p += 4;
+					post.maxMemType42 = stb_font::ttULONG(p); p += 4;
+					post.minMemType1 = stb_font::ttULONG(p); p += 4;
+					post.maxMemType1 = stb_font::ttULONG(p); p += 4;
+					postFixedPitch = post.isFixedPitch;
+				}
+				{
+					int adv[3], lsb[1];
+					get_HMetrics('a', adv, lsb);
+					get_HMetrics('i', &adv[1], lsb);
+					get_HMetrics('.', &adv[2], lsb);
+					bool isfixed = (adv[0] != adv[1] || adv[0] != adv[2] || adv[1] != adv[2]);
+					charFixedPitch = isfixed ? 0 : 1;
+				}
+				isFixedPitch = postFixedPitch || charFixedPitch;
+			}
+			bool is_fixed_pitch()
+			{
+				return isFixedPitch;
 			}
 		public:
 #ifndef _FONT_NO_BITMAP
@@ -1727,7 +1905,7 @@ namespace hz {
 				/* now do the blit */
 
 				/* adjust `line' to point to the first byte of the bitmap */
-				line += y_pos * pitch + (x_pos >> 3);
+				line += (uint64_t)y_pos * pitch + (x_pos >> 3);
 				x_pos &= 7;
 
 				/* the higher byte of `rval' is used as a buffer */
@@ -2009,7 +2187,7 @@ namespace hz {
 				switch (index_format)
 				{
 				case 1: /* 4-byte offsets relative to `image_offset' */
-					p += 4 * (glyph_index - start);
+					p += (uint64_t)4 * (glyph_index - start);
 					if (p + 8 > p_limit)
 						return 0;
 					image_start = stb_font::ttULONG(p);
@@ -2032,7 +2210,7 @@ namespace hz {
 				}
 				break;
 				case 3: /* 2-byte offsets relative to 'image_offset' */
-					p += 2 * (glyph_index - start);
+					p += (uint64_t)2 * (glyph_index - start);
 					if (p + 4 > p_limit)
 						return 0;
 					image_start = stb_font::ttUSHORT(p);
@@ -2334,7 +2512,7 @@ namespace hz {
 
 				if (get_index(decoder, gidx, x_pos, y_pos))
 				{
-					out->resize(bitmap->rows * (uint32_t)bitmap->pitch);
+					out->resize((uint64_t)bitmap->rows * bitmap->pitch);
 					memcpy(out->data(), bitmap->buffer, out->size());
 					ot->x = metrics->horiBearingX;
 					ot->y = metrics->horiBearingY;
@@ -2379,11 +2557,13 @@ namespace hz {
 #ifndef _FONT_NO_BITMAP
 					if (first_bitmap)
 					{
+						// 解析位图
 						ret = get_glyph_bitmap(gidx, height, ot, out, bitmap);
 					}
 #endif
 					if (!ret)
 					{
+						// 解析轮廓并光栅化
 						double advance = height;
 						font_dev::get_glyph_bitmap(&font, gidx, height, ot, out, &advance);
 						if (bitmap)
@@ -2392,12 +2572,25 @@ namespace hz {
 							bitmap->width = bitmap->pitch = ot->z;
 							bitmap->rows = ot->w;
 							bitmap->advance = advance;
-							bitmap->pixel_mode = PX_GRAY;
+							bitmap->pixel_mode = PX_GRAY;	//255灰度图
 							ret = 1;
 						}
 					}
 				}
 				return ret;
+			}
+			/*
+
+			*/
+			void get_VMetrics(int* ascent, int* descent, int* lineGap)
+			{
+				font_dev::getFontVMetrics(&font, ascent, descent, lineGap);
+			}
+			void get_HMetrics(int codepoint, int* advance, int* lsb)
+			{
+				int glyph = font_dev::getGlyphIndex(&font, codepoint);
+				font_dev::getFontHMetrics(&font, glyph, advance, lsb);
+				return;
 			}
 		private:
 
@@ -2487,7 +2680,7 @@ namespace hz {
 					font->descender = (float)descent / (float)fh;
 					font->lineh = (float)(fh + lineGap) / (float)fh;
 					font->name = font->get_info_str(def_language_id);
-
+					font->init_post_table();
 #ifndef _FONT_NO_BITMAP
 					font->init_sbit();
 #endif // !_FONT_NO_BITMAP
@@ -2519,7 +2712,10 @@ namespace hz {
 					{
 						ns = it->get_info_str(language_id, 2);
 					}
-					ret[n].push_back(ns);
+					ret[n]["is_fixed"] = it->isFixedPitch;
+					//ret[n]["post_fixed"] = it->postFixedPitch;
+					//ret[n]["char_fixed"] = it->charFixedPitch;
+					ret[n]["style"].push_back(ns);
 				}
 			}
 			return ret;
@@ -2647,9 +2843,7 @@ namespace hz {
 				dst++;
 			}
 		}
-
-
-		static void blur(unsigned char* dst, int w, int h, int dstStride, float blur, int n)
+		static void Blur(unsigned char* dst, int w, int h, int dstStride, float blur, int n)
 		{
 			int alpha;
 			float sigma;
@@ -2664,6 +2858,69 @@ namespace hz {
 				blurCols(dst, w, h, dstStride, alpha);
 			}
 		}
+		static void copy_bitmap(Bitmap* dst, Bitmap* src, int x, int y)
+		{
+			int pixel_mode = src->pixel_mode;
+			unsigned char* db = dst->buffer;
+			unsigned char* sb = src->buffer;
+			dst->pixel_mode = PX_GRAY;
+			if (pixel_mode == PX_GRAY)				/*256灰度图*/
+			{
+				for (size_t j = 0; j < src->rows && j + y < dst->rows; j++)
+				{
+					auto pj = src->pitch * j;
+					unsigned char* pixel = sb + pj;
+					auto jp = j + y;
+					int64_t psy = (jp * dst->pitch);
+					if (psy < 0 || jp >= dst->rows)
+					{
+						continue;
+					}
+					unsigned char* dc = db + psy;
+					for (int i = 0; (i < src->width) && ((i + x) < dst->width); i++)
+					{
+						dc[i + x] = pixel[i];
+					}
+				}
+			}
+			else if (pixel_mode == PX_MONO)			/*单色位图1位*/
+			{
+				for (size_t j = 0; j < src->rows && j + y < dst->rows; j++)
+				{
+					auto pj = src->pitch * j;
+					unsigned char* pixel = sb + pj;
+					auto jp = j + y;
+					int64_t psy = (jp * dst->pitch);
+					if (psy < 0 || jp >= dst->rows)
+					{
+						continue;
+					}
+					unsigned char* dc = db + psy;
+					for (int i = 0; (i < src->width) && ((i + x) < dst->width); i++)
+					{
+						unsigned char c = (pixel[i / 8] & (0x80 >> (i & 7))) ? 255 : 0;
+						dc[i * x] = c ? 255 : 0;
+					}
+				}
+			}
+		}
+		static void get_blur(Bitmap* dst, Bitmap* src, float blur, int n, std::string* bitdata)
+		{
+			*dst = *src;
+			dst->width += blur * 2.0;
+			dst->rows += blur * 2.0;
+			dst->pitch = dst->width;
+			dst->advance += blur * 2.0;
+			uint32_t size = dst->rows * (uint32_t)dst->pitch;
+			if (size == 0)
+				return;
+			bitdata->resize(size);
+			dst->buffer = (unsigned char*)bitdata->data();
+			memset(dst->buffer, 0, size);
+			copy_bitmap(dst, src, blur, blur);
+			Blur((unsigned char*)dst->buffer, dst->width, dst->rows, dst->pitch, blur, n);
+		}
+
 		glyph_shape* get_glyph_shape(tt_info* font, const char* str)
 		{
 			if (!font && fonts.size())
@@ -2844,7 +3101,7 @@ namespace hz {
 			if (iblur > 0) {
 				//stash->nscratch = 0;
 				bdst = &dst[glyph->x0 + glyph->y0 * params_width];
-				blur(bdst, gw, gh, params_width, iblur, 2);
+				Blur(bdst, gw, gh, params_width, iblur, 2);
 			}
 			//print_test(dst, params_width, params_height);
 
