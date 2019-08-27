@@ -85,7 +85,9 @@ namespace std {
 		}
 	};
 }
-namespace hz {
+namespace hz
+{
+
 
 	class font_att :public Res
 	{
@@ -263,10 +265,82 @@ namespace hz {
 	private:
 
 	};
+	/*---------------------------------------------------------------------------------------------------------------------------------------------------
+	TODO	字体管理
 
-	class Fonts
+	----------------------------------------------------------------------------------------------------------------------------------------------------*/
+	class Fonts :public Singleton<Fonts>
 	{
 	public:
+
+		typedef int32_t Fixed;
+#define FWord int16_t
+#define uFWord uint16_t
+#define Card8 uint8_t
+#define Card16 uint16_t
+#define Card32 uint32_t
+
+#define head_VERSION VERSION(1, 0)
+
+#define DATE_TIME_SIZE 8
+		typedef Card8 longDateTime[DATE_TIME_SIZE];
+
+		/* TrueType Collection Header */
+		typedef struct
+		{
+			Card32 TTCTag;
+			Fixed Version;
+			Card32 DirectoryCount;
+			Card32* TableDirectory; /* [DirectoryCount] */
+			Card32 DSIGTag;
+			Card32 DSIGLength;
+			Card32 DSIGOffset;
+		} ttcfTbl;
+		typedef struct
+		{
+			Fixed	version;//	0x00010000 if (version 1.0)
+			Fixed	fontRevision;//	set by font manufacturer
+			uint32_t	checkSumAdjustment;//	To compute : set it to 0, calculate the checksum for the 'head' table and put it in the table directory, sum the entire font as a uint32_t, then store 0xB1B0AFBA - sum. (The checksum for the 'head' table will be wrong as a result.That is OK; do not reset it.)
+			uint32_t	magicNumber;//	set to 0x5F0F3CF5
+			uint16_t	flags;/*	bit 0 - y value of 0 specifies baseline
+			bit 1 - x position of left most black bit is LSB
+			bit 2 - scaled point size and actual point size will differ(i.e. 24 point glyph differs from 12 point glyph scaled by factor of 2)
+			bit 3 - use integer scaling instead of fractional
+			bit 4 - (used by the Microsoft implementation of the TrueType scaler)
+			bit 5 - This bit should be set in fonts that are intended to e laid out vertically, and in which the glyphs have been drawn such that an x - coordinate of 0 corresponds to the desired vertical baseline.
+			bit 6 - This bit must be set to zero.
+			bit 7 - This bit should be set if the font requires layout for correct linguistic rendering(e.g.Arabic fonts).
+			bit 8 - This bit should be set for an AAT font which has one or more metamorphosis effects designated as happening by default.
+			bit 9 - This bit should be set if the font contains any strong right - to - left glyphs.
+			bit 10 - This bit should be set if the font contains Indic - style rearrangement effects.
+			bits 11 - 13 - Defined by Adobe.
+			bit 14 - This bit should be set if the glyphs in the font are simply generic symbols for code point ranges, such as for a last resort font.
+			*/
+			uint16_t	unitsPerEm;//	range from 64 to 16384
+			longDateTime	created;//	international date
+			longDateTime	modified;//	international date
+			FWord	xMin;//	for all glyph bounding boxes
+			FWord	yMin;//	for all glyph bounding boxes
+			FWord	xMax;//	for all glyph bounding boxes
+			FWord	yMax;//	for all glyph bounding boxes
+			uint16_t	macStyle;/*	bit 0 bold
+			bit 1 italic
+			bit 2 underline
+			bit 3 outline
+			bit 4 shadow
+			bit 5 condensed(narrow)
+			bit 6 extended*/
+			uint16_t	lowestRecPPEM;//	smallest readable size in pixels
+			int16_t	fontDirectionHint;/*	0 Mixed directional glyphs
+			1 Only strongly left to right glyphs
+			2 Like 1 but also contains neutrals
+			- 1 Only strongly right to left glyphs
+			- 2 Like - 1 but also contains neutrals*/
+			int16_t	indexToLocFormat;//	0 for short offsets, 1 for long
+			int16_t	glyphDataFormat;//	0 for current format
+
+		}head_table;
+		// Entry
 		typedef struct sfnt_header_
 		{
 			unsigned int tag = 0;
@@ -274,6 +348,15 @@ namespace hz {
 			unsigned int offset; //From beginning of header.
 			unsigned int logicalLength;
 		}sfnt_header;
+		typedef struct
+		{
+			Fixed version;
+			Card16 numTables;
+			Card16 searchRange;
+			Card16 entrySelector;
+			Card16 rangeShift;
+			sfnt_header* directory; /* [numTables] */
+		} sfntTbl;
 		typedef struct post_header_
 		{
 			int32_t	format;//	Format of this table
@@ -286,6 +369,52 @@ namespace hz {
 			uint32_t	minMemType1;	//Minimum memory usage when a TrueType font is downloaded as a Type 1 font
 			uint32_t	maxMemType1;
 		}post_header;
+		typedef struct
+		{
+			Fixed version;
+			FWord ascender;
+			FWord descender;
+			FWord lineGap;
+			uFWord advanceWidthMax;
+			FWord minLeftSideBearing;
+			FWord minRightSideBearing;
+			FWord xMaxExtent;
+			int16_t caretSlopeRise;
+			int16_t caretSlopeRun;
+			int16_t caretOffset;
+			int16_t reserved[4];
+			int16_t metricDataFormat;
+			uint16_t numberOfLongHorMetrics;
+		} hheaTbl;
+
+
+		typedef struct {
+			uint16_t format;
+			uint16_t length;
+			uint16_t language;
+			unsigned char glyphId[256];
+		} Format0;
+#define FORMAT0_SIZE (uint16 * 3 + uint8 * 256)
+		/*
+		Format 2: High - byte mapping through table
+		*/
+		typedef struct {
+			unsigned short firstCode;
+			unsigned short entryCount;
+			short idDelta;
+			unsigned short idRangeOffset;
+		} Segment2;
+#define SEGMENT2_SIZE (uint16 * 3 + int16 * 1)
+
+		typedef struct {
+			unsigned short format;
+			unsigned short length;
+			unsigned short language;
+			unsigned short segmentKeys[256];
+			Segment2* segment;
+			unsigned short* glyphId;
+		} Format2;
+		// ------------------------------------------------------------------------------------------------
 		typedef struct  Bitmap_
 		{
 			unsigned int    rows;
@@ -297,9 +426,61 @@ namespace hz {
 			unsigned int	capacity = 0;
 			unsigned short  num_grays;
 			unsigned char   pixel_mode;
+			void* data = 0;
 			unsigned char   palette_mode;
 			void* palette;
 		} Bitmap;
+
+		union ft_key_s
+		{
+			uint64_t u = 0;
+			struct
+			{
+				char32_t unicode_codepoint;
+				unsigned short font_dpi;
+				// 字号支持 1-255
+				unsigned char font_size;
+				// 模糊大小支持 0-255
+				unsigned char blur_size;
+			}v;
+		};
+		class ft_item
+		{
+		public:
+			Image* _image = nullptr;
+			char32_t _unicode_codepoint = 0;
+			// 缓存位置xy, 字符图像zw(width,height)
+			glm::ivec4 _rect;
+			// 基线偏移
+			glm::ivec2 _baseline;
+			double _baseline_f = 0.0;
+			// 步进，等宽字体一般会英文相同、中文相同
+			double _advance = 0.0;
+			unsigned char _blur_size = 0;
+			int count = 0;
+		public:
+			ft_item()
+			{
+			}
+			~ft_item()
+			{
+			}
+			void set_it(char32_t codepoint, Image* img, const glm::ivec4& rect, const glm::ivec2& baseline, double advance, unsigned char blur_size, double baselinef)
+			{
+				_unicode_codepoint = codepoint;
+				_image = img;
+				_rect = rect;
+				_baseline = baseline;
+				_baseline_f = baselinef;
+				_advance = advance;
+				_blur_size = blur_size;
+			}
+			void set_it(const ft_item& fit)
+			{
+				*this = fit;
+			}
+		private:
+		};
 		typedef enum  _Pixel_Mode_
 		{
 			PX_NONE = 0,
@@ -499,6 +680,10 @@ namespace hz {
 #endif // !_FONT_NO_BITMAP
 
 
+#define DL_long(v) v=ttLONG(data);data+=4
+#define DL_short(v) v=ttSHORT(data);data+=2
+#define DL_ulong(v) v=ttULONG(data);data+=4
+#define DL_ushort(v) v=ttUSHORT(data);data+=2
 
 #define FONS_INVALID -1
 
@@ -572,6 +757,150 @@ namespace hz {
 
 			*state = utf8d[256 + *state + type];
 			return *state;
+		}
+
+		/* FIR filter used by the default and light filters */
+		static void lcd_filter_fir(Fonts::Bitmap* bitmap, int  mode, int weights_type)
+		{
+			static const uint8_t  default_filter[5] = { 0x08, 0x4d, 0x56, 0x4d, 0x08 };
+			static const uint8_t  light_filter[5] = { 0x00, 0x55, 0x56, 0x55, 0x00 };
+
+			const uint8_t* weights = weights_type ? default_filter : light_filter;
+			uint32_t   width = (uint32_t)bitmap->width;
+			uint32_t   height = (uint32_t)bitmap->rows;
+
+
+			/* horizontal in-place FIR filter */
+			if (mode == 0 && width >= 4)
+			{
+				unsigned char* line = bitmap->buffer;
+
+
+				/* take care of bitmap flow */
+				if (bitmap->pitch < 0)
+					line -= bitmap->pitch * (int64_t)(bitmap->rows - 1);
+
+				/* `fir' and `pix' must be at least 32 bit wide, since the sum of */
+				/* the values in `weights' can exceed 0xFF                        */
+
+				for (; height > 0; height--, line += bitmap->pitch)
+				{
+					uint32_t  fir[4];        /* below, `pix' is used as the 5th element */
+					uint32_t  val1, xx;
+
+
+					val1 = line[0];
+					if (val1)
+					{
+						val1 = val1;
+					}
+					fir[0] = weights[2] * val1;
+					fir[1] = weights[3] * val1;
+					fir[2] = weights[4] * val1;
+					fir[3] = 0;
+
+					val1 = line[1];
+					fir[0] += weights[1] * val1;
+					fir[1] += weights[2] * val1;
+					fir[2] += weights[3] * val1;
+					fir[3] += weights[4] * val1;
+
+					for (xx = 2; xx < width; xx++)
+					{
+						uint32_t  val, pix;
+
+
+						val = line[xx];
+						pix = fir[0] + weights[0] * val;
+						fir[0] = fir[1] + weights[1] * val;
+						fir[1] = fir[2] + weights[2] * val;
+						fir[2] = fir[3] + weights[3] * val;
+						fir[3] = weights[4] * val;
+
+						pix >>= 8;
+						pix |= (uint32_t)-(int)(pix >> 8);
+						line[xx - 2] = (unsigned char)pix;
+					}
+
+					{
+						uint32_t  pix;
+
+
+						pix = fir[0] >> 8;
+						pix |= (uint32_t)-(int)(pix >> 8);
+						line[xx - 2] = (unsigned char)pix;
+
+						pix = fir[1] >> 8;
+						pix |= (uint32_t)-(int)(pix >> 8);
+						line[xx - 1] = (unsigned char)pix;
+					}
+				}
+			}
+
+			/* vertical in-place FIR filter */
+			else if (mode == 1 && height >= 4)
+			{
+				unsigned char* column = bitmap->buffer;
+				int    pitch = bitmap->pitch;
+
+
+				/* take care of bitmap flow */
+				if (bitmap->pitch < 0)
+					column -= (int64_t)bitmap->pitch * (int64_t)(bitmap->rows - 1);
+
+				for (; width > 0; width--, column++)
+				{
+					unsigned char* col = column;
+					uint32_t   fir[4];       /* below, `pix' is used as the 5th element */
+					uint32_t   val1, yy;
+
+
+					val1 = col[0];
+					fir[0] = weights[2] * val1;
+					fir[1] = weights[3] * val1;
+					fir[2] = weights[4] * val1;
+					fir[3] = 0;
+					col += pitch;
+
+					val1 = col[0];
+					fir[0] += weights[1] * val1;
+					fir[1] += weights[2] * val1;
+					fir[2] += weights[3] * val1;
+					fir[3] += weights[4] * val1;
+					col += pitch;
+
+					for (yy = 2; yy < height; yy++)
+					{
+						uint32_t  val, pix;
+
+
+						val = col[0];
+						pix = fir[0] + weights[0] * val;
+						fir[0] = fir[1] + weights[1] * val;
+						fir[1] = fir[2] + weights[2] * val;
+						fir[2] = fir[3] + weights[3] * val;
+						fir[3] = weights[4] * val;
+
+						pix >>= 8;
+						pix |= (uint32_t)-(int)(pix >> 8);
+						col[-2 * pitch] = (unsigned char)pix;
+						col += pitch;
+					}
+
+					{
+						uint32_t  pix;
+
+
+						pix = fir[0] >> 8;
+						pix |= (uint32_t)-(int)(pix >> 8);
+						col[-2 * pitch] = (unsigned char)pix;
+
+						pix = fir[1] >> 8;
+						pix |= (uint32_t)-(int)(pix >> 8);
+						col[-pitch] = (unsigned char)pix;
+					}
+				}
+			}
 		}
 
 		class Glyph
@@ -677,7 +1006,7 @@ namespace hz {
 				FT_Fixed advFixed;
 				FONS_NOTUSED(scale);
 
-				ftError = FT_Set_Pixel_Sizes(font->font, 0, (FT_UInt)(size * (float)font->font->units_per_EM / (float)(font->font->ascender - font->font->descender)));
+				ftError = FT_Set_Pixel_Sizes(font->font, 0, (unsigned int)(size * (float)font->font->units_per_EM / (float)(font->font->ascender - font->font->descender)));
 				if (ftError) return 0;
 				ftError = FT_Load_Glyph(font->font, glyph, FT_LOAD_RENDER | FT_LOAD_FORCE_AUTOHINT);
 				if (ftError) return 0;
@@ -805,6 +1134,28 @@ namespace hz {
 			{
 				return stbtt_ScaleForPixelHeight(&font->font, size);
 			}
+			static void getPixelGLScale(font_impl* font, glm::ivec4* ot)
+			{
+				int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+				stbtt_GetCodepointBox(&font->font, L'g', &x0, &y0, &x1, &y1);
+				ot->x = x0;
+				ot->y = y0;
+				ot->z = x1;
+				ot->w = y1;
+				ot++;
+				stbtt_GetCodepointBox(&font->font, L'l', &x0, &y0, &x1, &y1);
+				ot->x = x0;
+				ot->y = y0;
+				ot->z = x1;
+				ot->w = y1;
+				ot++;
+				stbtt_GetCodepointBox(&font->font, L'中', &x0, &y0, &x1, &y1);
+				ot->x = x0;
+				ot->y = y0;
+				ot->z = x1;
+				ot->w = y1;
+				return;
+			}
 			// 获取utf8字符
 			static const char* get_glyph_index_last(font_impl* font, const char* str, int* index)
 			{
@@ -842,9 +1193,110 @@ namespace hz {
 				return index;
 			}
 
+
+#define BYTE_( p, i )  ( ((const unsigned char*)(p))[(i)] )
+#define BYTE_U16( p, i, s1 )  ( (uint16_t)( BYTE_( p, i ) ) << (s1) )
+#define BYTE_U32( p, i, s1 )  ( (uint32_t)( BYTE_( p, i ) ) << (s1) )
+#define PEEK_USHORT( p )  uint16_t( BYTE_U16( p, 0, 8 ) | BYTE_U16( p, 1, 0 ) )
+#define NEXT_SHORT( b ) ( (short)( b += 2, PEEK_USHORT( b - 2 ) ) )
+#define NEXT_USHORT( b ) ( (unsigned short)( b += 2, PEEK_USHORT( b - 2 ) ) )
+			static unsigned char* tt_cmap2_get_subheader(unsigned char* table, unsigned int char_code)
+			{
+				unsigned char* result = NULL;
+				if (char_code < 0x10000UL)
+				{
+					unsigned int   char_lo = (unsigned int)(char_code & 0xFF);
+					unsigned int   char_hi = (unsigned int)(char_code >> 8);
+					unsigned char* p = table + 6;    /* keys table */
+					unsigned char* subs = table + 518;  /* subheaders table */
+					unsigned char* sub;
+					if (char_hi == 0)
+					{
+						/* an 8-bit character code -- we use subHeader 0 in this case */
+						/* to test whether the character code is in the charmap       */
+						/*                                                            */
+						sub = subs;
+						p += char_lo * 2;
+						if (PEEK_USHORT(p) != 0)sub = 0;
+					}
+					else
+					{
+						p += char_hi * 2;
+						sub = subs + (uint64_t)PEEK_USHORT(p);
+					}
+					result = sub;
+				}
+				return result;
+			}
+
+			static int tt_cmap2_char_index(unsigned char* table, unsigned int char_code)
+			{
+				unsigned int   result = 0;
+				unsigned char* subheader;
+				subheader = tt_cmap2_get_subheader(table, char_code);
+				if (subheader)
+				{
+					unsigned char* p = subheader;
+					unsigned int   idx = ((unsigned int)(char_code) & 0xFF);
+					unsigned int   start, count;
+					int    delta;
+					unsigned int   offset;
+					start = NEXT_USHORT(p);
+					count = NEXT_USHORT(p);
+					delta = NEXT_SHORT(p);
+					offset = PEEK_USHORT(p);
+
+					idx -= start;
+					if (idx < count && offset != 0)
+					{
+						p += offset + 2 * idx;
+						idx = PEEK_USHORT(p);
+						if (idx != 0)
+							result = (unsigned int)((int)idx + delta) & 0xFFFFU;
+					}
+				}
+				return result;
+			}
+			static int get_ext_glyph_index(const stbtt_fontinfo* info, unsigned int codepoint)
+			{
+				int ret = 0;
+				uint8_t* data = info->data;
+				uint32_t index_map = info->index_map;
+				char* t = (char*)& codepoint;
+				if (codepoint > 127)
+					std::swap(t[0], t[1]);
+				uint16_t format = ttUSHORT(data + index_map + 0);
+				if (format == 2) {
+					//STBTT_assert(0); // @TODO: high-byte mapping for japanese/chinese/korean
+					ret = tt_cmap2_char_index(data + index_map, codepoint);
+				}
+				return ret;
+			}
+			static int get_glyph_index2(font_impl* font, const char* t)
+			{
+				const stbtt_fontinfo* info = &font->font;
+				int ret = 0;
+				uint8_t* data = info->data;
+				uint32_t index_map = info->index_map;
+				uint16_t format = ttUSHORT(data + index_map + 0);
+				unsigned int codepoint = 0;
+				if (format == 2) {
+					// @TODO: high-byte mapping for japanese/chinese/korean
+					codepoint = (unsigned int)t[0] & 0xff;
+					if (codepoint > 127)
+					{
+						codepoint <<= 8;
+						codepoint |= (unsigned int)t[1] & 0xff;
+					}
+					ret = tt_cmap2_char_index(data + index_map, codepoint);
+				}
+				return ret;
+			}
+
 			static int getGlyphIndex(font_impl* font, int codepoint)
 			{
-				return stbtt_FindGlyphIndex(&font->font, codepoint);
+				int idx = stbtt_FindGlyphIndex(&font->font, codepoint);
+				return idx ? idx : get_ext_glyph_index(&font->font, codepoint);
 			}
 
 			static int buildGlyphBitmap(font_impl* font, int glyph, float size, float scale,
@@ -866,8 +1318,76 @@ namespace hz {
 			{
 				return stbtt_GetGlyphKernAdvance(&font->font, glyph1, glyph2);
 			}
+			static int getKernAdvanceCH(font_impl* font, int ch1, int ch2)
+			{
+				return stbtt_GetCodepointKernAdvance(&font->font, ch1, ch2);
+			}
+			static void get_head(font_impl* font, head_table* p)
+			{
+				if (font && p)
+				{
+					auto info = &font->font;
+					auto data = info->data + info->head;
+					DL_long(p->version);
+					DL_long(p->fontRevision);
+					DL_long(p->checkSumAdjustment);
+					DL_long(p->magicNumber);
+					DL_ushort(p->flags);
+					DL_ushort(p->unitsPerEm);
+					int sldt = sizeof(longDateTime);
+					memcpy(p->created, data, sldt); data += sldt;
+					memcpy(p->modified, data, sldt); data += sldt;
+					auto pxy = info->data + info->head + 36;
+					DL_ushort(p->xMin);
+					DL_ushort(p->yMin);
+					DL_ushort(p->xMax);
+					DL_ushort(p->yMax);
+					DL_ushort(p->macStyle);
+					DL_ushort(p->lowestRecPPEM);
+					DL_short(p->fontDirectionHint);
+					DL_short(p->indexToLocFormat);
+					DL_short(p->glyphDataFormat);
+				}
+			}
+			static void get_hhea(font_impl* font, hheaTbl* hhea)
+			{
+				if (font && hhea)
+				{
+					auto info = &font->font;
+					auto data = info->data + info->hhea;
 
-			static char* get_glyph_bitmap(font_impl* font, int gidx, double height, glm::ivec4* ot, std::string* out, double* advance)
+					DL_long(hhea->version);
+					DL_short(hhea->ascender);
+					DL_short(hhea->descender);
+					DL_short(hhea->lineGap);
+					DL_ushort(hhea->advanceWidthMax);
+					DL_short(hhea->minLeftSideBearing);
+					DL_short(hhea->minRightSideBearing);
+					DL_short(hhea->xMaxExtent);
+					DL_short(hhea->caretSlopeRise);
+					DL_short(hhea->caretSlopeRun);
+					DL_short(hhea->caretOffset);
+					DL_short(hhea->reserved[0]);
+					DL_short(hhea->reserved[1]);
+					DL_short(hhea->reserved[2]);
+					DL_short(hhea->reserved[3]);
+					DL_short(hhea->metricDataFormat);
+					DL_ushort(hhea->numberOfLongHorMetrics);
+				}
+			}
+			static glm::ivec4 get_boundin_box(font_impl* font)
+			{
+				int x0 = 0, y0 = 0, x1, y1; // =0 suppresses compiler warning
+				stbtt_GetFontBoundingBox(&font->font, &x0, &y0, &x1, &y1);
+				return glm::ivec4(x0, y0, x1, y1);
+			}
+			static glm::ivec2 get_codepoint_hmetrics(font_impl* font, int ch)
+			{
+				int advance = 0, lsb = 0;
+				stbtt_GetCodepointHMetrics(&font->font, ch, &advance, &lsb);
+				return glm::ivec2(advance, lsb);
+			}
+			static char* get_glyph_bitmap(font_impl* font, int gidx, double scale, glm::ivec4* ot, std::vector<char>* out, double* advance, glm::vec2 lcd = { 1,1 })
 			{
 				//int i, j, baseline, ch = 0;
 				int baseline;
@@ -875,23 +1395,39 @@ namespace hz {
 				int descent;
 				int linegap;
 				//float xpos = 2; // leave a little padding in case the character extends left
-				float scale = stbtt_ScaleForPixelHeight(&font->font, height);
+				//float scale = stbtt_ScaleForPixelHeight(&font->font, height);
+				//float scale1 = stbtt_ScaleForMappingEmToPixels(&font->font, height);
+				int x0 = 0, y0 = 0, x1, y1; // =0 suppresses compiler warning
+				//if (!stbtt_GetGlyphBox(&font->font, gidx, &x0, &y0, &x1, &y1))
+				//{
+				//}
+				auto fbb = get_boundin_box(font);
 				stbtt_GetFontVMetrics(&font->font, &ascent, &descent, &linegap);
+				//double pscale1 = fbb.w + abs(fbb.y);
+				//double pscale = ascent;
+				//auto scale2 = height / pscale;
+				//scale = scale2;
 				baseline = (int)(ascent * scale);
-				int advancei, lsb, x0, y0, x1, y1;
+				int advancei, lsb;//, x0, y0, x1, y1;
 				float shift_x = 0.0f;
 				float shift_y = 0.0f;
-				//stbtt_GetCodepointHMetrics(&font->font, ch, &advance, &lsb);
+				auto ghl = get_codepoint_hmetrics(font, L'g');
+				auto Lhl = get_codepoint_hmetrics(font, L'L');
 				stbtt_GetGlyphHMetrics(&font->font, gidx, &advancei, &lsb);
-				//stbtt_GetCodepointBitmapBoxSubpixel(&font->font, ch, scale, scale, shiftX, shiftY, &x0, &y0, &x1, &y1);
-				stbtt_GetGlyphBitmapBoxSubpixel(&font->font, gidx, scale, scale, shift_x, shift_y, &x0, &y0, &x1, &y1);
 				double adv = (double)advancei * scale;
+				//stbtt_GetCodepointBitmapBoxSubpixel(&font->font, ch, scale, scale, shiftX, shiftY, &x0, &y0, &x1, &y1);
+				stbtt_GetGlyphBitmapBoxSubpixel(&font->font, gidx, scale * lcd.x, scale * lcd.y, shift_x, shift_y, &x0, &y0, &x1, &y1);
+
 				*advance = adv;
 				ot->x = x0;
-				ot->y = -y0;
+				ot->y = y0;
 				ot->z = x1 - x0;
 				ot->w = y1 - y0;
 				size_t pcs = (int64_t)ot->z * ot->w;
+				if (pcs == 117)
+				{
+					pcs = 117;
+				}
 				if (out->size() < pcs)
 				{
 					out->resize(pcs);
@@ -903,7 +1439,7 @@ namespace hz {
 					x1 - x0,
 					y1 - y0,
 					x1 - x0, // screen width ( stride )
-					scale, scale,
+					scale * lcd.x, scale * lcd.y,
 					shift_x, shift_y, // shift x, shift y 
 					gidx);
 
@@ -1160,7 +1696,7 @@ namespace hz {
 		private:
 
 		};
-
+		// todo				 tt_info
 		class tt_info
 		{
 		public:
@@ -1208,7 +1744,11 @@ namespace hz {
 					if (encoding_id)
 					{
 #ifdef __json_helper_h__
+#ifdef _STD_STR_
+						n = isu8 ? jsonT::wstring_to_utf8(to_wstr(name_, true)) : jsonT::wstring_to_ansi(to_wstr(name_, true));
+#else
 						n = isu8 ? jsonT::wstring_to_utf8(name_.to_wstr(true)) : jsonT::wstring_to_ansi(name_.to_wstr(true));
+#endif
 #endif // __json_helper_h__
 					}
 					else {
@@ -1220,6 +1760,20 @@ namespace hz {
 				{
 					std::string n = get_name(false);
 					printf("name：%s\tname_id：%d\tplatform_id：%d\tlanguage_id：%d\tencoding_id：%d\n", n.c_str(), name_id, platform_id, language_id, encoding_id);
+				}
+
+				static std::wstring to_wstr(std::wstring str, bool is_swap = false)
+				{
+					std::wstring ret = str;
+					if (is_swap)
+					{
+						char* temp = (char*)ret.data();
+						for (int i = 0; i < ret.size(); ++i)
+						{
+							temp = tt_ushort(temp);
+						}
+					}
+					return ret;
 				}
 			};
 
@@ -1297,6 +1851,10 @@ namespace hz {
 							return &ist[i];
 						}
 					}
+					static IndexSubTableArray a;
+					a.firstGlyphIndex = 0;
+					a.lastGlyphIndex = 98;
+					a.additionalOffsetToIndexSubtable = 0;
 					return nullptr;
 				}
 				int resize_bitmap(uint32_t size)
@@ -1315,11 +1873,12 @@ namespace hz {
 			};
 #endif //!_FONT_NO_BITMAP
 		public:
+			// todo			tt_info数据区
 			//k=language_id			2052 简体中文	1033 英语
 			std::map<int, std::vector<info_one*>> _detail;
 
 			font_impl_info font;
-			std::string name;
+			std::string _name, _aname;
 			int isFixedPitch;
 			int postFixedPitch, charFixedPitch;
 			bool is_copy = true;
@@ -1327,6 +1886,9 @@ namespace hz {
 			unsigned char* data = 0;
 			int dataSize = 0;
 			unsigned char freeData = 0;
+			head_table head;
+			hheaTbl hhea;
+
 			float ascender;
 			float descender;
 			float lineh;
@@ -1338,62 +1900,19 @@ namespace hz {
 			std::vector<tt_info*> fallbacks;
 
 			std::unordered_map<int, Glyph*> _lut;
+			std::unordered_map<int, double> _scale_lut;
 			LockS _lock;
 		private:
 			/*
 				图像缓存表
 				字体		key: uint64_t：字符utf16(int32)、字高font_height（字号*dpi/72）{unsigned short 1-1638}、模糊大小(unsigned char)
 			*/
-			class ft_item
-			{
-			public:
-				Image* _image = nullptr;
-				char32_t _unicode_codepoint = 0;
-				// 缓存位置xy, 字符图像zw(width,height)
-				glm::ivec4 _rect;
-				// 基线偏移
-				glm::ivec2 _baseline;
-				// 步进，等宽字体一般会英文相同、中文相同
-				double _advance = 0.0;
-				unsigned char _blue_size = 0;
-			public:
-				ft_item()
-				{
-				}
-				~ft_item()
-				{
-				}
-				void set_it(char32_t codepoint, Image* img, const glm::ivec4& rect, const glm::ivec2& baseline, double advance)
-				{
-					_unicode_codepoint = codepoint;
-					_image = img;
-					_rect = rect;
-					_baseline = baseline;
-					_advance = advance;
-				}
-				void set_it(const ft_item& fit)
-				{
-					*this = fit;
-				}
-			private:
-			};
-			union ft_key_s
-			{
-				uint64_t u = 0;
-				struct
-				{
-					char32_t unicode_codepoint;
-					unsigned short font_dpi;
-					// 字号支持 1-255
-					unsigned char font_size;
-					// 模糊大小支持 0-255
-					unsigned char blue_size;
-				}v;
-			};
+
 			// 查询表
 			std::unordered_map<uint64_t, ft_item*> _cache_table;
 			// 数据表
-			std::vector<ft_item> _ft_item_data;
+			//std::vector<ft_item> _ft_item_data;
+			std::list<ft_item> _ft_item_data;
 		private:
 #ifndef _FONT_NO_BITMAP
 
@@ -1543,49 +2062,73 @@ namespace hz {
 				}
 			}
 		public:
+			void push_fallbacks(tt_info* fp)
+			{
+				LOCK_W(_lock);
+				fallbacks.push_back(fp);
+			}
 			/*
-			缓存操作
+			todo				缓存操作
 
 			字符utf16(int32)、字号{unsigned short 1-1638}、模糊大小(unsigned short)
 			// 缓存位置xy, 字符图像zw(width,height)
 			// 基线偏移
 			*/
-			void push_cache(ft_key_s* key, Image* img, const glm::ivec4& rect, const glm::ivec2& baseline, double advance)
+			ft_item* push_cache(ft_key_s* key, Image* img, const glm::ivec4& rect, const glm::ivec2& baseline, double advance, double blf)
 			{
-				if (!key || !key->u || key->v.unicode_codepoint || key->v.font_size)
+				if (!key || !key->u || !key->v.unicode_codepoint || !key->v.font_size)
 				{
-					return;
+					return nullptr;
 				}
 				LOCK_W(_lock);
 				int fkss = sizeof(ft_key_s);
-				ft_item* p = _cache_table[key->u];
-				if (!p)
+				ft_item* ret = 0;
+				auto it = _cache_table.find(key->u);
+				if (it == _cache_table.end())
 				{
-					p = get_ftit(1);
-					_cache_table[key->u] = p;
+					//ret = fit_reserve(1);
+					ft_item fm;
+					fm.set_it(key->v.unicode_codepoint, img, rect, baseline, advance, key->v.blur_size, blf);
+					_ft_item_data.emplace_back(fm);
+					auto lt = --_ft_item_data.end();
+					ret = &(*lt);
+					_cache_table[key->u] = &(*lt);
 				}
-				p->set_it(key->v.unicode_codepoint, img, rect, baseline, advance);
+				else {
+					throw (-1);
+				}
+				return ret;
+				//_ft_item_data[ret].set_it(key->v.unicode_codepoint, img, rect, baseline, advance, key->v.blur_size);
+				//return &_ft_item_data[ret];
 			}
 			// 批量插入
-			void push_cache(ft_key_s* key, ft_item* ps, size_t n)
+			ft_item* push_cache(ft_key_s* key, ft_item* ps, size_t n, std::vector<ft_item*>* out)
 			{
-				if (!key || !key->u || key->v.font_size || !ps || !n)
+				if (!key || !key->u || !key->v.font_size || !ps || !n)
 				{
-					return;
+					return nullptr;
 				}
 				LOCK_W(_lock);
+				//auto ret = fit_reserve(n);
+				ft_key_s key2;
+				key2.u = key->u;
 				for (size_t i = 0; i < n; i++)
 				{
 					auto& it = ps[i];
-					key->v.unicode_codepoint = it._unicode_codepoint;
-					ft_item* p = _cache_table[key->u];
-					if (!p)
-					{
-						p = get_ftit(1);
-						_cache_table[key->u] = p;
-					}
-					p->set_it(it);
+					key2.v.unicode_codepoint = it._unicode_codepoint;
+					key2.v.blur_size = it._blur_size;
+					it.count = n;
+					ft_item fm;
+					fm.set_it(it);
+					_ft_item_data.emplace_back(fm);
+					auto lt = --_ft_item_data.end();
+					_cache_table[key2.u] = &(*lt);
+					out->push_back(&(*lt));
+					//_ft_item_data[ret + i].set_it(it);
+					//_cache_table[key2.u] = ret + i;
+					//out->push_back(&_ft_item_data[ret + i]);
 				}
+				return 0;// _ft_item_data.data() + ret;
 			}
 			void clear_cache()
 			{
@@ -1593,14 +2136,35 @@ namespace hz {
 				_ft_item_data.clear();
 				_cache_table.clear();
 			}
-			ft_item* get_ftit(int n)
+			// 查询返回指针
+			ft_item* find_item(ft_key_s* key)
 			{
-				ft_item* p = 0;
-				size_t idx = _ft_item_data.size();
-				_ft_item_data.resize(idx + n);
-				p = _ft_item_data.data() + idx;
+				ft_item* p = nullptr;
+				if (key && key->u)
+				{
+					LOCK_R(_lock);
+					ft_key_s key2;
+					key2.u = key->u;
+					//key2.v.blur_size = 0;
+					auto it = _cache_table.find(key2.u);
+					if (it != _cache_table.end())
+					{
+						//p = _ft_item_data.data() + it->second;
+						p = it->second;
+					}
+				}
 				return p;
 			}
+		private:
+			//// 增加n个缓存
+			//size_t fit_reserve(int n)
+			//{
+			//	ft_item* p = 0;
+			//	size_t idx = _ft_item_data.size();
+			//	_ft_item_data.resize(idx + n);
+			//	p = _ft_item_data.data() + idx;
+			//	return idx;
+			//}
 
 		public:
 
@@ -1681,6 +2245,15 @@ namespace hz {
 				}
 				{
 					int adv[3], lsb[1];
+#if 0
+					int tecp = 0;
+					auto tf = "a";
+					tecp = *((int*)tf);
+					int glyph = font_dev::getGlyphIndex(&font, tecp),
+						glyph1 = font_dev::get_glyph_index2(&font, "翡"),
+						glyph2 = font_dev::get_glyph_index2(&font, "a");
+					//8304
+#endif
 					get_HMetrics('a', adv, lsb);
 					get_HMetrics('i', &adv[1], lsb);
 					get_HMetrics('.', &adv[2], lsb);
@@ -1688,6 +2261,9 @@ namespace hz {
 					charFixedPitch = isfixed ? 0 : 1;
 				}
 				isFixedPitch = postFixedPitch || charFixedPitch;
+				font_dev::get_head(font_i, &head);
+				font_dev::get_hhea(font_i, &hhea);
+
 			}
 			bool is_fixed_pitch()
 			{
@@ -1706,6 +2282,7 @@ namespace hz {
 					out[i].additionalOffsetToIndexSubtable = stb_font::ttULONG(d + 4);
 					d += 8;
 				}
+				return;
 			}
 			// 获取BitmapSizeTable
 			static njson get_bitmap_size_table(uint8_t* blc, unsigned int count,
@@ -2176,7 +2753,7 @@ namespace hz {
 				image_offset = it->additionalOffsetToIndexSubtable;
 				if (!image_offset)
 				{
-					return 0;
+					//return 0;
 				}
 				p += image_offset;
 				//p_limit
@@ -2359,7 +2936,7 @@ namespace hz {
 				break;
 				case sbit_table_type::TYPE_SBIX:
 				{
-					//TODO:解析SBIX
+					//TODO		解析SBIX
 				}
 				break;
 				default:
@@ -2383,6 +2960,7 @@ namespace hz {
 				{
 					return 0;
 				}
+
 				// 位图表eblc
 				//std::vector<BitmapSizeTable> bsts;
 				//std::vector<std::vector<IndexSubTableArray>> index_sub_table;
@@ -2495,7 +3073,7 @@ namespace hz {
 				return 1;
 			}
 			// 传空白的解码指针
-			int get_glyph_bitmap(int gidx, int height, glm::ivec4* ot, std::string* out, Bitmap* out_bitmap)
+			int get_glyph_bitmap(int gidx, int height, glm::ivec4* ot, Bitmap* out_bitmap, std::vector<char>* out)
 			{
 				Bitmap* bitmap = 0;
 				int x_pos = 0, y_pos = 0, ret = 0;
@@ -2515,7 +3093,7 @@ namespace hz {
 					out->resize((uint64_t)bitmap->rows * bitmap->pitch);
 					memcpy(out->data(), bitmap->buffer, out->size());
 					ot->x = metrics->horiBearingX;
-					ot->y = metrics->horiBearingY;
+					ot->y = -metrics->horiBearingY;
 					auto ha = metrics->horiAdvance;
 					bitmap->advance = std::max(metrics->horiAdvance, metrics->vertAdvance);
 					ot->z = bitmap->width;
@@ -2523,6 +3101,8 @@ namespace hz {
 					if (out_bitmap)
 					{
 						*out_bitmap = *bitmap;
+						//out_bitmap->data = out;
+						out_bitmap->buffer = (unsigned char*)out->data();
 					}
 					ret = 1;
 					// 灰度图转RGBA
@@ -2549,7 +3129,7 @@ namespace hz {
 			Bitmap* bitmap		输出位图信息
 			返回1成功
 			*/
-			int get_glyph_image(int gidx, double height, glm::ivec4* ot, std::string* out, Bitmap* bitmap, bool first_bitmap)
+			int get_glyph_image(int gidx, double height, glm::ivec4* ot, Bitmap* bitmap, std::vector<char>* out, bool first_bitmap, int lcd_type = 0)
 			{
 				int ret = 0;
 				if (gidx > 0)
@@ -2558,21 +3138,32 @@ namespace hz {
 					if (first_bitmap)
 					{
 						// 解析位图
-						ret = get_glyph_bitmap(gidx, height, ot, out, bitmap);
+						ret = get_glyph_bitmap(gidx, height, ot, bitmap, out);
 					}
 #endif
 					if (!ret)
 					{
 						// 解析轮廓并光栅化
 						double advance = height;
-						font_dev::get_glyph_bitmap(&font, gidx, height, ot, out, &advance);
+						glm::vec2 lcds[] = { {1,1},{3,1},{1,3} };
+						double scale = get_scale_height(height);
+						auto fbb = font_dev::get_boundin_box(&font);
+						font_dev::get_glyph_bitmap(&font, gidx, scale, ot, out, &advance, lcds[lcd_type]);
 						if (bitmap)
 						{
+							auto hh = hhea;
+							auto he = hhea.ascender + hhea.descender + hhea.lineGap;
+							auto hef = hhea.ascender - hhea.descender + hhea.lineGap;
+
+							double hed = scale * he;
+							double hedf = scale * hef;
+							double lg = scale * hhea.lineGap;
 							bitmap->buffer = (unsigned char*)out->data();
 							bitmap->width = bitmap->pitch = ot->z;
 							bitmap->rows = ot->w;
 							bitmap->advance = advance;
 							bitmap->pixel_mode = PX_GRAY;	//255灰度图
+							init_bitmap_bitdepth(bitmap, 8);
 							ret = 1;
 						}
 					}
@@ -2580,8 +3171,108 @@ namespace hz {
 				return ret;
 			}
 			/*
-
+			获取量
 			*/
+			double get_scale_height(int height)
+			{
+				double scale = 0.0;
+				{
+					//LOCK_W(_lock);
+					scale = _scale_lut[height];
+					if (!(scale > 0))
+					{
+						scale = font_dev::getPixelHeightScale(&font, height);
+						//glm::ivec4 glrc[3];
+						//font_dev::getPixelGLScale(&font, glrc);
+						//auto adl = hhea.ascender + abs(hhea.descender);
+						//double ng = abs(glrc[0].y) + abs(glrc[1].w);
+						//double s1 = height - 1;
+						//auto n = s1 / ng;
+						_scale_lut[height] = scale;// = n;
+					}
+				}
+				return scale;
+			}
+			int get_line_height(double height, bool islinegap = true)
+			{
+				double scale = get_scale_height(height);
+				auto adl = hhea.ascender + abs(hhea.descender) + (islinegap ? hhea.lineGap : 0);
+				double f = scale * adl;
+				int ret = ceil(f);	// 向上取整
+				if (ret & 1)
+				{
+					ret++;
+				}
+				return ret;
+			}
+			// 获取最大行高
+			int get_rbl_height(double height, glm::ivec3* out)
+			{
+#if 0
+				double scale = get_scale_height(height);
+				double f = hhea.ascender;
+				double ba = ceil(f * scale);
+				f += abs(hhea.descender);
+				int ret = ceil(f * scale);	// 向上取整
+				if (ret & 1)
+				{
+					ret++;
+				}
+				if (ret > out->y)
+				{
+					out->z = std::max(out->z, (int)ba);
+					out->y = ret;
+					f += hhea.lineGap;
+					ret = ceil(f * scale);
+					if (ret & 1)
+					{
+						ret++;
+					}
+					out->x = ret;
+				}
+				return ret;
+#else
+				glm::ivec3 ret;
+				double scale = get_scale_height(height);
+				double f = hhea.ascender;
+				double ba = ceil(f * scale);
+				f += abs(hhea.descender);
+				ret.z = ba;
+				ret.y = ceil(f * scale);	// 向上取整
+				if (ret.y & 1)
+				{
+					ret.y++;
+				}
+				f += hhea.lineGap;
+				ret.x = ceil(f * scale);
+				if (ret.x & 1)
+				{
+					ret.x++;
+				}
+				if (ret.x > out->x)
+				{
+					*out = ret;
+				}
+				return ret.x;
+#endif
+			}
+			int get_base_line(double height)
+			{
+				float scale = get_scale_height(height);
+				double f = hhea.ascender;
+				return ceil(f * scale);
+				//return floor(f * scale); // 向下取整
+			}
+			int get_xmax_extent(double height, int* line_gap)
+			{
+				float scale = get_scale_height(height);
+				double f = hhea.xMaxExtent, lig = hhea.lineGap;
+				if (line_gap)
+				{
+					*line_gap = ceil(lig * scale);
+				}
+				return ceil(f * scale);
+			}
 			void get_VMetrics(int* ascent, int* descent, int* lineGap)
 			{
 				font_dev::getFontVMetrics(&font, ascent, descent, lineGap);
@@ -2597,15 +3288,72 @@ namespace hz {
 		};
 		// !tt_info
 
+	public:
+		// todo 样式
+		//----------------------------------------------------------------------------------------------------------------------------------------------------------
+		class css_text
+		{
+		public:
+			tt_info* font = nullptr;
+			double font_size = 12;
+			double dpi = 96;
+			unsigned int color = -1;
+			unsigned int color_blur = 0xff000000;
+			unsigned int outline_color = 0;
+			int row_y = 0;
+			bool outline = false;
+			double outline_thickness = 1.0;
+			double row_height = -1;
+			double row_base_y = 0;
+			unsigned char blur_size = 0;
+			struct
+			{
+				int x = 0, y = 0;
+			} blur_pos;
+			bool first_bitmap = false;
+			double fns = 0;
+		public:
+			css_text()
+			{
+			}
+
+			~css_text()
+			{
+			}
+			void set_font_size(double size = 12, double dpi_ = 96)
+			{
+				font_size = size; dpi = dpi_; mk_fns();
+			}
+			double get_fheight()
+			{
+				if (fns < 1)
+				{
+					mk_fns();
+				}
+				return fns;
+			}
+		private:
+			void mk_fns()
+			{
+				fns = font_size * dpi / 72.0;
+				double k[] = { ceil(fns), floor(fns),ceil(17.6),ceil(17.1),floor(17.6),floor(17.1) };
+				int ks = fns + 0.5;
+				fns = round(fns);
+			}
+		};
 
 	private:
-		// 数据区
+		// TODO		数据区
+		std::set<std::string> dv;
 		std::vector<std::vector<char>*> fn_data;
-		std::vector<tt_info*> fonts;
+		std::vector<tt_info*> _fonts;
 		// 根据字体名查找
 		std::unordered_map<std::string, std::vector<tt_info*>> _tbs;
+		// 读写锁
 		LockS _lk;
 		int def_language_id = 2052;
+		// 图像缓存
+		ImagePacker<Image> _packer;
 	public:
 		Fonts()
 		{
@@ -2617,15 +3365,155 @@ namespace hz {
 			{
 				delete it;
 			}
-			for (auto it : fonts)
+			for (auto it : _fonts)
 			{
 				tt_info::free_info(it);
 			}
 		}
 	public:
+#ifndef __FILE__h__
+		static std::string getAP()
+		{
+			std::string ret;
+#ifdef _WIN32
+			char szAppPath[1024] = { 0 };
+			GetModuleFileNameA(GetModuleHandleA(""), (char*)szAppPath, 1024);
+			(strrchr((char*)szAppPath, '\\'))[1] = 0;
+			ret = szAppPath;
+#else
+			// linux获取本进程目录
+			size_t len = PATH_MAX;
+			char processdir[PATH_MAX];
+			char processname[1024];
+			char* path_end;
+			std::vector<std::string> vs;
+			if (readlink("/proc/self/exe", processdir, len) <= 0)
+				return ret;
+			path_end = strrchr(processdir, '/');
+			if (path_end == NULL)
+				return ret;
+			++path_end;
+			strcpy(processname, path_end);
+			*path_end = '\0';
+			size_t l = (size_t)(path_end - processdir);
+			vs.push_back(processdir);
+			vs.push_back(processname);
+			ret = processdir;
+			//ret = getenv("HOME");
+			//ret += "/";
+#endif
+			return ret;
+		}
+		static std::string getAP(std::string name, std::string pat = "")
+		{
+			std::string rap = getAP();
+			std::string stp = rap.find('/') != -1 ? "/" : "\\";
+			if (pat != "")
+			{
+				rap += pat + stp;
+			}
+			rap += name;
+			return rap;
+		}
+		//验证
+		static std::string getFn(std::string fnc, bool isutf8 = false)
+		{
+			std::string tem = fnc;
+#ifndef __ANDROID__
+			if (0 != access(fnc.c_str(), 0))
+			{
+				std::set<std::string> fv;
+				fv.insert(getAP(fnc));
+				for (auto it : s()->dv)
+					fv.insert(getAP(fnc, it));
+				fnc = "";
+				for (auto& it : fv)
+				{
+					if (0 == access(it.c_str(), 0))
+					{
+						fnc = it;
+						break;
+					}
+				}
+			}
+#endif
+			if (fnc == "")
+			{
+				fnc = tem;
+			}
+#ifdef strutil
+			return isutf8 ? hz::strutil::AnsiToUtf8(fnc.c_str()) : fnc;
+#else
+			return fnc;
+#endif
+		}
+		static bool read_binary_file(std::string filename, std::vector<char>& result, bool ismv = false)
+		{
+			int64_t size = 0;
+			uint64_t  retval;
+			void* buff = 0;
+			result.clear();
+			//LOGW(("read_binary_file0:" + filename).c_str());
+#if (defined(VK_USE_PLATFORM_IOS_MVK) || defined(VK_USE_PLATFORM_MACOS_MVK))
+			filename = [[[NSBundle mainBundle]resourcePath] stringByAppendingPathComponent:@(filename)] .UTF8String;
+#endif
+			filename = s()->getFn(filename);
+#ifdef _WIN32
+			if (filename.find("/"))
+			{
+				filename = replace(filename, "/", "\\");
+			}
+#endif
+			const char* fn = filename.c_str();
+			FILE* fp = ismv ? 0 : fopen(filename.c_str(), "rb");
+			if (!fp)
+			{
+#ifdef __ANDROID__
+
+				LOGE("func=%s,line=%d,file=%s\n", __FUNCTION__, __LINE__, __FILE__);
+				LOGI("a_mgr%p,%s", a_mgr, filename.c_str());
+				AAsset* asset = AAssetManager_open((AAssetManager*)a_mgr, filename.c_str(), AASSET_MODE_STREAMING);
+
+				assert(asset);
+				if (!asset)return false;
+				size_t size = AAsset_getLength(asset);
+				assert(size > 0);
+				LOGI("%p", size);
+				result.resize(size);
+				void* textureData = result.data();
+				AAsset_read(asset, textureData, size);
+				AAsset_close(asset);
+				LOGW("read_binary_file1: %d", (int)size);
+				return true;
+#else
+				return false;
+#endif
+			}
+#ifdef _WIN32
+			_fseeki64(fp, 0L, SEEK_END);
+			size = _ftelli64(fp);
+			_fseeki64(fp, 0L, SEEK_SET);
+#else			
+			fseeko64(fp, 0L, SEEK_END);
+			size = ftello64(fp);
+			fseeko64(fp, 0L, SEEK_SET);
+#endif // _WIN32
+			result.resize(size);
+			buff = &result[0];
+			retval = fread(buff, size, 1, fp);
+			assert(retval == 1);
+			fclose(fp);
+			return true;
+		}
+#endif
+	public:
 		void set_langid(int langid)
 		{
 			def_language_id = langid;
+		}
+		tt_info* get_font(int idx)
+		{
+			return (idx < 0 || idx > _fonts.size()) ? nullptr : _fonts[idx];
 		}
 		// 文件名，是否复制数据
 		int add_font_file(const std::string& fn)
@@ -2636,7 +3524,7 @@ namespace hz {
 #ifdef __FILE__h__
 			hz::File::read_binary_file(fn, data);
 #else
-
+			read_binary_file(fn, data);
 #endif // __FILE__h__
 			if (data.size())
 			{
@@ -2679,14 +3567,15 @@ namespace hz {
 					font->ascender = (float)ascent / (float)fh;
 					font->descender = (float)descent / (float)fh;
 					font->lineh = (float)(fh + lineGap) / (float)fh;
-					font->name = font->get_info_str(def_language_id);
+					font->_name = font->get_info_str(def_language_id);
+					font->_aname = jsonT::utf8_to_ansi(font->_name);
 					font->init_post_table();
 #ifndef _FONT_NO_BITMAP
 					font->init_sbit();
 #endif // !_FONT_NO_BITMAP
 					LOCK_W(_lk);
-					_tbs[font->name].push_back(font);
-					fonts.push_back(font);
+					_tbs[font->_name].push_back(font);
+					_fonts.push_back(font);
 
 					//font->print_info();
 				}
@@ -2843,7 +3732,7 @@ namespace hz {
 				dst++;
 			}
 		}
-		static void Blur(unsigned char* dst, int w, int h, int dstStride, float blur, int n)
+		static void Blur(unsigned char* dst, int w, int h, int dstStride, float blur, int n, int mode = 0x01 | 0x02)
 		{
 			int alpha;
 			float sigma;
@@ -2854,16 +3743,85 @@ namespace hz {
 			alpha = (int)((1 << APREC) * (1.0f - expf(-2.3f / (sigma + 1.0f))));
 			for (int i = 0; i < n; i++)
 			{
-				blurRows(dst, w, h, dstStride, alpha);
-				blurCols(dst, w, h, dstStride, alpha);
+				if (mode & 0x01)
+					blurRows(dst, w, h, dstStride, alpha);
+				if (mode & 0x02)
+					blurCols(dst, w, h, dstStride, alpha);
 			}
 		}
-		static void copy_bitmap(Bitmap* dst, Bitmap* src, int x, int y)
+
+		/* A possible bicubic interpolation consists in performing a convolution
+		   with the following kernel :
+									[ 0  2  0  0][s0]
+									[-1  0  1  0][s1]
+			p(t) = 0.5 [1 t t^2 t^3][ 2 -5  4 -1][s2]
+									[-1  3 -3  1][s3]
+			Where s0..s3 are the samples, and t is the range from 0.0 to 1.0 */
+		static inline float bicubic(float s0, float s1, float s2, float s3, float t) {
+			float r0 = 0.5f * (2.0f * s1);
+			float r1 = 0.5f * (-s0 + s2);
+			float r2 = 0.5f * (2.0 * s0 - 5.0f * s1 + 4.0f * s2 - s3);
+			float r3 = 0.5f * (-s0 + 3.0f * s1 - 3.0f * s2 + s3);
+			return r3 * t * t * t + r2 * t * t + r1 * t + r0;
+		}
+
+
+		/* sYX is a matrix with the samples (row-major)
+		   xt and yt are the interpolation fractions in the two directions ranging from
+		   0.0 to 1.0 */
+		static inline float bicubic2D(
+			float s00, float s01, float s02, float s03,
+			float s10, float s11, float s12, float s13,
+			float s20, float s21, float s22, float s23,
+			float s30, float s31, float s32, float s33, float xt, float yt) {
+			// The bicubic convolution consists in passing the bicubic kernel in x
+			// and then in y (or vice-versa, really)
+			float r0 = bicubic(s00, s01, s02, s03, xt);
+			float r1 = bicubic(s10, s11, s12, s13, xt);
+			float r2 = bicubic(s20, s21, s22, s23, xt);
+			float r3 = bicubic(s30, s31, s32, s33, xt);
+			return bicubic(r0, r1, r2, r3, yt);
+		}
+		//
+		/*
+		lcd =a
+		a->b
+		*/
+		static void lcd2rgba(byte* b, byte* a, int W, int H)
 		{
+			byte* end = b + (W * H * 4);
+			int x = 0;
+			int z = W & 3;
+			while (1) {
+				if (b >= end) break;
+				b[0] = a[2]; // reverse RGB
+				b[1] = a[1];
+				b[2] = a[0];
+				b[3] = 0;
+				a += 3;
+				b += 4;
+				x++;
+				if (x == W) {
+					x = 0;
+					a += z;
+				}
+			}
+		}
+
+		static void copy_bitmap(Bitmap* dst, Bitmap* src, int x, int y, std::vector<char>* out)
+		{
+			Fonts::init_bitmap_bitdepth(dst, 8);
+			size_t size = dst->rows * (uint32_t)dst->pitch;
+			if (size > out->size())
+			{
+				out->resize(size);
+			}
+			dst->buffer = (unsigned char*)out->data();
+			memset(dst->buffer, 0, size);
 			int pixel_mode = src->pixel_mode;
 			unsigned char* db = dst->buffer;
 			unsigned char* sb = src->buffer;
-			dst->pixel_mode = PX_GRAY;
+
 			if (pixel_mode == PX_GRAY)				/*256灰度图*/
 			{
 				for (size_t j = 0; j < src->rows && j + y < dst->rows; j++)
@@ -2879,6 +3837,12 @@ namespace hz {
 					unsigned char* dc = db + psy;
 					for (int i = 0; (i < src->width) && ((i + x) < dst->width); i++)
 					{
+						auto dt = &dc[i + x];
+						int ds = dt - db;
+						if (ds > size)
+						{
+							dt = dt;
+						}
 						dc[i + x] = pixel[i];
 					}
 				}
@@ -2899,12 +3863,332 @@ namespace hz {
 					for (int i = 0; (i < src->width) && ((i + x) < dst->width); i++)
 					{
 						unsigned char c = (pixel[i / 8] & (0x80 >> (i & 7))) ? 255 : 0;
-						dc[i * x] = c ? 255 : 0;
+						auto dt = &dc[i + x];
+						int ds = dt - db;
+						if (ds > size)
+						{
+							dt = dt;
+						}
+						dc[i + x] = c ? 255 : 0;
 					}
 				}
 			}
 		}
-		static void get_blur(Bitmap* dst, Bitmap* src, float blur, int n, std::string* bitdata)
+		static void init_bitmap_bitdepth(Bitmap* bitmap, int bit_depth)
+		{
+			bitmap->bit_depth = bit_depth;
+
+			switch (bit_depth)
+			{
+			case 1:
+				bitmap->pixel_mode = Pixel_Mode::PX_MONO;
+				bitmap->pitch = (int)((bitmap->width + 7) >> 3);
+				bitmap->num_grays = 2;
+				break;
+
+			case 2:
+				bitmap->pixel_mode = Pixel_Mode::PX_GRAY2;
+				bitmap->pitch = (int)((bitmap->width + 3) >> 2);
+				bitmap->num_grays = 4;
+				break;
+
+			case 4:
+				bitmap->pixel_mode = Pixel_Mode::PX_GRAY4;
+				bitmap->pitch = (int)((bitmap->width + 1) >> 1);
+				bitmap->num_grays = 16;
+				break;
+
+			case 8:
+				bitmap->pixel_mode = Pixel_Mode::PX_GRAY;
+				bitmap->pitch = (int)(bitmap->width);
+				bitmap->num_grays = 256;
+				break;
+
+			case 32:
+				bitmap->pixel_mode = Pixel_Mode::PX_BGRA;
+				bitmap->pitch = (int)(bitmap->width * 4);
+				bitmap->num_grays = 256;
+				break;
+
+			default:
+				return;
+			}
+		}
+		/* Enlarge `bitmap' horizontally and vertically by `xpixels' */
+	/* and `ypixels', respectively.                              */
+
+		static int ft_bitmap_assure_buffer(Fonts::Bitmap* bitmap, unsigned int xpixels, unsigned int ypixels, std::vector<char>* nbuf)
+		{
+			int				error;
+			int             pitch;
+			int             new_pitch;
+			unsigned int         bpp;
+			unsigned int         i, width, height;
+			unsigned char* buffer = NULL;
+
+
+			width = bitmap->width;
+			height = bitmap->rows;
+			pitch = bitmap->pitch;
+			if (pitch < 0)
+				pitch = -pitch;
+
+			switch (bitmap->pixel_mode)
+			{
+			case PX_MONO:
+				bpp = 1;
+				new_pitch = (int)((width + xpixels + 7) >> 3);
+				break;
+			case PX_GRAY2:
+				bpp = 2;
+				new_pitch = (int)((width + xpixels + 3) >> 2);
+				break;
+			case PX_GRAY4:
+				bpp = 4;
+				new_pitch = (int)((width + xpixels + 1) >> 1);
+				break;
+			case PX_GRAY:
+			case PX_LCD:
+			case PX_LCD_V:
+				bpp = 8;
+				new_pitch = (int)(width + xpixels);
+				break;
+			default:
+				return 0;
+			}
+
+			/* if no need to allocate memory */
+			if (ypixels == 0 && new_pitch <= pitch)
+			{
+				/* zero the padding */
+				unsigned int  bit_width = (unsigned int)pitch * 8;
+				unsigned int  bit_last = (width + xpixels) * bpp;
+
+
+				if (bit_last < bit_width)
+				{
+					unsigned char* line = bitmap->buffer + (bit_last >> 3);
+					unsigned char* end = bitmap->buffer + pitch;
+					unsigned int   shift = bit_last & 7;
+					unsigned int   mask = 0xFF00U >> shift;
+					unsigned int   count = height;
+
+
+					for (; count > 0; count--, line += pitch, end += pitch)
+					{
+						unsigned char* write = line;
+
+
+						if (shift > 0)
+						{
+							write[0] = (unsigned char)(write[0] & mask);
+							write++;
+						}
+						if (write < end)
+							memset(write, 0, end - write);
+					}
+				}
+
+				return 0;
+			}
+
+			/* otherwise allocate new buffer */
+			auto ry = bitmap->rows + ypixels;
+			nbuf->resize(ry * new_pitch);
+			buffer = (unsigned char*)nbuf->data();
+			///if (FT_QALLOC_MULT(buffer, new_pitch, bitmap->rows + ypixels))
+			//	return error;
+
+			/* new rows get added at the top of the bitmap, */
+			/* thus take care of the flow direction         */
+			if (bitmap->pitch > 0)
+			{
+				unsigned int  len = (width * bpp + 7) >> 3;
+				char* dst;
+				char* dst_b = (char*)buffer;
+
+				for (i = 0; i < bitmap->rows; i++)
+				{
+					dst = (char*)buffer + (unsigned int)new_pitch * (ypixels + i);
+					char* src = (char*)bitmap->buffer + (unsigned int)pitch * i;
+					auto dec = dst - dst_b;
+					uint64_t ls = dec + len;
+					if (ls > nbuf->size())
+					{
+						ls = ls;
+					}
+					memcpy(dst, src, len);
+				}
+			}
+			else
+			{
+				unsigned int  len = (width * bpp + 7) >> 3;
+
+
+				for (i = 0; i < bitmap->rows; i++)
+					memcpy(buffer + (unsigned int)new_pitch * i,
+						bitmap->buffer + (unsigned int)pitch * i,
+						len);
+			}
+
+			//free(bitmap->buffer);
+			bitmap->buffer = buffer;
+
+			if (bitmap->pitch < 0)
+				new_pitch = -new_pitch;
+
+			/* set pitch only, width and height are left untouched */
+			bitmap->pitch = new_pitch;
+
+			return 0;
+		}
+		/*
+		加粗bitmap，支持位图PX_MONO、PX_GRAY
+		newbuf和不能和buffer一样
+		*/
+		static void bitmap_embolden(Fonts::Bitmap* bitmap, int xstr, int ystr, std::vector<char>* newbuf = nullptr)
+		{
+			if (!newbuf)
+			{
+				return;
+			}
+			ft_bitmap_assure_buffer(bitmap, xstr, ystr, newbuf);
+
+			/* take care of bitmap flow */
+			auto pitch = bitmap->pitch;
+			int x, y, i;
+			unsigned char* p;
+			if (pitch > 0)
+				p = bitmap->buffer + pitch * ystr;
+			else
+			{
+				pitch = -pitch;
+				p = bitmap->buffer + (unsigned int)pitch * (bitmap->rows - 1);
+			}
+
+			/* for each row */
+			for (y = 0; y < bitmap->rows; y++)
+			{
+				/*
+				 * Horizontally:
+				 *
+				 * From the last pixel on, make each pixel or'ed with the
+				 * `xstr' pixels before it.
+				 */
+				for (x = pitch - 1; x >= 0; x--)
+				{
+					unsigned char  tmp;
+
+
+					tmp = p[x];
+					for (i = 1; i <= xstr; i++)
+					{
+						if (bitmap->pixel_mode == PX_MONO)
+						{
+							p[x] |= tmp >> i;
+
+							/* the maximum value of 8 for `xstr' comes from here */
+							if (x > 0)
+								p[x] |= p[x - 1] << (8 - i);
+
+#if 0
+							if (p[x] == 0xFF)
+								break;
+#endif
+						}
+						else
+						{
+							if (x - i >= 0)
+							{
+								if (p[x] + p[x - i] > bitmap->num_grays - 1)
+								{
+									p[x] = (unsigned char)(bitmap->num_grays - 1);
+									break;
+								}
+								else
+								{
+									p[x] = (unsigned char)(p[x] + p[x - i]);
+									if (p[x] == bitmap->num_grays - 1)
+										break;
+								}
+							}
+							else
+								break;
+						}
+					}
+				}
+
+				/*
+				 * Vertically:
+				 *
+				 * Make the above `ystr' rows or'ed with it.
+				 */
+				for (x = 1; x <= ystr; x++)
+				{
+					unsigned char* q;
+
+
+					q = p - bitmap->pitch * x;
+					for (i = 0; i < pitch; i++)
+						q[i] |= p[i];
+				}
+
+				p += bitmap->pitch;
+			}
+
+			bitmap->width += (unsigned int)xstr;
+			bitmap->rows += (unsigned int)ystr;
+		}
+
+		static void copy_bitmap_mask(Bitmap* dst, Bitmap* src, glm::ivec2 dstpos, std::function<void(unsigned char* dp, unsigned char* sp)> func)
+		{
+			int x = dstpos.x, y = dstpos.y;
+			int pixel_mode = src->pixel_mode;
+			unsigned char* db = dst->buffer;
+			unsigned char* sb = src->buffer;
+			dst->pixel_mode = PX_GRAY;
+			if (pixel_mode == PX_GRAY)				/*256灰度图*/
+			{
+				for (size_t j = 0; j < src->rows && j + y < dst->rows; j++)
+				{
+					auto pj = src->pitch * j;
+					unsigned char* pixel = sb + pj;
+					auto jp = j + y;
+					int64_t psy = (jp * dst->pitch);
+					if (psy < 0 || jp >= dst->rows)
+					{
+						continue;
+					}
+					unsigned char* dc = db + psy;
+					for (int i = 0; (i < src->width) && ((i + x) < dst->width); i++)
+					{
+						func(dc + i + x, pixel + i);
+					}
+				}
+			}
+			else if (pixel_mode == PX_MONO)			/*单色位图1位*/
+			{
+				for (size_t j = 0; j < src->rows && j + y < dst->rows; j++)
+				{
+					auto pj = src->pitch * j;
+					unsigned char* pixel = sb + pj;
+					auto jp = j + y;
+					int64_t psy = (jp * dst->pitch);
+					if (psy < 0 || jp >= dst->rows)
+					{
+						continue;
+					}
+					unsigned char* dc = db + psy;
+					for (int i = 0; (i < src->width) && ((i + x) < dst->width); i++)
+					{
+						unsigned char c = (pixel[i / 8] & (0x80 >> (i & 7))) ? 255 : 0;
+						func(dc + i + x, &c);
+					}
+				}
+			}
+		}
+
+		static void get_blur(Bitmap* dst, Bitmap* src, float blur, int n, std::vector<char>* bitdata, int mode = 0)
 		{
 			*dst = *src;
 			dst->width += blur * 2.0;
@@ -2915,17 +4199,19 @@ namespace hz {
 			if (size == 0)
 				return;
 			bitdata->resize(size);
-			dst->buffer = (unsigned char*)bitdata->data();
-			memset(dst->buffer, 0, size);
-			copy_bitmap(dst, src, blur, blur);
-			Blur((unsigned char*)dst->buffer, dst->width, dst->rows, dst->pitch, blur, n);
+			copy_bitmap(dst, src, blur, blur, bitdata);
+			if (mode < 1)
+			{
+				mode = 0x01 | 0x02;
+			}
+			Blur((unsigned char*)dst->buffer, dst->width, dst->rows, dst->pitch, blur, n, mode);
 		}
 
 		glyph_shape* get_glyph_shape(tt_info* font, const char* str)
 		{
-			if (!font && fonts.size())
+			if (!font && _fonts.size())
 			{
-				font = fonts[0];
+				font = _fonts[0];
 			}
 			else
 			{
@@ -2946,11 +4232,11 @@ namespace hz {
 			return ret;
 		}
 		// 获取字形
-		Glyph* get_glyph(tt_info* font, const char* codepoint, short isize, short iblur, int bitmapOption = FONS_GLYPH_BITMAP_REQUIRED)
+		Glyph* get_glyph_test0(tt_info* font, const char* codepoint, short isize, short iblur, int bitmapOption = FONS_GLYPH_BITMAP_REQUIRED)
 		{
-			return get_glyph(font, font_dev::get_u8_to_u16(codepoint), isize, iblur, bitmapOption);
+			return get_glyph_test(font, font_dev::get_u8_to_u16(codepoint), isize, iblur, bitmapOption);
 		}
-		char* get_glyph(tt_info* font, unsigned int codepoint, float height, glm::ivec4* ot, std::string* out)
+		char* get_glyph_test1(tt_info* font, unsigned int codepoint, float height, glm::ivec4* ot, std::vector<char>* out)
 		{
 			int i, g, advance, lsb, x0, y0, x1, y1, gw, gh, gx = 0, gy = 0, x, y;
 			float scale;
@@ -2960,9 +4246,9 @@ namespace hz {
 			unsigned char* bdst;
 			unsigned char* dst;
 			tt_info* renderFont = font;
-			if (!font && fonts.size())
+			if (!font && _fonts.size())
 			{
-				renderFont = fonts[0];
+				renderFont = _fonts[0];
 			}
 			if (!renderFont)
 			{
@@ -2972,7 +4258,7 @@ namespace hz {
 			double adv;
 			return font_dev::get_glyph_bitmap(&renderFont->font, g, height, ot, out, &adv);
 		}
-		Glyph* get_glyph(tt_info* font, unsigned int codepoint, short isize, short iblur, int bitmapOption = FONS_GLYPH_BITMAP_REQUIRED)
+		Glyph* get_glyph_test(tt_info* font, unsigned int codepoint, short isize, short iblur, int bitmapOption = FONS_GLYPH_BITMAP_REQUIRED)
 		{
 			int i, g, advance, lsb, x0, y0, x1, y1, gw, gh, gx = 0, gy = 0, x, y;
 			float scale;
@@ -2982,9 +4268,9 @@ namespace hz {
 			int pad, added;
 			unsigned char* bdst;
 			unsigned char* dst;
-			if (!font && fonts.size())
+			if (!font && _fonts.size())
 			{
-				font = fonts[0];
+				font = _fonts[0];
 			}
 			else
 			{
@@ -3152,6 +4438,275 @@ namespace hz {
 			}
 			return str;
 		}
+		static const char* get_u8_index(const char* str, int idx)
+		{
+			unsigned int codepoint[1];
+			unsigned int utf8state = 0;
+			for (; str && *str && idx > 0; ) {
+				if (fons_decutf8(&utf8state, codepoint, *(const unsigned char*)str++))
+				{
+					idx--;
+					continue;
+				}
+				break;
+			}
+			return str;
+		}
+	private:
+		Image* push_cache_bitmap(Bitmap* bitmap, glm::ivec2* pos, int linegap = 0, unsigned int col = -1)
+		{
+			int width = bitmap->width + linegap, height = bitmap->rows + linegap;
+			glm::ivec4 rc4 = { 0, 0, bitmap->width, bitmap->rows };
+			auto ret = _packer.push_rect({ width, height }, pos);
+			if (ret)
+			{
+				rc4.x = pos->x;
+				rc4.y = pos->y;
+				//ret->draw_rect(rc4, 0, col);
+				ret->copy_to_image(bitmap->buffer, bitmap->pitch, rc4, col, bitmap->pixel_mode, 0.0);
+			}
+			return ret;
+		}
+	public:
+		void save_cache(std::string fdn)
+		{
+			int i = 0;
+			_packer.maps([=, &i](Image* img) {
+				std::string fn = fdn + std::to_string(i);
+				img->saveImage(fn + ".png");
+				});
+		}
+		glm::vec3 make_outline_y(css_text* ct, size_t n)
+		{
+			glm::ivec3 ret = { 0,0,0 };
+			for (size_t i = 0; i < n; i++)
+			{
+				auto it = &ct[i];
+				if (it->font)
+					it->font->get_rbl_height(it->get_fheight(), &ret);
+			}
+
+			for (size_t i = 0; i < n; i++)
+			{
+				auto it = &ct[i];
+				it->row_height = ret.x;
+				it->row_y = ret.y;
+				it->row_base_y = ret.z;
+			}
+
+			return ret;
+		}
+	public:
+		/*
+			查询是否有缓存，没有则生成
+				ft_key_s key {
+				char32_t unicode_codepoint;
+				unsigned short font_dpi;
+				// 字号支持 1-255
+				unsigned char font_size;
+				// 模糊大小支持 0-255
+				unsigned char blur_size;
+				};
+		*/
+		std::vector<ft_item*> make_cache(tt_info* font, ft_key_s* key, double fns, bool first_bitmap)
+		{
+			std::vector<ft_item*> ret;
+			ft_key_s k2;
+			k2.u = key->u;
+			k2.v.blur_size = 0;
+			ret.resize(1);
+			ret[0] = font->find_item(&k2);
+			bool isblur = false;
+			if (key->v.blur_size)
+			{
+				ret.push_back(font->find_item(key));
+			}
+			if (!ret[0] || (ret.size() > 1 && !ret[1]))
+			{
+				tt_info* rfont = nullptr;
+				Bitmap bitmap[1] = {}, blur[1] = {};
+				std::vector<char> bitbuf[2];
+				glm::ivec4 rc;
+				std::vector<ft_item>  ps;
+				auto kt = key->v;
+				double base_line = 0;
+				int gidx = font->get_glyph_index(kt.unicode_codepoint, &rfont);
+				if (rfont)
+				{
+					auto bit = rfont->get_glyph_image(gidx, fns, &rc, bitmap, &bitbuf[0], first_bitmap);
+					glm::ivec2 pos;
+					if (font != rfont)
+					{
+						base_line = rfont->get_base_line(fns);
+					}
+					if (!ret[0])
+					{
+						ps.resize(1);
+						auto fit = &ps[0];
+						auto frc = rc;
+						auto bimg = push_cache_bitmap(bitmap, &pos, 0, -1);
+						frc.x = pos.x;
+						frc.y = pos.y;
+						fit->set_it(kt.unicode_codepoint, bimg, frc, { rc.x, rc.y }, bitmap->advance, 0, base_line);
+						//ret[0] = font->push_cache(&k2, ps.data(), ps.size());
+					}
+					if (kt.blur_size > 0)
+					{
+						ft_item tt;
+						ps.push_back(tt);
+						auto fit = &ps[ps.size() - 1];
+						Fonts::get_blur(blur, bitmap, kt.blur_size, 1, &bitbuf[1]);
+						auto buimg = push_cache_bitmap(blur, &pos, 0, -1);
+						auto frc = glm::ivec4(pos.x, pos.y, blur->width, blur->rows);
+						fit->set_it(kt.unicode_codepoint, buimg, frc, { rc.x, rc.y }, bitmap->advance, kt.blur_size, base_line);
+						//ret[1] = font->push_cache(key, ps.data(), ps.size());
+					}
+					if (ps.size())
+					{
+						std::vector<ft_item*> outit;
+						font->push_cache(key, ps.data(), ps.size(), &outit);
+						if (!ret[0] && outit.size() > 1)
+						{
+							ret[0] = outit[0];
+							ret[1] = outit[1];
+						}
+						else
+						{
+							int idx = 0;
+							if (kt.blur_size > 0)idx = 1;
+							ret[idx] = outit[0];
+						}
+					}
+				}
+			}
+			return ret;
+		}
+		static int get_kern_advance(tt_info* font, int g1, int g2)
+		{
+			return font ? font_dev::getGlyphKernAdvance(&font->font, g1, g2) : 0;
+		}
+		static int get_kern_advance_ch(tt_info* font, int ch1, int ch2)
+		{
+			return font ? font_dev::getKernAdvanceCH(&font->font, ch1, ch2) : 0;
+		}
+
+#define _NO_CACHE_0
+		// todo		渲染到image
+		void build_text(Image* dst, Fonts::tt_info* font, const std::string& str, size_t count, size_t first_idx, double font_size, unsigned int color = -1
+			, glm::ivec2 pos = { 0,0 }, unsigned char blur_size = 0, glm::ivec2 blur_pos = { 0,0 }, unsigned int color_blur = -1
+			, double dpi = 96, bool first_bitmap = true)
+		{
+			Fonts::tt_info* rfont = nullptr;
+			double fns = font_size * dpi / 72.0;
+			const char* t = str.c_str() + first_idx;
+			unsigned int unicode_codepoint = 0;
+			char32_t ch = 0;
+			double scale = font->get_scale_height(fns);
+			int px = pos.x, py = pos.y, tpx = 0, tpy = 0;
+			int img_height = dst->width;
+			double line_height = font->get_line_height(fns);
+			double base_line = font->get_base_line(fns);
+			double adv = 0; int kern = 0;
+#ifdef _NO_CACHE_
+			// 增强亮度
+			float brightness = 0.0;
+			glm::ivec4 rc;
+			Fonts::Bitmap bitmap[1] = {};
+			Fonts::Bitmap blur[1] = {};
+			std::vector<char> bit_buf[2];
+			// 分配缓存区
+			bit_buf[0].resize(line_height * line_height);
+			bit_buf[1].resize(line_height * line_height);
+#else
+			Fonts::ft_key_s fks[1] = {};
+			auto& fk = fks->v;
+			std::vector<Fonts::ft_item*> ftits;
+#endif // _NO_CACHE_
+			auto ft = this;// get_ft(0);
+			for (int i = 0; i < count && t && *t; i++)
+			{
+				const char* t1 = t, * t2;
+				t = Fonts::get_u8_last(t, &unicode_codepoint);
+				t2 = t;
+				if (ch)
+					kern = Fonts::get_kern_advance_ch(font, ch, unicode_codepoint);
+				if (kern != 0)
+				{
+					auto kernf = scale * kern;
+					kern = kernf;
+				}
+				ch = unicode_codepoint;
+				glm::ivec4 fs;
+#ifndef _NO_CACHE_
+				fk.unicode_codepoint = unicode_codepoint;
+				fk.font_size = font_size;
+				fk.font_dpi = dpi;
+				fk.blur_size = blur_size;
+				ftits = ft->make_cache(font, fks, fns, false);
+				if (ftits.size())
+				{
+					auto ftit = ftits[0];
+					if (tpx + ftit->_advance > img_height)
+					{
+						tpx = px = 0;
+						py += line_height;
+					}
+					double dbl = ftit->_baseline_f > 0 ? ftit->_baseline_f : base_line;
+					// 缓存图画到目标图像
+					if (blur_size > 0 && ftits.size() > 1)
+					{
+						auto bft = ftits[1];
+						glm::ivec2 dps = { kern + tpx + bft->_baseline.x + blur_pos.x - blur_size,
+							py + dbl + bft->_baseline.y + blur_pos.y - blur_size };
+						dst->draw_image2(bft->_image, bft->_rect, dps, color_blur);
+					}
+					glm::ivec2 dps = { kern + tpx + ftit->_baseline.x,py + dbl + ftit->_baseline.y };
+					dst->draw_image2(ftit->_image, ftit->_rect, dps, color);
+					adv = ftit->_advance;
+				}
+				tpx += adv;
+#else
+				int gidx = font->get_glyph_index(unicode_codepoint, &rfont);
+				if (rfont)
+				{
+					auto bit = rfont->get_glyph_image(gidx, fns, &rc, bitmap, &bit_buf[0], false);
+					if (blur_size > 0)
+					{
+						Fonts::get_blur(blur, bitmap, blur_size, 1, &bit_buf[1]);
+					}
+					auto cpbit = blur;
+
+					if (tpx + bitmap->advance > img_height)
+					{
+						tpx = px = 0;
+						py += line_height;
+					}
+
+					if (bit)
+					{
+						double dbl = ftit->_baseline_f > 0 ? ftit->_baseline_f : base_line;
+						// 灰度图转RGBA
+						if (blur_size > 0)
+						{
+							glm::ivec4 brc = { kern + tpx + rc.x + blur_pos.x - blur_size, py + dbl + rc.y + blur_pos.y - blur_size,
+								cpbit->width, cpbit->rows };
+							dst->copy_to_image(cpbit->buffer, cpbit->pitch, brc, color_blur, cpbit->pixel_mode, 0, true);
+						}
+						glm::ivec4 frc = { kern + tpx + rc.x,py + dbl + rc.y, bitmap->width, bitmap->rows };
+						dst->copy_to_image(bitmap->buffer, bitmap->pitch, frc, color, bitmap->pixel_mode, brightness, true);
+					}
+				}
+				tpx += bitmap->advance;
+#endif
+			}
+
+#ifndef _NO_CACHE_
+			//if (ftit && ftit->_image)
+			//	ftit->_image->saveImage("temp/test_cache.png");
+#endif
+			return;
+		}
+
 	public:
 #ifndef _FONT_NO_BITMAP
 
@@ -3159,6 +4714,7 @@ namespace hz {
 
 	public:
 		/*
+		todo			路径填充光栅化-function
 		输入路径path，缩放比例scale、bpm_size{宽高xy,每行步长z}，
 		xy_off偏移默认0
 		输出灰度图
@@ -3201,5 +4757,7 @@ namespace hz {
 
 	}; //！Fonts
 
+
+	// css_text
 }; //!hz
 #endif // !__font_h__

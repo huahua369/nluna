@@ -1026,6 +1026,9 @@ extern "C" {
 		STBTT_MS_EID_SYMBOL = 0,
 		STBTT_MS_EID_UNICODE_BMP = 1,
 		STBTT_MS_EID_SHIFTJIS = 2,
+		STBTT_MS_EID_PRC,
+		STBTT_MS_EID_BigFive,
+		STBTT_MS_EID_Johab,
 		STBTT_MS_EID_UNICODE_FULL = 10
 	};
 
@@ -1424,6 +1427,9 @@ static int stbtt_InitFont_internal(stbtt_fontinfo* info, unsigned char* data, in
 			switch (ttUSHORT(data + encoding_record + 2)) {
 			case STBTT_MS_EID_UNICODE_BMP:
 			case STBTT_MS_EID_UNICODE_FULL:
+			case STBTT_MS_EID_PRC:
+			case STBTT_MS_EID_BigFive:
+			case STBTT_MS_EID_Johab:
 				// MS/Unicode
 				info->index_map = cmap + ttULONG(data + encoding_record + 4);
 				break;
@@ -1463,7 +1469,7 @@ STBTT_DEF int stbtt_FindGlyphIndex(const stbtt_fontinfo* info, int unicode_codep
 		return 0;
 	}
 	else if (format == 2) {
-		STBTT_assert(0); // @TODO: high-byte mapping for japanese/chinese/korean
+		//STBTT_assert(0); // @TODO: high-byte mapping for japanese/chinese/korean
 		return 0;
 	}
 	else if (format == 4) { // standard mapping for windows fonts: binary search collection of ranges

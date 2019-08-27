@@ -1,11 +1,10 @@
+#include <WinSock2.h>
 #include <windows.h>
 #include <stdlib.h>
 #define _STD_STR_
 
 #define STB_IMPLEMENTATION
-#include "tools/base/camera.hpp"
-#include "tools/image_packer.h"
-#include "tools/font.h"
+#include "tools/aindex.h"
 
 static void print_json(const njson& n, int idxs)
 {
@@ -43,8 +42,8 @@ void load_font(hz::Fonts* fts)
 void test_font(int w = 512, int h = 512)
 {
 	hz::Fonts fts;
-	hz::FontBox<hz::Image> packer;							//»º´æ
-	packer.set_defmax({ w, h });
+	//hz::FontBox<hz::Image> packer;							//»º´æ
+	//packer.set_defmax({ w, h });
 	std::set<hz::Image*> out;
 	hz::Image* img = hz::Image::create_null(16, 16);
 	hz::Image* cav = hz::Image::create_null(512, 128);
@@ -62,7 +61,7 @@ void test_font(int w = 512, int h = 512)
 	unsigned int wcp = 0;
 	t = hz::Fonts::get_u8_last(t, &wcp);
 	int gidx = nsimsun->get_glyph_index(wcp, &rfont);
-	auto bit = rfont->get_glyph_image(gidx, fns, &ot, &bittem, bitmap, true);
+	//auto bit = rfont->get_glyph_image(gidx, fns, &ot, &bittem, bitmap, true);
 	return;
 }
 int main()

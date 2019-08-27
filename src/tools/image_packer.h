@@ -269,7 +269,7 @@ namespace hz
 	};
 
 	// 用法
-	FontBox<Image> _box;
+	ImagePacker<Image> _box;
 	//设置默认块大小
 	_box.set_defmax({ 1024,1024 });
 
@@ -282,7 +282,7 @@ namespace hz
 	_box.clear();
 	*/
 	template<class _Ty = Image, class pr_copy_value = _Ty::copy_image, class pr_create = _Ty::create_size>
-	class FontBox :public Res
+	class ImagePacker :public Res
 	{
 	public:
 		using value_type =_Ty;
@@ -399,10 +399,10 @@ namespace hz
 		glm::ivec2 _defmax = { 1024, 1024 };
 		LockS _lock;
 	public:
-		FontBox()
+		ImagePacker()
 		{
 		}
-		~FontBox()
+		~ImagePacker()
 		{
 			LOCK_W(_lock);
 			for (auto it : _box)
@@ -410,41 +410,80 @@ namespace hz
 				value_type::destroy(it);
 			}
 		}
-	public:
-		// todo把一个图像矩形装箱返回位置
-		glm::ivec4 push(value_type* img, value_type** oi)
+		void maps(std::function<void(value_type*)> func)
 		{
-			glm::ivec4 rs = { 0,0,img->width,img->height };
-			glm::ivec4 ret = { -1,-1,rs.z,rs.w };
+			LOCK_R(_lock);
+			for (auto it : _box)
+			{
+				func(it);
+			}
+		}
+	public:
+		/*
+		todo:把一个图像矩形装箱返回位置
+		dst 是源图像区域，
+		ivec2 返回坐标
+		*/
+		value_type* push(value_type* img, glm::ivec4* dst, glm::ivec2* pos)
+		{
+			glm::ivec4 td;
+			if (!dst)
+			{
+				dst = &td;
+			}
+			if (dst->z < 1)
+			{
+				dst->z = img->width;
+			}
+			if (dst->w < 1)
+			{
+				dst->w = img->height;
+			}
+			int iw = (img->width - dst->x), ih = (img->height - dst->y);
+			int width = std::min(iw, dst->z)
+				, height = std::min(ih, dst->w);
+			glm::ivec4 rs = { dst->x, dst->y, width, height };
+
+			value_type* ret = nullptr;
 			glm::ivec2 s = { rs.z,rs.w };
 			if (rs.z > _defmax.x || rs.w > _defmax.y)
 			{
 				return ret;
 			}
-			bool no_put = find_put(s, rs, img, ret, oi);
-			if (no_put)
+			ret = find_put(s, pos, img, &rs);
+			if (!ret)
 			{
 				push_box();
-				find_put(s, rs, img, ret, oi);
+				ret = find_put(s, pos, img, &rs);
 			}
 			return ret;
 		}
-		// todo把一个矩形颜色块装箱返回位置
-		glm::ivec4 push_rect(glm::ivec2 rcs, unsigned int col, value_type** oi)
+		// todo把一个矩形块装箱返回位置
+		value_type* push_rect(glm::ivec2 rc, glm::ivec2* pos)
 		{
-			hz::Image img;
-			img.resize(rcs.x, rcs.y);
-			img.clear_color(col);
-			return push(&img, oi);
+			value_type* ret = nullptr;
+			glm::ivec2 s = { rc.x, rc.y };
+			if (rc.x > _defmax.x || rc.y > _defmax.y)
+			{
+				return ret;
+			}
+			ret = find_put(s, pos);
+			if (!ret)
+			{
+				push_box();
+				ret = find_put(s, pos);
+			}
+			return ret;
 		}
 
 	private:
-		bool find_put(const glm::ivec2& s, const glm::ivec4& rs, value_type* img, glm::ivec4& ret, value_type** oi)
+		value_type* find_put(const glm::ivec2& s, glm::ivec2* out_pos, value_type* img = nullptr, glm::ivec4* rs = nullptr)
 		{
 			LOCK_W(_lock);
 			std::vector<box_node*> addtem, full;
 			glm::ivec2 pos;
-			bool no_put = true;
+			glm::ivec4 dst_rect = { 0,0,s.x,s.y };
+			value_type* ret = nullptr;
 			//查找合适的位置
 			std::vector<box_node*> tem;
 			auto fs = s;
@@ -464,15 +503,12 @@ namespace hz
 				auto nbn = it->find_split_put(s, &pos);
 				if (pos.x >= 0 && (pos.y >= 0))
 				{
-					ret.x = pos.x;
-					ret.y = pos.y;
+					dst_rect.x = pos.x;
+					dst_rect.y = pos.y;
+					ret = it->_value;
 					if (img && img->width > 0 && img->height > 0)
 					{
-						value_copy(it->_value, img, rs, ret);
-						if (oi)
-						{
-							*oi = it->_value;
-						}
+						value_copy(it->_value, img, *rs, dst_rect);
 					}
 					if (nbn)
 					{
@@ -482,12 +518,11 @@ namespace hz
 					{
 						full.push_back(it);
 					}
-					no_put = false;
 					break;
 				}
 				if (nbn)
 				{
-					printf("error\n");
+					printf("unknown error\n");
 					throw "find_put";
 				}
 			}
@@ -504,7 +539,11 @@ namespace hz
 				}
 				push_box_free(0, true);
 			}
-			return no_put;
+			if (out_pos)
+			{
+				*out_pos = pos;
+			}
+			return ret;
 		}
 	public:
 		void clear()
@@ -566,7 +605,7 @@ namespace hz
 	public:
 		static void test_packer()
 		{
-			hz::FontBox<hz::Image> packer;							//缓存
+			hz::ImagePacker<hz::Image> packer;							//缓存
 			packer.set_defmax({ 512, 512 });
 			std::set<hz::Image*> out;
 			hz::Image* img = hz::Image::create_null(16, 16);
@@ -615,7 +654,7 @@ namespace hz
 			{
 				auto& it = rcs[i];
 				glm::ivec4 trc = { it.x,it.y,it.w,it.h };
-				tespack.DrawRect(trc, 0, it.id);
+				tespack.draw_rect(trc, 0, it.id);
 			}
 			out.insert(&tespack);
 			i = 0;
@@ -626,7 +665,7 @@ namespace hz
 			}
 		}
 	};
-	// !FontBox
+	// !ImagePacker
 #endif
 }
 // !hz
