@@ -1262,12 +1262,17 @@ namespace hz
 				int ret = 0;
 				uint8_t* data = info->data;
 				uint32_t index_map = info->index_map;
-				char* t = (char*)& codepoint;
-				if (codepoint > 127)
-					std::swap(t[0], t[1]);
+				wchar_t wt[] = { codepoint,0 };
 				uint16_t format = ttUSHORT(data + index_map + 0);
 				if (format == 2) {
 					//STBTT_assert(0); // @TODO: high-byte mapping for japanese/chinese/korean
+					if (codepoint > 127)
+					{
+						std::string st = jsonT::wstring_to_ansi(wt);
+						char* t = (char*)& codepoint;
+						t[0] = st[1]; t[1] = st[0];
+						//std::swap(t[0], t[1]);
+					}
 					ret = tt_cmap2_char_index(data + index_map, codepoint);
 				}
 				return ret;
@@ -1299,10 +1304,9 @@ namespace hz
 				return idx ? idx : get_ext_glyph_index(&font->font, codepoint);
 			}
 
-			static int buildGlyphBitmap(font_impl* font, int glyph, float size, float scale,
+			static int buildGlyphBitmap(font_impl* font, int glyph, float scale,
 				int* advance, int* lsb, int* x0, int* y0, int* x1, int* y1)
 			{
-				FONS_NOTUSED(size);
 				stbtt_GetGlyphHMetrics(&font->font, glyph, advance, lsb);
 				stbtt_GetGlyphBitmapBox(&font->font, glyph, scale, scale, x0, y0, x1, y1);
 				return 1;
@@ -1707,9 +1711,11 @@ namespace hz
 #ifdef _STD_STR_
 				std::wstring name_;
 				std::string name_a;
+				std::string ndata;
 #else
 				w_string name_;
 				s_string name_a;
+				s_string ndata;
 #endif
 				int platform_id = 0;
 				int encoding_id = 0;
@@ -1735,6 +1741,7 @@ namespace hz
 					{
 						name_a.assign(temp, length_);
 					}
+					ndata.assign(temp, length_);
 					name_.assign((wchar_t*)name, length_ / 2);
 				}
 
@@ -1749,7 +1756,44 @@ namespace hz
 #else
 						n = isu8 ? jsonT::wstring_to_utf8(name_.to_wstr(true)) : jsonT::wstring_to_ansi(name_.to_wstr(true));
 #endif
+#else
+#ifdef _STD_STR_
+						n = isu8 ? wstring_to_utf8(to_wstr(name_, true)) : wstring_to_ansi(to_wstr(name_, true));
+#else
+						n = isu8 ? wstring_to_utf8(name_.to_wstr(true)) : wstring_to_ansi(name_.to_wstr(true));
+#endif
 #endif // __json_helper_h__
+
+						switch (platform_id)
+						{
+						case 0:
+							// unicode
+							break;
+						case 1:
+							// Macintosh
+							break;
+						case 2:
+							// (reserved; do not use)
+							break;
+						case 3:
+							// Microsoft
+							if (encoding_id == 3 && language_id == 2052)
+							{
+								n = "";
+								char* tw = (char*)ndata.data();
+								tw++;
+								int len = length_ / 2;
+								for (size_t i = 0; i < len; i++, tw += 2)
+								{
+									auto it = *tw;
+									n.push_back(it);
+								}
+								n = jsonT::ansi_to_utf8(n);
+							}
+							break;
+						default:
+							break;
+						}
 					}
 					else {
 						n = name_a.c_str();
@@ -3206,7 +3250,7 @@ namespace hz
 				return ret;
 			}
 			// 获取最大行高
-			int get_rbl_height(double height, glm::ivec3* out)
+			glm::ivec3 get_rbl_height(double height, glm::ivec3* out, bool* is)
 			{
 #if 0
 				double scale = get_scale_height(height);
@@ -3249,11 +3293,16 @@ namespace hz
 				{
 					ret.x++;
 				}
-				if (ret.x > out->x)
+				if (out)
 				{
-					*out = ret;
+					if (ret.x >= out->x || (ret.x == out->x && out->z < ret.x))
+					{
+						*out = ret;
+						if (is)
+							* is = true;
+					}
 				}
-				return ret.x;
+				return ret;
 #endif
 			}
 			int get_base_line(double height)
@@ -3294,17 +3343,29 @@ namespace hz
 		class css_text
 		{
 		public:
+			enum e_text_decoration
+			{
+				none,//: 无装饰
+				blink = 1,//: 闪烁
+				underline = 2,//: 下划线
+				line_through = 4,//: 贯穿线
+				overline = 8,//: 上划线
+				all_line = underline | line_through | overline,
+			};
+		public:
 			tt_info* font = nullptr;
 			double font_size = 12;
 			double dpi = 96;
 			unsigned int color = -1;
 			unsigned int color_blur = 0xff000000;
 			unsigned int outline_color = 0;
-			int row_y = 0;
-			bool outline = false;
-			double outline_thickness = 1.0;
+			// 装饰线
+			unsigned int text_decoration = 0;
+			double line_thickness = 1.0, line_thickness1 = 1.0;
 			double row_height = -1;
 			double row_base_y = 0;
+			// 最大行高
+			int row_y = 0;
 			unsigned char blur_size = 0;
 			struct
 			{
@@ -3324,9 +3385,9 @@ namespace hz
 			{
 				font_size = size; dpi = dpi_; mk_fns();
 			}
-			double get_fheight()
+			double get_fheight(bool is = false)
 			{
-				if (fns < 1)
+				if (fns < 1 || is)
 				{
 					mk_fns();
 				}
@@ -3505,6 +3566,57 @@ namespace hz
 			fclose(fp);
 			return true;
 		}
+		static bool save_binary_file(std::string filename, const char* data, uint64_t size, uint64_t pos = 0, bool is_plus = false)
+		{
+			uint64_t  retval;
+			if (!data || !size)
+			{
+				return false;
+			}
+			//LOGW(("read_binary_file0:" + filename).c_str());
+#if (defined(VK_USE_PLATFORM_IOS_MVK) || defined(VK_USE_PLATFORM_MACOS_MVK))
+			filename = [[[NSBundle mainBundle]resourcePath] stringByAppendingPathComponent:@(filename)] .UTF8String;
+#endif
+			//filename = s()->getFn(filename);
+#ifdef _WIN32
+			if (filename[1] != ':')
+				filename = getAP(filename);
+#endif // _WIN32
+			//check_make_path(getPath(filename.c_str(), pathdrive | pathdir));
+			const char* fn = filename.c_str();
+			FILE* fp = fopen(filename.c_str(), is_plus ? "ab" : "wb");
+
+			if (!fp && !is_plus)
+			{
+#ifdef MAPVIEW 
+				hz::MapView mv;
+				if (mv.openfile(fn) || mv.createfile(fn))			//打开文件					
+				{
+					mv.creatmap(size);
+					char* buf = (char*)mv.mapview();	//获取映射内容
+					if (buf)
+					{
+						memcpy(buf, data, size);
+						mv.FlushView();
+						return true;
+					}
+				}
+#endif
+				return false;// "fail to open file: " + filename;
+			}
+#ifdef _WIN32
+			if (is_plus)
+				_fseeki64(fp, pos, SEEK_SET);
+#else			
+			if (is_plus)
+				fseeko64(fp, pos, SEEK_SET);
+#endif // _WIN32
+			retval = fwrite(data, size, 1, fp);
+			assert(retval == 1);
+			fclose(fp);
+			return true;
+		}
+
 #endif
 	public:
 		void set_langid(int langid)
@@ -3617,9 +3729,10 @@ namespace hz
 			auto it = _tbs.find(name);
 			if (it != _tbs.end() && it->second.size())
 			{
+				ret = it->second.size() ? it->second[0] : nullptr;
 				for (auto& ft : it->second)
 				{
-					auto fst = ft->get_info_str(1033, 2);
+					auto fst = ft->get_info_str(2052, 2);
 					if (fst == st)
 					{
 						ret = ft;
@@ -4304,7 +4417,7 @@ namespace hz
 			g = font->get_glyph_index(codepoint, &renderFont);
 
 			scale = font_dev::getPixelHeightScale(&renderFont->font, size);
-			font_dev::buildGlyphBitmap(&renderFont->font, g, size, scale, &advance, &lsb, &x0, &y0, &x1, &y1);
+			font_dev::buildGlyphBitmap(&renderFont->font, g, scale, &advance, &lsb, &x0, &y0, &x1, &y1);
 			gw = x1 - x0 + pad * 2;
 			gh = y1 - y0 + pad * 2;
 
@@ -4464,6 +4577,7 @@ namespace hz
 				rc4.y = pos->y;
 				//ret->draw_rect(rc4, 0, col);
 				ret->copy_to_image(bitmap->buffer, bitmap->pitch, rc4, col, bitmap->pixel_mode, 0.0);
+				ret->set_update();
 			}
 			return ret;
 		}
@@ -4473,22 +4587,43 @@ namespace hz
 			int i = 0;
 			_packer.maps([=, &i](Image* img) {
 				std::string fn = fdn + std::to_string(i);
+#ifdef __FILE__h__
 				img->saveImage(fn + ".png");
+#else
+				auto d = img->png_data();
+				save_binary_file(fn + ".png", d.data(), d.size());
+#endif
 				});
 		}
 		glm::vec3 make_outline_y(css_text* ct, size_t n)
 		{
 			glm::ivec3 ret = { 0,0,0 };
+			std::vector<glm::ivec3> os;
+			css_text* mt = 0;
+			double lt = 0;
 			for (size_t i = 0; i < n; i++)
 			{
 				auto it = &ct[i];
+				bool ism = false;
 				if (it->font)
-					it->font->get_rbl_height(it->get_fheight(), &ret);
-			}
+				{
+					auto itr = it->font->get_rbl_height(it->get_fheight(true), &ret, &ism);
+					os.push_back(itr);
+					it->line_thickness1 = std::max(1.0, floor(0.1 * itr.y));
+					if (ism)
+					{
+						lt = it->line_thickness1;
+						mt = it;
+					}
+				}
 
+			}
+			//auto ul = get_extent(mt, "_");
+			//auto lt = get_extent(mt, "-");
 			for (size_t i = 0; i < n; i++)
 			{
 				auto it = &ct[i];
+				it->line_thickness = lt;
 				it->row_height = ret.x;
 				it->row_y = ret.y;
 				it->row_base_y = ret.z;
@@ -4591,6 +4726,26 @@ namespace hz
 		}
 
 #define _NO_CACHE_0
+#if 1
+		glm::ivec3 get_extent(css_text * csst, const char* str)
+		{
+			glm::ivec3 ret;
+			tt_info* font = csst->font;
+			tt_info* rfont = nullptr;
+			unsigned int codepoint;
+			auto t = Fonts::get_u8_last(str, &codepoint);
+			auto g = font->get_glyph_index(codepoint, &rfont);
+			if (g)
+			{
+				double fns = csst->get_fheight();
+				double scale = rfont->get_scale_height(fns);
+				int x0 = 0, y0 = 0, x1 = 0, y1 = 0, advance, lsb;
+				font_dev::buildGlyphBitmap(&rfont->font, g, scale, &advance, &lsb, &x0, &y0, &x1, &y1);
+				int c = t - str;
+				ret = { x1 - x0 ,y1 - y0, c };
+			}
+			return ret;
+		}
 		// todo		渲染到image
 		void build_text(Image* dst, Fonts::tt_info* font, const std::string& str, size_t count, size_t first_idx, double font_size, unsigned int color = -1
 			, glm::ivec2 pos = { 0,0 }, unsigned char blur_size = 0, glm::ivec2 blur_pos = { 0,0 }, unsigned int color_blur = -1
@@ -4706,7 +4861,167 @@ namespace hz
 #endif
 			return;
 		}
+		// todo		生成到draw_font_info
+		glm::ivec2 build_info(Fonts::css_text* csst, const std::string& str, size_t count, size_t first_idx, glm::ivec2 pos, draw_font_info* out)
+		{
+			glm::ivec2 ret;
+			if (!csst || !csst->font || count < 1)
+			{
+				return ret;
+			}
+			Fonts::tt_info* rfont = nullptr;
+			double fns = csst->get_fheight();
+			const char* t = str.c_str();
+			t = utf8_char_pos(first_idx, t, str.size());
+			unsigned int unicode_codepoint = 0;
+			char32_t ch = 0;
+			int px = pos.x, py = pos.y, tpx = px, tpy = py, mx = 0;
+			int img_height = INT_MAX;
+			double scale = csst->font->get_scale_height(fns);
+			double line_height = csst->font->get_line_height(fns);
+			double oline_height = line_height;
+			//double dlh = font->get_line_height(fns);
+			int line_gap = 0;
+			double xe = csst->font->get_xmax_extent(fns, &line_gap);
+			double base_line = csst->font->get_base_line(fns);
+			double adv = 0;
+			double outline = csst->row_y;
+			double bs = 0;
+			auto rbl = csst->font->get_rbl_height(fns, nullptr, nullptr);
+			if (csst->row_height > rbl.x)
+			{
+				py += csst->row_height - line_height;
+				line_height = csst->row_height;
+				bs = csst->row_base_y - base_line;
+			}
+			else
+			{
+				if (csst->row_y != 0)
+					outline = csst->font->get_line_height(fns, false);
+			}
+			Fonts::ft_key_s fks[1] = {};
+			auto& fk = fks->v;
+			unsigned int oc = csst->outline_color ? csst->outline_color : csst->color;
+			//Fonts::ft_item* ftit = 0;
+			std::vector<Fonts::ft_item*> ftits;
+			int kern = 0;
+			std::vector<draw_image_info> vitems, * vitem = &vitems;
+			std::vector<glm::ivec2> vposi, * vpos = &vposi;
+			if (out)
+			{
+				vitem = &out->vitem;
+				vpos = &out->vpos;
+			}
 
+			vitem->reserve(std::min(count, str.size()));
+			std::wstring twstr;
+			double maxbs = 0.0;
+			for (int i = 0; i < count && t && *t; i++)
+			{
+				const char* t1 = t, * t2;
+				t = Fonts::get_u8_last(t, &unicode_codepoint);
+				if (unicode_codepoint == '\n')
+				{
+					mx = std::max(tpx, mx);
+					tpx = px;
+					py += line_height;
+					tpy += line_height;
+					ch = 0;
+					continue;
+				}
+				t2 = t;
+				if (ch)
+					kern = Fonts::get_kern_advance_ch(csst->font, ch, unicode_codepoint);
+				if (kern != 0)
+				{
+					auto kernf = scale * kern;
+					kern = kernf;
+				}
+				twstr.push_back(unicode_codepoint);
+				ch = unicode_codepoint;
+				fk.unicode_codepoint = unicode_codepoint;
+				fk.font_size = csst->font_size;
+				fk.font_dpi = csst->dpi;
+				fk.blur_size = csst->blur_size;
+				ftits = make_cache(csst->font, fks, fns, csst->first_bitmap);
+				if (ftits.size())
+				{
+					auto ftit = ftits[0];
+
+					if (tpx + ftit->_advance > img_height)
+					{
+						mx = std::max(tpx, mx);
+						tpx = px;
+						py += line_height;
+						tpy += line_height;
+					}
+					double dbl = /*ftit->_baseline_f > 0 ? ftit->_baseline_f :*/ base_line;
+					// 缓存图画到目标图像
+					if (csst->blur_size > 0 && ftits.size() > 1)
+					{
+						auto bft = ftits[1];
+						glm::ivec2 dps = { tpx + bft->_baseline.x + csst->blur_pos.x - csst->blur_size,
+							py + dbl + bft->_baseline.y + csst->blur_pos.y - csst->blur_size };
+						draw_image_info dii;
+						dii.user_image = bft->_image;
+						dii.a = { dps.x + kern, dps.y, bft->_rect.z, bft->_rect.w };
+						dii.rect = bft->_rect;
+						dii.col = csst->color_blur;
+						vitem->push_back(dii);
+					}
+					glm::ivec2 dps = { tpx + ftit->_baseline.x,py + dbl + ftit->_baseline.y };
+					draw_image_info dii;
+					dii.user_image = ftit->_image;
+					dii.a = { dps.x + kern, dps.y, ftit->_rect.z, ftit->_rect.w };
+					dii.rect = ftit->_rect;
+					dii.col = csst->color;
+					dii.adv = adv;
+					adv = ftit->_advance + kern;
+					double iy0 = dii.a.y + dii.a.w - pos.y;
+					iy0 -= fns;
+					maxbs = std::max(maxbs, iy0);
+					vitem->push_back(dii);
+				}
+				vpos->push_back({ adv, py });
+				tpx += adv;
+			}
+			njson posn, dif;
+			maxbs -= bs;
+			mx = std::max(tpx, mx);
+			ret.x = mx;
+			ret.y = pos.y;
+			if (out)
+			{
+				out->base_line = base_line;
+				out->diffbs = bs;
+				out->awidth = mx;
+			}
+
+			//draw_line({ pos.x, pos.y + base_line + bs }, { mx, pos.y + base_line + bs }, 0x5000ff00);
+			int wd = 0;
+			float maxh = pos.y + outline, miny = pos.y;
+			for (auto& it : *vitem)
+			{
+				posn.push_back(v4to(it.a));
+				double iy = (double)it.a.y + it.a.w - pos.y;
+				iy -= fns;
+				dif.push_back(iy);
+				auto t = twstr[wd++];
+				it.a.y -= maxbs;
+				if (t > 255)
+				{
+					it.a.y = std::max(it.a.y, miny);
+					if (it.a.y + it.a.w > maxh)
+					{
+						it.a.y -= it.a.y + it.a.w - maxh;
+					}
+				}
+				//draw_image(&it);
+			}
+
+			return ret;
+		}
+#endif
 	public:
 #ifndef _FONT_NO_BITMAP
 

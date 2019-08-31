@@ -18,8 +18,8 @@
 #include <string>
 #include <regex>
 
-#include "hlUtil.h"
-#include "hl_time.h"
+//#include "hlUtil.h"
+//#include "hl_time.h"
 
 #ifndef NO_JSONTOOL
 #ifndef NJSON_H
@@ -52,7 +52,7 @@ namespace hz
 		static_str()
 		{
 		}
-		static_str(const T* s, size_t len) :str(s), size(len)
+		static_str(const T* s, size_t len) :str(s), _size(len)
 		{
 		}
 		~static_str()
@@ -60,19 +60,19 @@ namespace hz
 		}
 		static_str& assign(const T* s, size_t len)
 		{
-			str = s; size = len;
+			str = s; _size = len;
 			return *this;
 		}
 		std::wstring to_wstr(bool is_swap = false)
 		{
 			std::wstring ret;
-			if (str && size)
+			if (str && _size)
 			{
-				ret.assign(str, size);
+				ret.assign(str, _size);
 				if (is_swap)
 				{
 					char* temp = (char*)ret.data();
-					for (int i = 0; i < size; ++i)
+					for (int i = 0; i < _size; ++i)
 					{
 						temp = tt_ushort(temp);
 					}
@@ -89,15 +89,23 @@ namespace hz
 		std::string to_str()
 		{
 			std::string ret;
-			if (str && size)
+			if (str && _size)
 			{
-				ret.assign(str, size);
+				ret.assign((char*)str, _size);
 			}
 			return ret;
 		}
 		operator const T* ()
 		{
 			return str;
+		}
+		const T* data()
+		{
+			return str;
+		}
+		size_t size()
+		{
+			return _size;
 		}
 		static_str& operator= (const char* s)
 		{
@@ -116,7 +124,7 @@ namespace hz
 		}
 	private:
 		const T* str = 0;
-		size_t size = 0;
+		size_t _size = 0;
 	};
 
 	typedef static_str<wchar_t> w_string;
@@ -663,7 +671,21 @@ namespace hz
 		}
 		return { rv[0],rv[1],rv[2],rv[3] };
 	}
-
+	static njson v2to(const glm::vec2& v)
+	{
+		std::vector<double> rv = { v.x,v.y };
+		return rv;
+	}
+	static njson v3to(const glm::vec3& v)
+	{
+		std::vector<double> rv = { v.x,v.y ,v.z };
+		return rv;
+	}
+	static njson v4to(const glm::vec4& v)
+	{
+		std::vector<double> rv = { v.x,v.y ,v.z,v.w };
+		return rv;
+	}
 #endif
 	template <typename T>
 	static T* toPtr(const njson& v)
@@ -2107,5 +2129,6 @@ auto s1= n.dump(2);//缩进2个空格
 */
 
 
+//#include "xml2json.h"
 
 #endif // __json_helper_h__
