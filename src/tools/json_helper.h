@@ -435,15 +435,15 @@ namespace hz
 		return p;
 	}
 	// 获取第n个字符的位置
-	static const char* utf8_char_pos(int64_t pos, const char* buffer, int64_t len)
+	static const char* utf8_char_pos(const char* buffer, int64_t pos, uint64_t len = -1)
 	{
-		const char* p = 0, *pend = buffer + len;
+		const char* p = 0, *pend = (len == -1 ? (char*)len : buffer + len);
 		int64_t count = 0;
-		if (!buffer || len <= 0)
+		if (!buffer || len == 0)
 		{
 			return 0;
 		}
-		for (p = buffer; p < pend; p++)
+		for (p = buffer; *p && p < pend; p++)
 		{
 			if (UTF8_ASCII(*p) || (UTF8_FIRST(*p)))
 			{

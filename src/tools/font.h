@@ -88,7 +88,26 @@ namespace std {
 namespace hz
 {
 
-
+	static char* w2a(wchar_t* data_from, size_t size, char* out, size_t outsize)
+	{
+		static std::locale sys_locale("");
+		const wchar_t* data_from_end = data_from + size;
+		const wchar_t* data_from_next = 0;
+		char* data_to = (char*)out;
+		char* data_to_end = data_to + outsize;
+		char* data_to_next = 0;
+		typedef std::codecvt<wchar_t, char, mbstate_t> convert_facet;
+		mbstate_t out_state = { 0 };
+		auto result = std::use_facet<convert_facet>(sys_locale).out(
+			out_state, data_from, data_from_end, data_from_next,
+			data_to, data_to_end, data_to_next);
+		if (result == convert_facet::ok)
+		{
+			return data_to;
+		}
+		return data_to;
+	}
+#if 0
 	class font_att :public Res
 	{
 	public:
@@ -265,6 +284,7 @@ namespace hz
 	private:
 
 	};
+#endif
 	/*---------------------------------------------------------------------------------------------------------------------------------------------------
 	TODO	字体管理
 
@@ -442,6 +462,17 @@ namespace hz
 				unsigned char font_size;
 				// 模糊大小支持 0-255
 				unsigned char blur_size;
+			}v;
+		};
+		union ft_char_s
+		{
+			uint64_t u = 0;
+			struct
+			{
+				char32_t unicode_codepoint;
+				unsigned short font_dpi;
+				// 字号支持 1-255
+				unsigned char font_size;
 			}v;
 		};
 		class ft_item
@@ -1262,13 +1293,25 @@ namespace hz
 				int ret = 0;
 				uint8_t* data = info->data;
 				uint32_t index_map = info->index_map;
-				wchar_t wt[] = { codepoint,0 };
+				wchar_t wt[] = { codepoint, 0 };
 				uint16_t format = ttUSHORT(data + index_map + 0);
+				/*
+					0*
+					2
+					4*
+					6*
+					8
+					10
+					12*
+					13*
+					14
+				*/
 				if (format == 2) {
 					//STBTT_assert(0); // @TODO: high-byte mapping for japanese/chinese/korean
 					if (codepoint > 127)
 					{
-						std::string st = jsonT::wstring_to_ansi(wt);
+						char st[4] = { 0 };
+						auto astr = w2a(wt, 1, st, 4);
 						char* t = (char*)& codepoint;
 						t[0] = st[1]; t[1] = st[0];
 						//std::swap(t[0], t[1]);
@@ -1444,7 +1487,7 @@ namespace hz
 					y1 - y0,
 					x1 - x0, // screen width ( stride )
 					scale * lcd.x, scale * lcd.y,
-					shift_x, shift_y, // shift x, shift y 
+					shift_x, shift_y, // shift x, shift y
 					gidx);
 
 				return pxs;
@@ -1944,7 +1987,11 @@ namespace hz
 			std::vector<tt_info*> fallbacks;
 
 			std::unordered_map<int, Glyph*> _lut;
+			// 缩放缓存表
 			std::unordered_map<int, double> _scale_lut;
+			// 宽度缓存表
+			std::unordered_map<unsigned int, glm::ivec3> _char_lut;
+
 			LockS _lock;
 		private:
 			/*
@@ -2198,6 +2245,42 @@ namespace hz
 					}
 				}
 				return p;
+			}
+			// todo 获取字符大小
+			glm::ivec3 get_char_extent(char32_t ch, unsigned char font_size, unsigned short font_dpi)
+			{
+				ft_char_s cs;
+				cs.v.font_dpi = font_dpi;
+				cs.v.font_size = font_size;
+				cs.v.unicode_codepoint = ch;
+				{
+					LOCK_R(_lock);
+					auto it = _char_lut.find(cs.u);
+					if (it != _char_lut.end())
+					{
+						return it->second;
+					}
+				}
+				glm::ivec3 ret;
+				tt_info* rfont = nullptr;
+				auto g = get_glyph_index(ch, &rfont);
+				if (g)
+				{
+					double fns = round((double)font_size * font_dpi / 72.0);
+					double scale = rfont->get_scale_height(fns);
+					int x0 = 0, y0 = 0, x1 = 0, y1 = 0, advance, lsb;
+					font_dev::buildGlyphBitmap(&rfont->font, g, scale, &advance, &lsb, &x0, &y0, &x1, &y1);
+					double adv = scale * advance;
+					ret = { x1 - x0, y1 - y0 , adv };
+					LOCK_W(_lock);
+					_char_lut[cs.u] = ret;
+				}
+				return ret;
+			}
+			void clear_char_lut()
+			{
+				LOCK_W(_lock);
+				_char_lut.clear();
 			}
 		private:
 			//// 增加n个缓存
@@ -3009,6 +3092,7 @@ namespace hz
 				//std::vector<BitmapSizeTable> bsts;
 				//std::vector<std::vector<IndexSubTableArray>> index_sub_table;
 				njson ns = get_bitmap_size_table(b, count, _bsts, _index_sub_table, _msidx_table);
+				printf("<%s>包含位图大小\n", _aname.c_str());
 				for (auto& it : ns)
 					printf("%s\n", it.dump().c_str());
 				// 位图数据表ebdt
@@ -3353,54 +3437,171 @@ namespace hz
 				all_line = underline | line_through | overline,
 			};
 		public:
-			tt_info* font = nullptr;
-			double font_size = 12;
-			double dpi = 96;
 			unsigned int color = -1;
 			unsigned int color_blur = 0xff000000;
 			unsigned int outline_color = 0;
 			// 装饰线
 			unsigned int text_decoration = 0;
-			double line_thickness = 1.0, line_thickness1 = 1.0;
+			double line_thickness = 1.0;
 			double row_height = -1;
 			double row_base_y = 0;
 			// 最大行高
 			int row_y = 0;
-			unsigned char blur_size = 0;
+			// tab宽度
+			uint8_t _tabs = 4;
+			// 字间隔
+			int _zpace = 0;
+			// 行间隔
+			int _lineSpacing = 0;
+			css_text* _row = 0;
+			bool first_bitmap = false;
 			struct
 			{
 				int x = 0, y = 0;
 			} blur_pos;
-			bool first_bitmap = false;
+			double  _fzpace = 0.0, _flineSpacing = 0.0;
+		private:
+			tt_info* font = nullptr;
+			double font_size = 12;
+			double dpi = 96;
+			unsigned char blur_size = 0;
+			std::atomic_int* _upinc = nullptr;
+			int _curinc = 0;
 			double fns = 0;
 		public:
 			css_text()
 			{
+				_upinc = new std::atomic_int(0);
 			}
-
+			css_text(const css_text& c)
+			{
+				*this = c;
+			}
 			~css_text()
 			{
-			}
-			void set_font_size(double size = 12, double dpi_ = 96)
-			{
-				font_size = size; dpi = dpi_; mk_fns();
-			}
-			double get_fheight(bool is = false)
-			{
-				if (fns < 1 || is)
+				if (_upinc)
 				{
+					delete _upinc;
+				}
+				_upinc = nullptr;
+			}
+			css_text& operator=(const css_text& c)
+			{
+				if (this != &c)
+				{
+					color = c.color;
+					color_blur = c.color_blur;
+					outline_color = c.outline_color;
+					text_decoration = c.text_decoration;
+					line_thickness = c.line_thickness;
+					row_height = c.row_height;
+					row_base_y = c.row_base_y;
+					row_y = c.row_y;
+					_tabs = c._tabs;
+					_zpace = c._zpace;
+					_lineSpacing = c._lineSpacing;
+					_row = c._row;
+					first_bitmap = c.first_bitmap;
+					blur_pos = c.blur_pos;;
+					_fzpace = c._fzpace;
+					_flineSpacing = c._flineSpacing;
+					font = c.font;
+					font_size = c.font_size;
+					dpi = c.dpi;
+					blur_size = c.blur_size;
+					if (!_upinc)
+						_upinc = new std::atomic_int(0);
+				}
+				return *this;
+			}
+			static css_text* create(const css_text* c)
+			{
+				css_text* p = new css_text();
+				if (c)
+				{
+					*p = *c;
+				}
+				return p;
+			}
+			void update()
+			{
+				if (_upinc)
+				{
+					(*_upinc)++;
+				}
+			}
+		public:
+			tt_info* get_font()
+			{
+				return font;
+			}
+			void set_font(tt_info* p)
+			{
+				font = p;
+			}
+			void set_font_size(double size, double dpi_ = 96)
+			{
+				font_size = size;
+				if (dpi_ > 0.0)
+					dpi = dpi_;
+				update();
+				mk_fns();
+			}
+			void set_blur_size(unsigned char bs)
+			{
+				blur_size = bs;
+			}
+			double get_font_size()
+			{
+				return font_size;
+			}
+			double get_font_dpi()
+			{
+				return dpi;
+			}
+			unsigned char get_blur_size()
+			{
+				return blur_size;
+			}
+			double get_fheight()
+			{
+				if (_curinc != *_upinc)
+				{
+					_curinc = *_upinc;
 					mk_fns();
 				}
 				return fns;
+			}
+			double get_row_lt(unsigned int etd)
+			{
+				return _row && _row->text_decoration & etd ? _row->line_thickness : line_thickness;
 			}
 		private:
 			void mk_fns()
 			{
 				fns = font_size * dpi / 72.0;
-				double k[] = { ceil(fns), floor(fns),ceil(17.6),ceil(17.1),floor(17.6),floor(17.1) };
-				int ks = fns + 0.5;
+				_fzpace = round((double)_zpace * dpi / 72.0);
+				_flineSpacing = round((double)_lineSpacing * dpi / 72.0);
 				fns = round(fns);
 			}
+		};
+		// todo 字符宽高结构
+		class text_extent
+		{
+		public:
+			glm::ivec2 _size;
+			const char* next_char = nullptr;
+		public:
+			text_extent()
+			{
+			}
+
+			~text_extent()
+			{
+			}
+
+		private:
+
 		};
 
 	private:
@@ -4600,33 +4801,30 @@ namespace hz
 			glm::ivec3 ret = { 0,0,0 };
 			std::vector<glm::ivec3> os;
 			css_text* mt = 0;
-			double lt = 0;
 			for (size_t i = 0; i < n; i++)
 			{
 				auto it = &ct[i];
 				bool ism = false;
-				if (it->font)
+				auto font = it->get_font();
+				if (font)
 				{
-					auto itr = it->font->get_rbl_height(it->get_fheight(true), &ret, &ism);
+					auto itr = font->get_rbl_height(it->get_fheight(), &ret, &ism);
 					os.push_back(itr);
-					it->line_thickness1 = std::max(1.0, floor(0.1 * itr.y));
+					it->line_thickness = std::max(1.0, floor(itr.y / 24.0));
 					if (ism)
 					{
-						lt = it->line_thickness1;
 						mt = it;
 					}
 				}
 
 			}
-			//auto ul = get_extent(mt, "_");
-			//auto lt = get_extent(mt, "-");
 			for (size_t i = 0; i < n; i++)
 			{
 				auto it = &ct[i];
-				it->line_thickness = lt;
 				it->row_height = ret.x;
 				it->row_y = ret.y;
 				it->row_base_y = ret.z;
+				it->_row = mt;
 			}
 
 			return ret;
@@ -4666,7 +4864,7 @@ namespace hz
 				auto kt = key->v;
 				double base_line = 0;
 				int gidx = font->get_glyph_index(kt.unicode_codepoint, &rfont);
-				if (rfont)
+				if (rfont && gidx)
 				{
 					auto bit = rfont->get_glyph_image(gidx, fns, &rc, bitmap, &bitbuf[0], first_bitmap);
 					glm::ivec2 pos;
@@ -4683,7 +4881,6 @@ namespace hz
 						frc.x = pos.x;
 						frc.y = pos.y;
 						fit->set_it(kt.unicode_codepoint, bimg, frc, { rc.x, rc.y }, bitmap->advance, 0, base_line);
-						//ret[0] = font->push_cache(&k2, ps.data(), ps.size());
 					}
 					if (kt.blur_size > 0)
 					{
@@ -4694,7 +4891,6 @@ namespace hz
 						auto buimg = push_cache_bitmap(blur, &pos, 0, -1);
 						auto frc = glm::ivec4(pos.x, pos.y, blur->width, blur->rows);
 						fit->set_it(kt.unicode_codepoint, buimg, frc, { rc.x, rc.y }, bitmap->advance, kt.blur_size, base_line);
-						//ret[1] = font->push_cache(key, ps.data(), ps.size());
 					}
 					if (ps.size())
 					{
@@ -4713,6 +4909,10 @@ namespace hz
 						}
 					}
 				}
+				else
+				{
+					ret.clear();
+				}
 			}
 			return ret;
 		}
@@ -4727,23 +4927,61 @@ namespace hz
 
 #define _NO_CACHE_0
 #if 1
-		glm::ivec3 get_extent(css_text * csst, const char* str)
+		// 获取单个u8字符宽高
+		glm::ivec3 get_extent_ch(css_text * csst, const char* str)
 		{
 			glm::ivec3 ret;
-			tt_info* font = csst->font;
-			tt_info* rfont = nullptr;
+			tt_info* font = csst->get_font();
 			unsigned int codepoint;
 			auto t = Fonts::get_u8_last(str, &codepoint);
-			auto g = font->get_glyph_index(codepoint, &rfont);
-			if (g)
+			if (font)
 			{
-				double fns = csst->get_fheight();
-				double scale = rfont->get_scale_height(fns);
-				int x0 = 0, y0 = 0, x1 = 0, y1 = 0, advance, lsb;
-				font_dev::buildGlyphBitmap(&rfont->font, g, scale, &advance, &lsb, &x0, &y0, &x1, &y1);
+				auto cs = font->get_char_extent(codepoint, csst->get_font_size(), csst->get_font_dpi());
 				int c = t - str;
-				ret = { x1 - x0 ,y1 - y0, c };
+				ret = { cs.x, cs.y, c };
 			}
+			return ret;
+		}
+		// 获取单个unicode字符宽高
+		glm::ivec3 get_extent_cp(css_text* csst, unsigned int codepoint)
+		{
+			glm::ivec3 ret;
+			tt_info* font = csst->get_font();
+			if (font)
+			{
+				ret = font->get_char_extent(codepoint, csst->get_font_size(), csst->get_font_dpi());
+			}
+			return ret;
+		}
+		// 获取n个字符宽高
+		text_extent get_extent_str(css_text* csst, const char* str, size_t count, size_t first)
+		{
+			text_extent ret;
+			tt_info* font = csst->get_font();
+			tt_info* rfont = nullptr;
+			unsigned int codepoint;
+			auto t = utf8_char_pos(str, first);
+			size_t i = 0;
+			int maxh = 0;
+			for (; *t && i < count; i++)
+			{
+				if (*t == '\n')
+				{
+					break;
+				}
+				if (*t == '\t')
+				{
+					auto spc = get_extent_cp(csst, L' ');
+					ret._size.x += spc.z * csst->_tabs + csst->_fzpace;
+					t++;
+					continue;;
+				}
+				t = Fonts::get_u8_last(t, &codepoint);
+				auto k = get_extent_cp(csst, codepoint);
+				ret._size.x += k.z + csst->_fzpace;
+				ret._size.y = std::max(ret._size.y, k.y);
+			}
+			ret.next_char = t;
 			return ret;
 		}
 		// todo		渲染到image
@@ -4753,7 +4991,8 @@ namespace hz
 		{
 			Fonts::tt_info* rfont = nullptr;
 			double fns = font_size * dpi / 72.0;
-			const char* t = str.c_str() + first_idx;
+			const char* t = str.c_str();// +first_idx;
+			t = utf8_char_pos(t, first_idx, str.size());
 			unsigned int unicode_codepoint = 0;
 			char32_t ch = 0;
 			double scale = font->get_scale_height(fns);
@@ -4865,29 +5104,29 @@ namespace hz
 		glm::ivec2 build_info(Fonts::css_text* csst, const std::string& str, size_t count, size_t first_idx, glm::ivec2 pos, draw_font_info* out)
 		{
 			glm::ivec2 ret;
-			if (!csst || !csst->font || count < 1)
+			auto font = csst->get_font();
+			if (!csst || !font || count < 1)
 			{
 				return ret;
 			}
 			Fonts::tt_info* rfont = nullptr;
 			double fns = csst->get_fheight();
 			const char* t = str.c_str();
-			t = utf8_char_pos(first_idx, t, str.size());
+			t = utf8_char_pos(t, first_idx, str.size());
 			unsigned int unicode_codepoint = 0;
 			char32_t ch = 0;
 			int px = pos.x, py = pos.y, tpx = px, tpy = py, mx = 0;
 			int img_height = INT_MAX;
-			double scale = csst->font->get_scale_height(fns);
-			double line_height = csst->font->get_line_height(fns);
+			double scale = font->get_scale_height(fns);
+			double line_height = font->get_line_height(fns);
 			double oline_height = line_height;
-			//double dlh = font->get_line_height(fns);
 			int line_gap = 0;
-			double xe = csst->font->get_xmax_extent(fns, &line_gap);
-			double base_line = csst->font->get_base_line(fns);
+			double xe = font->get_xmax_extent(fns, &line_gap);
+			double base_line = font->get_base_line(fns);
 			double adv = 0;
 			double outline = csst->row_y;
 			double bs = 0;
-			auto rbl = csst->font->get_rbl_height(fns, nullptr, nullptr);
+			auto rbl = font->get_rbl_height(fns, nullptr, nullptr);
 			if (csst->row_height > rbl.x)
 			{
 				py += csst->row_height - line_height;
@@ -4897,15 +5136,15 @@ namespace hz
 			else
 			{
 				if (csst->row_y != 0)
-					outline = csst->font->get_line_height(fns, false);
+					outline = font->get_line_height(fns, false);
 			}
 			Fonts::ft_key_s fks[1] = {};
 			auto& fk = fks->v;
 			unsigned int oc = csst->outline_color ? csst->outline_color : csst->color;
-			//Fonts::ft_item* ftit = 0;
 			std::vector<Fonts::ft_item*> ftits;
 			int kern = 0;
 			std::vector<draw_image_info> vitems, * vitem = &vitems;
+			std::vector<draw_image_info> vblurs;
 			std::vector<glm::ivec2> vposi, * vpos = &vposi;
 			if (out)
 			{
@@ -4931,7 +5170,7 @@ namespace hz
 				}
 				t2 = t;
 				if (ch)
-					kern = Fonts::get_kern_advance_ch(csst->font, ch, unicode_codepoint);
+					kern = Fonts::get_kern_advance_ch(font, ch, unicode_codepoint);
 				if (kern != 0)
 				{
 					auto kernf = scale * kern;
@@ -4940,10 +5179,10 @@ namespace hz
 				twstr.push_back(unicode_codepoint);
 				ch = unicode_codepoint;
 				fk.unicode_codepoint = unicode_codepoint;
-				fk.font_size = csst->font_size;
-				fk.font_dpi = csst->dpi;
-				fk.blur_size = csst->blur_size;
-				ftits = make_cache(csst->font, fks, fns, csst->first_bitmap);
+				fk.font_size = csst->get_font_size();
+				fk.font_dpi = csst->get_font_dpi();
+				fk.blur_size = csst->get_blur_size();
+				ftits = make_cache(font, fks, fns, csst->first_bitmap);
 				if (ftits.size())
 				{
 					auto ftit = ftits[0];
@@ -4957,17 +5196,18 @@ namespace hz
 					}
 					double dbl = /*ftit->_baseline_f > 0 ? ftit->_baseline_f :*/ base_line;
 					// 缓存图画到目标图像
-					if (csst->blur_size > 0 && ftits.size() > 1)
+					if (fk.blur_size > 0 && ftits.size() > 1)
 					{
 						auto bft = ftits[1];
-						glm::ivec2 dps = { tpx + bft->_baseline.x + csst->blur_pos.x - csst->blur_size,
-							py + dbl + bft->_baseline.y + csst->blur_pos.y - csst->blur_size };
+						glm::ivec2 dps = { tpx + bft->_baseline.x + csst->blur_pos.x - fk.blur_size,
+							py + dbl + bft->_baseline.y + csst->blur_pos.y - fk.blur_size };
 						draw_image_info dii;
 						dii.user_image = bft->_image;
 						dii.a = { dps.x + kern, dps.y, bft->_rect.z, bft->_rect.w };
 						dii.rect = bft->_rect;
 						dii.col = csst->color_blur;
-						vitem->push_back(dii);
+						dii.unser_data = (void*)unicode_codepoint;
+						vblurs.push_back(dii);
 					}
 					glm::ivec2 dps = { tpx + ftit->_baseline.x,py + dbl + ftit->_baseline.y };
 					draw_image_info dii;
@@ -4976,14 +5216,15 @@ namespace hz
 					dii.rect = ftit->_rect;
 					dii.col = csst->color;
 					dii.adv = adv;
+					dii.unser_data = (void*)unicode_codepoint;
 					adv = ftit->_advance + kern;
-					double iy0 = dii.a.y + dii.a.w - pos.y;
+					double iy0 = (double)dii.a.y + dii.a.w - pos.y;
 					iy0 -= fns;
 					maxbs = std::max(maxbs, iy0);
 					vitem->push_back(dii);
 				}
 				vpos->push_back({ adv, py });
-				tpx += adv;
+				tpx += adv + csst->_fzpace;
 			}
 			njson posn, dif;
 			maxbs -= bs;
@@ -4996,29 +5237,34 @@ namespace hz
 				out->diffbs = bs;
 				out->awidth = mx;
 			}
-
-			//draw_line({ pos.x, pos.y + base_line + bs }, { mx, pos.y + base_line + bs }, 0x5000ff00);
-			int wd = 0;
 			float maxh = pos.y + outline, miny = pos.y;
+			double cury = 0;
+			int i = 0;
 			for (auto& it : *vitem)
 			{
 				posn.push_back(v4to(it.a));
 				double iy = (double)it.a.y + it.a.w - pos.y;
 				iy -= fns;
 				dif.push_back(iy);
-				auto t = twstr[wd++];
+				auto t = (unsigned int)it.unser_data;
 				it.a.y -= maxbs;
+				if (i < vblurs.size())
+					vblurs[i].a.y -= maxbs;
 				if (t > 255)
 				{
 					it.a.y = std::max(it.a.y, miny);
 					if (it.a.y + it.a.w > maxh)
 					{
-						it.a.y -= it.a.y + it.a.w - maxh;
+						double diff = it.a.y + it.a.w - maxh;
+						it.a.y -= diff;
+						if (i < vblurs.size())
+							vblurs[i].a.y -= diff;
 					}
 				}
-				//draw_image(&it);
+				i++;
 			}
-
+			if (vblurs.size())
+				vitem->insert(vitem->begin(), vblurs.begin(), vblurs.end());
 			return ret;
 		}
 #endif
@@ -5076,3 +5322,48 @@ namespace hz
 	// css_text
 }; //!hz
 #endif // !__font_h__
+
+#if 0
+		// todo		文本渲染
+glm::ivec2 draw_text(Fonts::css_text * csst, glm::ivec2 pos, const std::string & str, size_t count = -1, size_t first_idx = 0, draw_font_info * out = nullptr)
+{
+	auto ft = Fonts::s();
+	draw_font_info dfi;
+	if (!out)
+	{
+		out = &dfi;
+	}
+	glm::ivec2 ret = ft->build_info(csst, str, count, first_idx, pos, out);
+	double oly = csst->row_base_y + 1;
+	double tns = csst->line_thickness;
+	auto fns = csst->get_fheight();
+	double base_line = csst->font->get_base_line(fns);
+	double bs = csst->row_base_y - base_line;
+	if (csst->text_decoration & hz::Fonts::css_text::underline)
+	{
+		//下划线
+		oly += tns;
+		auto col = csst->color;
+		draw_line({ pos.x, pos.y + oly }, { out->awidth, pos.y + oly }, col, tns);
+	}
+	if (csst->text_decoration & hz::Fonts::css_text::overline)
+	{
+		//上划线
+		auto col = csst->color;
+		draw_line({ pos.x, pos.y }, { out->awidth, pos.y }, col, tns);
+	}
+	for (auto& it : out->vitem)
+	{
+		draw_image(&it);
+	}
+	if (csst->text_decoration & hz::Fonts::css_text::line_through)
+	{
+		//贯穿线
+		tns = csst->line_thickness1;
+		oly = bs + base_line * 0.68;
+		auto col = csst->color;
+		draw_line({ pos.x, pos.y + oly }, { out->awidth, pos.y + oly }, col, tns);
+	}
+	return ret;
+}
+#endif
