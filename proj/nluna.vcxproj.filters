@@ -21,12 +21,15 @@
     <ClInclude Include="..\src\tools\image_packer.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\tools\aindex.h">
+    <ClInclude Include="..\src\tools\tools.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\test.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\tools\font.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

@@ -4,7 +4,7 @@
 #define _STD_STR_
 
 #define STB_IMPLEMENTATION
-#include "tools/aindex.h"
+#include "tools/tools.h"
 
 static void print_json(const njson& n, int idxs)
 {
@@ -60,7 +60,7 @@ void test_font(int w = 512, int h = 512)
 	const char* t1 = t, * t2;
 	unsigned int wcp = 0;
 	t = hz::Fonts::get_u8_last(t, &wcp);
-	int gidx = nsimsun->get_glyph_index(wcp, &rfont);
+	int gidx = nsimsun->get_glyph_index(wcp, &rfont,0);
 	//auto bit = rfont->get_glyph_image(gidx, fns, &ot, &bittem, bitmap, true);
 	return;
 }
