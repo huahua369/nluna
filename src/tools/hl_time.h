@@ -1,4 +1,4 @@
-#ifndef __hl_time__h__
+ï»¿#ifndef __hl_time__h__
 #define __hl_time__h__
 #include <time.h>
 #include <string.h>
@@ -39,30 +39,30 @@ namespace hz {
 
 	public:
 
-		//windowÉÏ×Ô¼ºÊµÏÖstrptimeº¯Êı£¬linuxÒÑ¾­Ìá¹©strptime
-		//strptimeº¯ÊıwindowsÆ½Ì¨ÉÏÊµÏÖ
-		static char* strptime(const char *buf, const char *fmt, struct tm *tm)
+		//windowä¸Šè‡ªå·±å®ç°strptimeå‡½æ•°ï¼Œlinuxå·²ç»æä¾›strptime
+		//strptimeå‡½æ•°windowså¹³å°ä¸Šå®ç°
+		static char* strptime(const char* buf, const char* fmt, struct tm* tm)
 		{
-			static const char *day[7] = {
+			static const char* day[7] = {
 				"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday",
 				"Friday", "Saturday"
 			};
-			static const char *abday[7] = {
+			static const char* abday[7] = {
 				"Sun","Mon","Tue","Wed","Thu","Fri","Sat"
 			};
-			static const char *mon[12] = {
+			static const char* mon[12] = {
 				"January", "February", "March", "April", "May", "June", "July",
 				"August", "September", "October", "November", "December"
 			};
-			static const char *abmon[12] = {
+			static const char* abmon[12] = {
 				"Jan", "Feb", "Mar", "Apr", "May", "Jun",
 				"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 			};
-			static const char *am_pm[2] = {
+			static const char* am_pm[2] = {
 				"AM", "PM"
 			};
 			char c;
-			const char *bp;
+			const char* bp;
 			size_t len = 0;
 			int alt_format, i, split_year = 0;
 
@@ -353,11 +353,11 @@ namespace hz {
 			}
 
 			/* LINTED functional specification */
-			return ((char *)bp);
+			return ((char*)bp);
 		}
 
 
-		static int conv_num(const char **buf, int *dest, int llim, int ulim)
+		static int conv_num(const char** buf, int* dest, int llim, int ulim)
 		{
 			int result = 0;
 
@@ -396,23 +396,23 @@ namespace hz {
 			}
 			return (char*)(s + input.tellg());
 		}
-		//»ñÈ¡Ê±¼ä
-		static std::string getFormat(time_t t, const std::string &fmt = "%Y-%m-%d %H:%M:%S", bool ms = false)
+		//è·å–æ—¶é—´
+		static std::string getFormat(time_t t, const std::string& fmt = "%Y-%m-%d %H:%M:%S", bool ms = false)
 		{
-			struct tm *p;
+			struct tm* p;
 			if (ms)
 				t *= 0.001;
 			p = gmtime(&t);
 			char s[80] = { 0 };
 			//strftime(s, 80, "%Y-%m-%d %H:%M:%S::%Z", p);
-			//printf("%d: %s\n", (int)t, jsonT::AtoA(s).c_str());
+			//printf("%d: %s\n", (int)t, jsont::AtoA(s).c_str());
 			t += 28800;
 			p = gmtime(&t);
 			strftime(s, 80, fmt.c_str(), p);
-			//printf("%d: %s\n", (int)t, jsonT::AtoA(s).c_str());
+			//printf("%d: %s\n", (int)t, jsont::AtoA(s).c_str());
 			return s;
 		}
-		static std::string getFormat(struct tm *p, const std::string &fmt = "%Y-%m-%d %H:%M:%S")
+		static std::string getFormat(struct tm* p, const std::string& fmt = "%Y-%m-%d %H:%M:%S")
 		{
 			char s[80] = { 0 };
 			strftime(s, 80, fmt.c_str(), p);
@@ -423,18 +423,18 @@ namespace hz {
 #define ARDRONE_FILE_DATE_FORMAT  "%Y%m%d_%H%M%S"
 #define ARDRONE_DEFAULT_DATE        "19700101_000000"
 
-		void yunshouhu_time2date(time_t time, const char *format, char *date)
+		void yunshouhu_time2date(time_t time, const char* format, char* date)
 		{
 			if (date)
 			{
-				struct tm *tm = localtime(&time);
+				struct tm* tm = localtime(&time);
 				strcpy(date, ARDRONE_DEFAULT_DATE);
 				if (tm != NULL)
 					strftime(date, ARDRONE_DATE_MAXSIZE, format ? format : ARDRONE_FILE_DATE_FORMAT, tm);
 			}
 		}
 
-		void yunshouhu_date2time(char *date, const char *format, time_t *time)
+		void yunshouhu_date2time(char* date, const char* format, time_t* time)
 		{
 			struct tm tm;
 
@@ -447,14 +447,14 @@ namespace hz {
 		}
 
 		//https://github.com/phdesign/pebble-phd/blob/f72313800357fd509def6abdde379067438fb3c1/src/utils.c
-		char* format_date_time(time_t datetime, const char *format) {
-			struct tm *temp_time = localtime(&datetime);
+		char* format_date_time(time_t datetime, const char* format) {
+			struct tm* temp_time = localtime(&datetime);
 			static char str_time[512] = { 0 };
 			strftime(str_time, sizeof(str_time), format, temp_time);
 			return str_time;
 		}
 
-		int main(int argc, char const *argv[])
+		int main(int argc, char const* argv[])
 		{
 			time_t nowTime = ::time(NULL);
 			char line[1024] = { 0 };
@@ -466,7 +466,7 @@ namespace hz {
 			strcpy(line, "2018-06-29 23:20:30");
 			yunshouhu_date2time(line, format, &secondTime);
 
-			printf("ctime is %s\n", ctime(&secondTime));//µÃµ½ÈÕÀúÊ±¼ä
+			printf("ctime is %s\n", ctime(&secondTime));//å¾—åˆ°æ—¥å†æ—¶é—´
 
 			yunshouhu_time2date(nowTime, NULL, line);
 			printf("%s\n", line);
@@ -474,11 +474,11 @@ namespace hz {
 			char* data = format_date_time(::time(NULL), (char*)"%Y-%m-%d %H:%M:%S");
 			printf("%s\n", data);
 
-			const char *format2 = "%Y year %m month %d date %H hour %M minute %S seconds ";//»¹²»Ö§³ÖÖĞÎÄ ÒªÊ¹ÓÃunicode±àÂëµÄÖĞÎÄ
+			const char* format2 = "%Y year %m month %d date %H hour %M minute %S seconds ";//è¿˜ä¸æ”¯æŒä¸­æ–‡ è¦ä½¿ç”¨unicodeç¼–ç çš„ä¸­æ–‡
 			data = format_date_time(::time(NULL), format2);
 			printf("%s\n", data);
 
-			format2 = "%Y\u5e74%m\u6708%d\u65e5 %H\u65f6%M\u5206%S\u79d2";//»¹²»Ö§³ÖÖĞÎÄ ÒªÊ¹ÓÃunicode±àÂëµÄÖĞÎÄ
+			format2 = "%Y\u5e74%m\u6708%d\u65e5 %H\u65f6%M\u5206%S\u79d2";//è¿˜ä¸æ”¯æŒä¸­æ–‡ è¦ä½¿ç”¨unicodeç¼–ç çš„ä¸­æ–‡
 			data = format_date_time(::time(NULL), format2);
 			printf("%s\n", data);
 
@@ -490,68 +490,68 @@ namespace hz {
 	//---------------------------------------------------------------------------------------------------
 	/*
 
-	º¯Êıstrftime()µÄ²Ù×÷ÓĞĞ©ÀàËÆÓÚsprintf()£ºÊ¶±ğÒÔ°Ù·ÖºÅ(%)¿ªÊ¼µÄ¸ñÊ½ÃüÁî¼¯ºÏ£¬¸ñÊ½»¯Êä³ö½á¹û·ÅÔÚÒ»¸ö×Ö·û´®ÖĞ¡£
-	¸ñÊ½»¯ÃüÁîËµÃ÷´®strDestÖĞ¸÷ÖÖÈÕÆÚºÍÊ±¼äĞÅÏ¢µÄÈ·ÇĞ±íÊ¾·½·¨¡£¸ñÊ½´®ÖĞµÄÆäËû×Ö·ûÔ­Ñù·Å½ø´®ÖĞ¡£¸ñÊ½ÃüÁîÁĞÔÚÏÂÃæ£¬ËüÃÇÊÇÇø·Ö´óĞ¡Ğ´µÄ¡£
+	å‡½æ•°strftime()çš„æ“ä½œæœ‰äº›ç±»ä¼¼äºsprintf()ï¼šè¯†åˆ«ä»¥ç™¾åˆ†å·(%)å¼€å§‹çš„æ ¼å¼å‘½ä»¤é›†åˆï¼Œæ ¼å¼åŒ–è¾“å‡ºç»“æœæ”¾åœ¨ä¸€ä¸ªå­—ç¬¦ä¸²ä¸­ã€‚
+	æ ¼å¼åŒ–å‘½ä»¤è¯´æ˜ä¸²strDestä¸­å„ç§æ—¥æœŸå’Œæ—¶é—´ä¿¡æ¯çš„ç¡®åˆ‡è¡¨ç¤ºæ–¹æ³•ã€‚æ ¼å¼ä¸²ä¸­çš„å…¶ä»–å­—ç¬¦åŸæ ·æ”¾è¿›ä¸²ä¸­ã€‚æ ¼å¼å‘½ä»¤åˆ—åœ¨ä¸‹é¢ï¼Œå®ƒä»¬æ˜¯åŒºåˆ†å¤§å°å†™çš„ã€‚
 
-	%a ĞÇÆÚ¼¸µÄ¼òĞ´
-	%A ĞÇÆÚ¼¸µÄÈ«³Æ
-	%b ÔÂ·ÖµÄ¼òĞ´
-	%B ÔÂ·İµÄÈ«³Æ
-	%c ±ê×¼µÄÈÕÆÚµÄÊ±¼ä´®
-	%C Äê·İµÄºóÁ½Î»Êı×Ö
-	%d Ê®½øÖÆ±íÊ¾µÄÃ¿ÔÂµÄµÚ¼¸Ìì
-	%D ÔÂ/Ìì/Äê
-	%e ÔÚÁ½×Ö·ûÓòÖĞ£¬Ê®½øÖÆ±íÊ¾µÄÃ¿ÔÂµÄµÚ¼¸Ìì
-	%F Äê-ÔÂ-ÈÕ
-	%g Äê·İµÄºóÁ½Î»Êı×Ö£¬Ê¹ÓÃ»ùÓÚÖÜµÄÄê
-	%G Äê·Ö£¬Ê¹ÓÃ»ùÓÚÖÜµÄÄê
-	%h ¼òĞ´µÄÔÂ·İÃû
-	%H 24Ğ¡Ê±ÖÆµÄĞ¡Ê±
-	%I 12Ğ¡Ê±ÖÆµÄĞ¡Ê±
-	%j Ê®½øÖÆ±íÊ¾µÄÃ¿ÄêµÄµÚ¼¸Ìì
-	%m Ê®½øÖÆ±íÊ¾µÄÔÂ·İ
-	%M Ê®Ê±ÖÆ±íÊ¾µÄ·ÖÖÓÊı
-	%n ĞÂĞĞ·û
-	%p ±¾µØµÄAM»òPMµÄµÈ¼ÛÏÔÊ¾
-	%r 12Ğ¡Ê±µÄÊ±¼ä
-	%R ÏÔÊ¾Ğ¡Ê±ºÍ·ÖÖÓ£ºhh:mm
-	%S Ê®½øÖÆµÄÃëÊı
-	%t Ë®Æ½ÖÆ±í·û
-	%T ÏÔÊ¾Ê±·ÖÃë£ºhh:mm:ss
-	%u Ã¿ÖÜµÄµÚ¼¸Ìì£¬ĞÇÆÚÒ»ÎªµÚÒ»Ìì £¨Öµ´Ó0µ½6£¬ĞÇÆÚÒ»Îª0£©
-	%U µÚÄêµÄµÚ¼¸ÖÜ£¬°ÑĞÇÆÚÈÕ×öÎªµÚÒ»Ìì£¨Öµ´Ó0µ½53£©
-	%V Ã¿ÄêµÄµÚ¼¸ÖÜ£¬Ê¹ÓÃ»ùÓÚÖÜµÄÄê
-	%w Ê®½øÖÆ±íÊ¾µÄĞÇÆÚ¼¸£¨Öµ´Ó0µ½6£¬ĞÇÆÚÌìÎª0£©
-	%W Ã¿ÄêµÄµÚ¼¸ÖÜ£¬°ÑĞÇÆÚÒ»×öÎªµÚÒ»Ìì£¨Öµ´Ó0µ½53£©
-	%x ±ê×¼µÄÈÕÆÚ´®
-	%X ±ê×¼µÄÊ±¼ä´®
-	%y ²»´øÊÀ¼ÍµÄÊ®½øÖÆÄê·İ£¨Öµ´Ó0µ½99£©
-	%Y ´øÊÀ¼Í²¿·ÖµÄÊ®½øÖÆÄê·İ
-	%z£¬%Z Ê±ÇøÃû³Æ£¬Èç¹û²»ÄÜµÃµ½Ê±ÇøÃû³ÆÔò·µ»Ø¿Õ×Ö·û¡£
-	%% °Ù·ÖºÅ
+	%a æ˜ŸæœŸå‡ çš„ç®€å†™
+	%A æ˜ŸæœŸå‡ çš„å…¨ç§°
+	%b æœˆåˆ†çš„ç®€å†™
+	%B æœˆä»½çš„å…¨ç§°
+	%c æ ‡å‡†çš„æ—¥æœŸçš„æ—¶é—´ä¸²
+	%C å¹´ä»½çš„åä¸¤ä½æ•°å­—
+	%d åè¿›åˆ¶è¡¨ç¤ºçš„æ¯æœˆçš„ç¬¬å‡ å¤©
+	%D æœˆ/å¤©/å¹´
+	%e åœ¨ä¸¤å­—ç¬¦åŸŸä¸­ï¼Œåè¿›åˆ¶è¡¨ç¤ºçš„æ¯æœˆçš„ç¬¬å‡ å¤©
+	%F å¹´-æœˆ-æ—¥
+	%g å¹´ä»½çš„åä¸¤ä½æ•°å­—ï¼Œä½¿ç”¨åŸºäºå‘¨çš„å¹´
+	%G å¹´åˆ†ï¼Œä½¿ç”¨åŸºäºå‘¨çš„å¹´
+	%h ç®€å†™çš„æœˆä»½å
+	%H 24å°æ—¶åˆ¶çš„å°æ—¶
+	%I 12å°æ—¶åˆ¶çš„å°æ—¶
+	%j åè¿›åˆ¶è¡¨ç¤ºçš„æ¯å¹´çš„ç¬¬å‡ å¤©
+	%m åè¿›åˆ¶è¡¨ç¤ºçš„æœˆä»½
+	%M åæ—¶åˆ¶è¡¨ç¤ºçš„åˆ†é’Ÿæ•°
+	%n æ–°è¡Œç¬¦
+	%p æœ¬åœ°çš„AMæˆ–PMçš„ç­‰ä»·æ˜¾ç¤º
+	%r 12å°æ—¶çš„æ—¶é—´
+	%R æ˜¾ç¤ºå°æ—¶å’Œåˆ†é’Ÿï¼šhh:mm
+	%S åè¿›åˆ¶çš„ç§’æ•°
+	%t æ°´å¹³åˆ¶è¡¨ç¬¦
+	%T æ˜¾ç¤ºæ—¶åˆ†ç§’ï¼šhh:mm:ss
+	%u æ¯å‘¨çš„ç¬¬å‡ å¤©ï¼Œæ˜ŸæœŸä¸€ä¸ºç¬¬ä¸€å¤© ï¼ˆå€¼ä»0åˆ°6ï¼Œæ˜ŸæœŸä¸€ä¸º0ï¼‰
+	%U ç¬¬å¹´çš„ç¬¬å‡ å‘¨ï¼ŒæŠŠæ˜ŸæœŸæ—¥åšä¸ºç¬¬ä¸€å¤©ï¼ˆå€¼ä»0åˆ°53ï¼‰
+	%V æ¯å¹´çš„ç¬¬å‡ å‘¨ï¼Œä½¿ç”¨åŸºäºå‘¨çš„å¹´
+	%w åè¿›åˆ¶è¡¨ç¤ºçš„æ˜ŸæœŸå‡ ï¼ˆå€¼ä»0åˆ°6ï¼Œæ˜ŸæœŸå¤©ä¸º0ï¼‰
+	%W æ¯å¹´çš„ç¬¬å‡ å‘¨ï¼ŒæŠŠæ˜ŸæœŸä¸€åšä¸ºç¬¬ä¸€å¤©ï¼ˆå€¼ä»0åˆ°53ï¼‰
+	%x æ ‡å‡†çš„æ—¥æœŸä¸²
+	%X æ ‡å‡†çš„æ—¶é—´ä¸²
+	%y ä¸å¸¦ä¸–çºªçš„åè¿›åˆ¶å¹´ä»½ï¼ˆå€¼ä»0åˆ°99ï¼‰
+	%Y å¸¦ä¸–çºªéƒ¨åˆ†çš„åè¿›åˆ¶å¹´ä»½
+	%zï¼Œ%Z æ—¶åŒºåç§°ï¼Œå¦‚æœä¸èƒ½å¾—åˆ°æ—¶åŒºåç§°åˆ™è¿”å›ç©ºå­—ç¬¦ã€‚
+	%% ç™¾åˆ†å·
 	*/
 	class Date
 	{
 		class tm_0
 		{
 		public:
-			int tm_sec = 0;   // Ãëseconds after the minute - [0, 60] including leap second
-			int tm_min = 0;   // ·Öminutes after the hour - [0, 59]
-			int tm_hour = 0;  // Ê±hours since midnight - [0, 23]
-			int tm_mday = 1;  // ÈÕday of the month - [1, 31]
-			int tm_mon = 0;   // ÔÂmonths since January - [0, 11]
-			int tm_year = 0;  // Äêyears since 1900
-			int tm_wday = 0;  // ĞÇÆÚdays since Sunday - [0, 6]
-			int tm_yday = 0;  // µÚ¼¸Ììdays since January 1 - [0, 365]
+			int tm_sec = 0;   // ç§’seconds after the minute - [0, 60] including leap second
+			int tm_min = 0;   // åˆ†minutes after the hour - [0, 59]
+			int tm_hour = 0;  // æ—¶hours since midnight - [0, 23]
+			int tm_mday = 1;  // æ—¥day of the month - [1, 31]
+			int tm_mon = 0;   // æœˆmonths since January - [0, 11]
+			int tm_year = 0;  // å¹´years since 1900
+			int tm_wday = 0;  // æ˜ŸæœŸdays since Sunday - [0, 6]
+			int tm_yday = 0;  // ç¬¬å‡ å¤©days since January 1 - [0, 365]
 			int tm_isdst = 0; // daylight savings time flag
 		};
 
 	private:
 		std::string _str, _fmt = "%Y-%m-%d %H:%M:%S";
 		struct tm _p = { 0 };
-		// ºÁÃë¼¶
+		// æ¯«ç§’çº§
 		time_t _t = 0;
-		// ±£´æºÁÃë
+		// ä¿å­˜æ¯«ç§’
 		time_t _milliseconds = 0;
 
 	public:
@@ -559,14 +559,17 @@ namespace hz {
 		{
 		}
 
-		Date(const std::string &dstr, const std::string fmt = "") :_str(dstr)
+		Date(const std::string& dstr, const std::string fmt = "")
 		{
-			_t = getDate2Time(dstr, "", (struct tm*)&_p, true, &_fmt);
+			_fmt = fmt;
+			_t = getDate2Time(dstr, "", (struct tm*) & _p, true, &_fmt);
+			_str = getFormat(_t, _fmt, true, (struct tm*) & _p);
 		}
 		Date(time_t t, const std::string fmt = "%Y-%m-%d %H:%M:%S") :_t(t)
 		{
 			_fmt = fmt;
-			_str = getFormat(_t, fmt, true, (struct tm*)&_p);
+			_str = getFormat(_t, fmt, true, (struct tm*) & _p);
+			_t = ::mktime((struct tm*) & _p) * 1000;
 		}
 		virtual ~Date()
 		{
@@ -582,17 +585,17 @@ namespace hz {
 		{
 			int tms[] = { sizeof(struct tm),sizeof(struct tm_0) };
 			_t = t;
-			_str = getFormat(t, "%Y-%m-%d %H:%M:%S", isms, (struct tm*)&_p);
+			_str = getFormat(t, "%Y-%m-%d %H:%M:%S", isms, (struct tm*) & _p);
 			if (!isms)
 			{
 				_t *= 1000;
 			}
 			_milliseconds = _t % 1000;
 		}
-		void set(const std::string &dstr)
+		void set(const std::string& dstr)
 		{
 			_str = dstr;
-			_t = getDate2Time(dstr, "", (struct tm*)&_p, true, &_fmt);
+			_t = getDate2Time(dstr, "", (struct tm*) & _p, true, &_fmt);
 			_milliseconds = _t % 1000;
 		}
 		template <typename T>
@@ -600,96 +603,101 @@ namespace hz {
 		{
 			return (T)*this;
 		}
-		const char* c_str()
+		const char* c_str() const
 		{
 			return _str.c_str();
 		}
-		std::string getYM()
+		std::string str() const
+		{
+			return _str.c_str();
+		}
+		std::string getYM()const
 		{
 			return _str.substr(0, 7);
 		}
+
 #if 1
-		int64_t getDate() //´Ó Date ¶ÔÏó·µ»ØÒ»¸öÔÂÖĞµÄÄ³Ò»Ìì (1 ~ 31)¡£
+		int64_t getDate() const//ä» Date å¯¹è±¡è¿”å›ä¸€ä¸ªæœˆä¸­çš„æŸä¸€å¤© (1 ~ 31)ã€‚
 		{
 			return _p.tm_mday;
 		}
-		int64_t getWDay() //´Ó Date ¶ÔÏó·µ»ØÒ»ÖÜÖĞµÄÄ³Ò»Ìì (0 ~ 6)¡£
+		int64_t getWDay()const //ä» Date å¯¹è±¡è¿”å›ä¸€å‘¨ä¸­çš„æŸä¸€å¤© (0 ~ 6)ã€‚
 		{
 			return _p.tm_wday;
 		}
-		int64_t getMonth() //´Ó Date ¶ÔÏó·µ»ØÔÂ·İ (0 ~ 11)¡£
+		int64_t getMonth() const//ä» Date å¯¹è±¡è¿”å›æœˆä»½ (0 ~ 11)ã€‚
 		{
 			return _p.tm_mon;
 		}
-		int64_t getFullYear() //´Ó Date ¶ÔÏóÒÔËÄÎ»Êı×Ö·µ»ØÄê·İ¡£
+		int64_t getFullYear()const //ä» Date å¯¹è±¡ä»¥å››ä½æ•°å­—è¿”å›å¹´ä»½ã€‚
 		{
 			return _p.tm_year + 1900;
 		}
-		int64_t getYear() //ÇëÊ¹ÓÃ getFullYear( ) ·½·¨´úÌæ¡£
+		int64_t getYear() const//è¯·ä½¿ç”¨ getFullYear( ) æ–¹æ³•ä»£æ›¿ã€‚
 		{
 			return _p.tm_year;
 		}
-		int64_t getHours() //·µ»Ø Date ¶ÔÏóµÄĞ¡Ê± (0 ~ 23)¡£
+		int64_t getHours() const//è¿”å› Date å¯¹è±¡çš„å°æ—¶ (0 ~ 23)ã€‚
 		{
 			return _p.tm_hour;
 		}
-		int64_t getMinutes() //·µ»Ø Date ¶ÔÏóµÄ·ÖÖÓ (0 ~ 59)¡£
+		int64_t getMinutes() const//è¿”å› Date å¯¹è±¡çš„åˆ†é’Ÿ (0 ~ 59)ã€‚
 		{
 			return _p.tm_min;
 		}
-		int64_t getSeconds() //·µ»Ø Date ¶ÔÏóµÄÃëÊı (0 ~ 59)¡£
+		int64_t getSeconds()const //è¿”å› Date å¯¹è±¡çš„ç§’æ•° (0 ~ 59)ã€‚
 		{
 			return _p.tm_sec;
 		}
-		int64_t getMilliseconds() //·µ»Ø Date ¶ÔÏóµÄºÁÃë(0 ~ 999)¡£
+		int64_t getMilliseconds()const //è¿”å› Date å¯¹è±¡çš„æ¯«ç§’(0 ~ 999)ã€‚
 		{
 			return std::max(_t % 1000, _milliseconds);
 		}
-		int64_t getTime() //·µ»Ø 1970 Äê 1 ÔÂ 1 ÈÕÖÁ½ñµÄºÁÃëÊı¡£
+		int64_t getTime()const //è¿”å› 1970 å¹´ 1 æœˆ 1 æ—¥è‡³ä»Šçš„æ¯«ç§’æ•°ã€‚
 		{
 			return _t;
 		}
-		int64_t getTimezoneOffset() //·µ»Ø±¾µØÊ±¼äÓë¸ñÁÖÍşÖÎ±ê×¼Ê±¼ä (GMT) µÄ·ÖÖÓ²î¡£
+		uint64_t getTimezoneOffset() //è¿”å›æœ¬åœ°æ—¶é—´ä¸æ ¼æ—å¨æ²»æ ‡å‡†æ—¶é—´ (GMT) çš„åˆ†é’Ÿå·®ã€‚
 		{
 			return 0;
 		}
-		int64_t getUTCDate() //¸ù¾İÊÀ½çÊ±´Ó Date ¶ÔÏó·µ»ØÔÂÖĞµÄÒ»Ìì (1 ~ 31)¡£
+		uint64_t getUTCDate() //æ ¹æ®ä¸–ç•Œæ—¶ä» Date å¯¹è±¡è¿”å›æœˆä¸­çš„ä¸€å¤© (1 ~ 31)ã€‚
 		{
 			return 0;
 		}
-		int64_t getUTCDay() //¸ù¾İÊÀ½çÊ±´Ó Date ¶ÔÏó·µ»ØÖÜÖĞµÄÒ»Ìì (0 ~ 6)¡£
+		uint64_t getUTCDay() //æ ¹æ®ä¸–ç•Œæ—¶ä» Date å¯¹è±¡è¿”å›å‘¨ä¸­çš„ä¸€å¤© (0 ~ 6)ã€‚
 		{
 			return 0;
 		}
-		int64_t getUTCMonth() //¸ù¾İÊÀ½çÊ±´Ó Date ¶ÔÏó·µ»ØÔÂ·İ (0 ~ 11)¡£
+		uint64_t getUTCMonth() //æ ¹æ®ä¸–ç•Œæ—¶ä» Date å¯¹è±¡è¿”å›æœˆä»½ (0 ~ 11)ã€‚
 		{
 			return 0;
 		}
-		int64_t getUTCFullYear() //¸ù¾İÊÀ½çÊ±´Ó Date ¶ÔÏó·µ»ØËÄÎ»ÊıµÄÄê·İ¡£
+		uint64_t getUTCFullYear() //æ ¹æ®ä¸–ç•Œæ—¶ä» Date å¯¹è±¡è¿”å›å››ä½æ•°çš„å¹´ä»½ã€‚
 		{
 			return 0;
 		}
-		int64_t getUTCHours() //¸ù¾İÊÀ½çÊ±·µ»Ø Date ¶ÔÏóµÄĞ¡Ê± (0 ~ 23)¡£
+		uint64_t getUTCHours() //æ ¹æ®ä¸–ç•Œæ—¶è¿”å› Date å¯¹è±¡çš„å°æ—¶ (0 ~ 23)ã€‚
 		{
 			return 0;
 		}
-		int64_t getUTCMinutes() //¸ù¾İÊÀ½çÊ±·µ»Ø Date ¶ÔÏóµÄ·ÖÖÓ (0 ~ 59)¡£
+		uint64_t getUTCMinutes() //æ ¹æ®ä¸–ç•Œæ—¶è¿”å› Date å¯¹è±¡çš„åˆ†é’Ÿ (0 ~ 59)ã€‚
 		{
 			return 0;
 		}
-		int64_t getUTCSeconds() //¸ù¾İÊÀ½çÊ±·µ»Ø Date ¶ÔÏóµÄÃëÖÓ (0 ~ 59)¡£
+		uint64_t getUTCSeconds() //æ ¹æ®ä¸–ç•Œæ—¶è¿”å› Date å¯¹è±¡çš„ç§’é’Ÿ (0 ~ 59)ã€‚
 		{
 			return 0;
 		}
-		int64_t getUTCMilliseconds() //¸ù¾İÊÀ½çÊ±·µ»Ø Date ¶ÔÏóµÄºÁÃë(0 ~ 999)¡£
+		uint64_t getUTCMilliseconds() //æ ¹æ®ä¸–ç•Œæ—¶è¿”å› Date å¯¹è±¡çš„æ¯«ç§’(0 ~ 999)ã€‚
 		{
 			return 0;
 		}
-		const char* parse() //·µ»Ø1970Äê1ÔÂ1ÈÕÎçÒ¹µ½Ö¸¶¨ÈÕÆÚ£¨×Ö·û´®£©µÄºÁÃëÊı¡£
+		const char* parse() //è¿”å›1970å¹´1æœˆ1æ—¥åˆå¤œåˆ°æŒ‡å®šæ—¥æœŸï¼ˆå­—ç¬¦ä¸²ï¼‰çš„æ¯«ç§’æ•°ã€‚
 		{
 			return _str.c_str();
 		}
-		int64_t setDay(int64_t s, bool ism = true) //ÉèÖÃ Date ¶ÔÏóÖĞÔÂµÄÄ³Ò»Ìì (1 ~ 31)¡£
+		uint64_t setDay(uint64_t s, bool ism = true) //è®¾ç½® Date å¯¹è±¡ä¸­æœˆçš„æŸä¸€å¤© (1 ~ 31)ã€‚
 		{
 			int cm = get_month_days(_p.tm_year + 1900, _p.tm_mon + 1);
 			s = std::max(std::min((int)s, 31), 1);
@@ -700,25 +708,25 @@ namespace hz {
 			}
 			return 0;
 		}
-		int64_t incDay(int64_t s, bool ism = true) //ÉèÖÃ Date ¶ÔÏóÖĞÔÂµÄÄ³Ò»Ìì (1 ~ 31)¡£
+		uint64_t incDay(uint64_t s, bool ism = true) //è®¾ç½® Date å¯¹è±¡ä¸­æœˆçš„æŸä¸€å¤© (1 ~ 31)ã€‚
 		{
 			auto n = Date::dateChange("2018-01-20", s);
 			time_t t1 = _t / 1000;
 			struct tm tmin = { 0 };
-			struct tm *tminp = &tmin;
+			struct tm* tminp = &tmin;
 			struct tm tmout = { 0 };
-			struct tm *tmoutp = &tmout;
+			struct tm* tmoutp = &tmout;
 
-			/*½«tm½á¹¹Êı¾İ×ª»»³É1970Äê1ÔÂ1ÈÕ¿ªÊ¼¼ÆËãµÄÃëÊı*/
+			/*å°†tmç»“æ„æ•°æ®è½¬æ¢æˆ1970å¹´1æœˆ1æ—¥å¼€å§‹è®¡ç®—çš„ç§’æ•°*/
 			//t1 = mktime(tminp);
-			/*¼ÆËãĞèÒªÔö¼Ó»òÕß¼õÉÙÌìÊı¶ÔÓ¦µÄÃëÊı£¬½á¹ûÊÇ×îÖÕÈÕÆÚ¶ÔÓ¦1970Äê1ÔÂ1ÈÕ¿ªÊ¼¼ÆËãµÄÃëÊı*/
+			/*è®¡ç®—éœ€è¦å¢åŠ æˆ–è€…å‡å°‘å¤©æ•°å¯¹åº”çš„ç§’æ•°ï¼Œç»“æœæ˜¯æœ€ç»ˆæ—¥æœŸå¯¹åº”1970å¹´1æœˆ1æ—¥å¼€å§‹è®¡ç®—çš„ç§’æ•°*/
 			t1 += s * 60 * 60 * 24;
 			set(t1, false);
-			/*½«time_tµÄĞÅÏ¢×ª»¯ÕæÊµÊÀ½çµÄÊ±¼äÈÕÆÚ±íÊ¾£¬½á¹ûÓÉ½á¹¹tm·µ»Ø*/
+			/*å°†time_tçš„ä¿¡æ¯è½¬åŒ–çœŸå®ä¸–ç•Œçš„æ—¶é—´æ—¥æœŸè¡¨ç¤ºï¼Œç»“æœç”±ç»“æ„tmè¿”å›*/
 			//tmoutp = localtime(&t1);
 			return 0;
 		}
-		int64_t setMonth(int64_t s, bool ism = true) //ÉèÖÃ Date ¶ÔÏóÖĞÔÂ·İ (0 ~ 11)¡£
+		uint64_t setMonth(uint64_t s, bool ism = true) //è®¾ç½® Date å¯¹è±¡ä¸­æœˆä»½ (0 ~ 11)ã€‚
 		{
 			s = std::max(std::min((int)s, 11), 0);
 			_p.tm_mon = s;
@@ -728,68 +736,68 @@ namespace hz {
 			}
 			return 0;
 		}
-		int64_t setFullYear(int64_t s, bool ism = true) //ÉèÖÃ Date ¶ÔÏóÖĞµÄÄê·İ£¨ËÄÎ»Êı×Ö£©¡£
+		uint64_t setFullYear(uint64_t s, bool ism = true) //è®¾ç½® Date å¯¹è±¡ä¸­çš„å¹´ä»½ï¼ˆå››ä½æ•°å­—ï¼‰ã€‚
 		{
 			_p.tm_year = s - 1900;
 			if (ism)make();
 			return 0;
 		}
-		int64_t setYear(int64_t s, bool ism = true) //ÇëÊ¹ÓÃ setFullYear( ) ·½·¨´úÌæ¡£
+		uint64_t setYear(uint64_t s, bool ism = true) //è¯·ä½¿ç”¨ setFullYear( ) æ–¹æ³•ä»£æ›¿ã€‚
 		{
 			_p.tm_year = s;
 			if (ism)make();
 			return 0;
 		}
-		int64_t setHours(int64_t s) //ÉèÖÃ Date ¶ÔÏóÖĞµÄĞ¡Ê± (0 ~ 23)¡£
+		uint64_t setHours(uint64_t s) //è®¾ç½® Date å¯¹è±¡ä¸­çš„å°æ—¶ (0 ~ 23)ã€‚
 		{
 			_p.tm_hour = s; make();
 			return 0;
 		}
-		int64_t setMinutes(int64_t s) //ÉèÖÃ Date ¶ÔÏóÖĞµÄ·ÖÖÓ (0 ~ 59)¡£
+		uint64_t setMinutes(uint64_t s) //è®¾ç½® Date å¯¹è±¡ä¸­çš„åˆ†é’Ÿ (0 ~ 59)ã€‚
 		{
 			_p.tm_min = s; make();
 			return 0;
 		}
-		int64_t setSeconds(int64_t s) //ÉèÖÃ Date ¶ÔÏóÖĞµÄÃëÖÓ (0 ~ 59)¡£
+		uint64_t setSeconds(uint64_t s) //è®¾ç½® Date å¯¹è±¡ä¸­çš„ç§’é’Ÿ (0 ~ 59)ã€‚
 		{
 			_p.tm_sec = s; make();
 			return 0;
 		}
-		int64_t setMilliseconds(int64_t s) //ÉèÖÃ Date ¶ÔÏóÖĞµÄºÁÃë (0 ~ 999)¡£
+		uint64_t setMilliseconds(uint64_t s) //è®¾ç½® Date å¯¹è±¡ä¸­çš„æ¯«ç§’ (0 ~ 999)ã€‚
 		{
 			_milliseconds = s;
 			return 0;
 		}
-		int64_t setTime(int64_t s) //ÒÔºÁÃëÉèÖÃ Date ¶ÔÏó¡£
+		uint64_t setTime(uint64_t s) //ä»¥æ¯«ç§’è®¾ç½® Date å¯¹è±¡ã€‚
 		{
 			set(s);
 			return 0;
 		}
-		int64_t setUTCDate(int64_t s) //¸ù¾İÊÀ½çÊ±ÉèÖÃ Date ¶ÔÏóÖĞÔÂ·İµÄÒ»Ìì (1 ~ 31)¡£
+		uint64_t setUTCDate(uint64_t s) //æ ¹æ®ä¸–ç•Œæ—¶è®¾ç½® Date å¯¹è±¡ä¸­æœˆä»½çš„ä¸€å¤© (1 ~ 31)ã€‚
 		{
 			return 0;
 		}
-		int64_t setUTCMonth(int64_t s) //¸ù¾İÊÀ½çÊ±ÉèÖÃ Date ¶ÔÏóÖĞµÄÔÂ·İ (0 ~ 11)¡£
+		uint64_t setUTCMonth(uint64_t s) //æ ¹æ®ä¸–ç•Œæ—¶è®¾ç½® Date å¯¹è±¡ä¸­çš„æœˆä»½ (0 ~ 11)ã€‚
 		{
 			return 0;
 		}
-		int64_t setUTCFullYear(int64_t s) //¸ù¾İÊÀ½çÊ±ÉèÖÃ Date ¶ÔÏóÖĞµÄÄê·İ£¨ËÄÎ»Êı×Ö£©¡£
+		uint64_t setUTCFullYear(uint64_t s) //æ ¹æ®ä¸–ç•Œæ—¶è®¾ç½® Date å¯¹è±¡ä¸­çš„å¹´ä»½ï¼ˆå››ä½æ•°å­—ï¼‰ã€‚
 		{
 			return 0;
 		}
-		int64_t setUTCHours(int64_t s) //¸ù¾İÊÀ½çÊ±ÉèÖÃ Date ¶ÔÏóÖĞµÄĞ¡Ê± (0 ~ 23)¡£
+		uint64_t setUTCHours(uint64_t s) //æ ¹æ®ä¸–ç•Œæ—¶è®¾ç½® Date å¯¹è±¡ä¸­çš„å°æ—¶ (0 ~ 23)ã€‚
 		{
 			return 0;
 		}
-		int64_t setUTCMinutes(int64_t s) //¸ù¾İÊÀ½çÊ±ÉèÖÃ Date ¶ÔÏóÖĞµÄ·ÖÖÓ (0 ~ 59)¡£
+		uint64_t setUTCMinutes(uint64_t s) //æ ¹æ®ä¸–ç•Œæ—¶è®¾ç½® Date å¯¹è±¡ä¸­çš„åˆ†é’Ÿ (0 ~ 59)ã€‚
 		{
 			return 0;
 		}
-		int64_t setUTCSeconds(int64_t s) //¸ù¾İÊÀ½çÊ±ÉèÖÃ Date ¶ÔÏóÖĞµÄÃëÖÓ (0 ~ 59)¡£
+		uint64_t setUTCSeconds(uint64_t s) //æ ¹æ®ä¸–ç•Œæ—¶è®¾ç½® Date å¯¹è±¡ä¸­çš„ç§’é’Ÿ (0 ~ 59)ã€‚
 		{
 			return 0;
 		}
-		int64_t setUTCMilliseconds(int64_t s) //¸ù¾İÊÀ½çÊ±ÉèÖÃ Date ¶ÔÏóÖĞµÄºÁÃë (0 ~ 999)¡£
+		uint64_t setUTCMilliseconds(uint64_t s) //æ ¹æ®ä¸–ç•Œæ—¶è®¾ç½® Date å¯¹è±¡ä¸­çš„æ¯«ç§’ (0 ~ 999)ã€‚
 		{
 			return 0;
 		}
@@ -804,23 +812,25 @@ namespace hz {
 		// 		{
 		// 			return _str;
 		// 		}
-		operator const std::string&() const
+#if 0
+		operator const std::string& () const
 		{
 			return _str;
 		}
 #ifdef _WIN32 
-		operator const char*() const
+		operator const char* () const
 		{
 			return _str.c_str();
 		}
 #endif
-		operator struct tm*() const
+#endif
+		operator struct tm* () const
 		{
-			return (struct tm*)&_p;
+			return (struct tm*) & _p;
 		}
 		/*
-		*Durations:Ê±³¤
-		const nMS = 1320; //ÒÔºÁÃëµ¥Î»±íÊ¾µÄ²îÖµÊ±¼ä
+		*Durations:æ—¶é•¿
+		const nMS = 1320; //ä»¥æ¯«ç§’å•ä½è¡¨ç¤ºçš„å·®å€¼æ—¶é—´
 		var nD = Math.floor(nMS/(1000 * 60 * 60 * 24));
 		var nH = Math.floor(nMS/(1000*60*60)) % 24;
 		var nM = Math.floor(nMS/(1000*60)) % 60;
@@ -828,8 +838,8 @@ namespace hz {
 		**/
 		void make()
 		{
-			_str = getFormat((struct tm*)&_p, _fmt.c_str());
-			_t = ::mktime((struct tm*)&_p) * 1000;
+			_str = getFormat((struct tm*) & _p, _fmt.c_str());
+			_t = ::mktime((struct tm*) & _p) * 1000;
 		}
 
 		static int calc_week_day(int y, int m, int d)
@@ -841,10 +851,10 @@ namespace hz {
 			}
 			int iWeek = (d + 2 * m + 3 * (m + 1) / 5 + y + y / 4 - y / 100 + y / 400) % 7;
 			iWeek++;
-			// 1-7 "ĞÇÆÚÒ»","ĞÇÆÚ¶ş","ĞÇÆÚÈı","ĞÇÆÚËÄ","ĞÇÆÚÎå","ĞÇÆÚÁù","ĞÇÆÚÈÕ",;
+			// 1-7 "æ˜ŸæœŸä¸€","æ˜ŸæœŸäºŒ","æ˜ŸæœŸä¸‰","æ˜ŸæœŸå››","æ˜ŸæœŸäº”","æ˜ŸæœŸå…­","æ˜ŸæœŸæ—¥",;
 			return iWeek;
 		}
-		// »ñÈ¡Ò»¸öÔÂÌìÊı
+		// è·å–ä¸€ä¸ªæœˆå¤©æ•°
 		static int get_month_days(int y, int m)
 		{
 			int d;
@@ -865,27 +875,27 @@ namespace hz {
 			}
 			return d;
 		}
-		static std::string dateChange(const char *cDateIn, int n)
+		static std::string dateChange(const char* cDateIn, int n)
 		{
 			time_t t1 = 0;
 			struct tm tmin = { 0 };
-			struct tm *tminp = &tmin;
+			struct tm* tminp = &tmin;
 			struct tm tmout = { 0 };
-			struct tm *tmoutp = &tmout;
+			struct tm* tmoutp = &tmout;
 
 			char tmp[8 + 32];
 			memset(tmp, 0, sizeof(tmp));
 
 			hz::times::strptime_(cDateIn, "%Y-%m-%d", tminp);
 
-			/*½«tm½á¹¹Êı¾İ×ª»»³É1970Äê1ÔÂ1ÈÕ¿ªÊ¼¼ÆËãµÄÃëÊı*/
+			/*å°†tmç»“æ„æ•°æ®è½¬æ¢æˆ1970å¹´1æœˆ1æ—¥å¼€å§‹è®¡ç®—çš„ç§’æ•°*/
 			t1 = mktime(tminp);
-			/*¼ÆËãĞèÒªÔö¼Ó»òÕß¼õÉÙÌìÊı¶ÔÓ¦µÄÃëÊı£¬½á¹ûÊÇ×îÖÕÈÕÆÚ¶ÔÓ¦1970Äê1ÔÂ1ÈÕ¿ªÊ¼¼ÆËãµÄÃëÊı*/
+			/*è®¡ç®—éœ€è¦å¢åŠ æˆ–è€…å‡å°‘å¤©æ•°å¯¹åº”çš„ç§’æ•°ï¼Œç»“æœæ˜¯æœ€ç»ˆæ—¥æœŸå¯¹åº”1970å¹´1æœˆ1æ—¥å¼€å§‹è®¡ç®—çš„ç§’æ•°*/
 			t1 += n * 60 * 60 * 24;
-			/*½«time_tµÄĞÅÏ¢×ª»¯ÕæÊµÊÀ½çµÄÊ±¼äÈÕÆÚ±íÊ¾£¬½á¹ûÓÉ½á¹¹tm·µ»Ø*/
+			/*å°†time_tçš„ä¿¡æ¯è½¬åŒ–çœŸå®ä¸–ç•Œçš„æ—¶é—´æ—¥æœŸè¡¨ç¤ºï¼Œç»“æœç”±ç»“æ„tmè¿”å›*/
 			tmoutp = localtime(&t1);
 
-			/*tmÀàĞÍµÄÊ±¼ä×ª»»¡£½«tm°´ÕÕ%Y%m%d¸ñÊ½×ª»¯¸³Öµµ½Êä³öÖĞ£¬×î´ó³¤¶È8+1*/
+			/*tmç±»å‹çš„æ—¶é—´è½¬æ¢ã€‚å°†tmæŒ‰ç…§%Y%m%dæ ¼å¼è½¬åŒ–èµ‹å€¼åˆ°è¾“å‡ºä¸­ï¼Œæœ€å¤§é•¿åº¦8+1*/
 			strftime(tmp, 8 + 32, "%Y-%m-%d", tmoutp);
 			return tmp;
 		}
@@ -911,7 +921,7 @@ namespace hz {
 			}
 			return daystotal;
 		}
-		// »ñÈ¡±¾ĞÇÆÚÈÕÆÚ
+		// è·å–æœ¬æ˜ŸæœŸæ—¥æœŸ
 		std::vector<std::string> get_wday_days()
 		{
 			std::vector<std::string> ret;
@@ -943,34 +953,37 @@ namespace hz {
 #endif
 	public:
 
-		//»ñÈ¡Ê±¼ä×Ö·û´®
-		static std::string getFormat(time_t t, const std::string &fmt, bool ms, struct tm *outtm = nullptr, time_t utc = 8)
+		//è·å–æ—¶é—´å­—ç¬¦ä¸²
+		static std::string getFormat(time_t t, const std::string& fmt, bool ms, struct tm* outtm = nullptr, time_t utc = 8)
 		{
-			struct tm *p;
+			struct tm* p;
+			struct tm p1 = {};
 
 			if (ms)
 				t *= 0.001;
 			char s[80] = { 0 };
 			//p = gmtime(&t);
 			//strftime(s, 80, "%Y-%m-%d %H:%M:%S::%Z", p);
-			//printf("%d: %s\n", (int)t, jsonT::AtoA(s).c_str());
+			//printf("%d: %s\n", (int)t, jsont::AtoA(s).c_str());
 			t += utc * 60 * 60;
 			p = gmtime(&t);
+			strftime(s, 80, fmt.c_str(), p);
+
+			auto nt = getDate2Time(s, "", (struct tm*) & p1, true);
 			if (outtm)
 			{
-				memcpy(outtm, p, sizeof(struct tm));
+				memcpy(outtm, &p1, sizeof(struct tm));
 			}
-			strftime(s, 80, fmt.c_str(), p);
-			//printf("%d: %s\n", (int)t, jsonT::AtoA(s).c_str());
+			//printf("%d: %s\n", (int)t, jsont::AtoA(s).c_str());
 			return s;
 		}
-		static std::string getFormat(struct tm *p, const std::string &fmt)
+		static std::string getFormat(struct tm* p, const std::string& fmt)
 		{
 			char s[256] = { 0 };
 			strftime(s, 256, fmt.c_str(), p);
 			return s;
 		}
-		//»ñÈ¡±¾»úÊ±¼ä
+		//è·å–æœ¬æœºæ—¶é—´
 		static std::string getDateNow()
 		{
 			time_t t = 0;
@@ -983,7 +996,11 @@ namespace hz {
 			::time(&t);
 			return getFormat(t, fmt, false);
 		}
-		static int64_t getDate2Time(const std::string &s, std::string fmt = "", struct tm *stms = nullptr, bool isms = true, std::string *ofmt = 0)
+		static Date now(std::string fmt = "%Y-%m-%d %H:%M:%S")
+		{
+			return Now(fmt);
+		}
+		static uint64_t getDate2Time(const std::string& s, std::string fmt = "", struct tm* stms = nullptr, bool isms = true, std::string* ofmt = 0)
 		{
 			static std::string sfmt = "%Y-%m-%d %H:%M:%S";
 			if (fmt.empty())
@@ -1009,7 +1026,7 @@ namespace hz {
 				stms = &stmss;
 			}
 			hz::times::strptime_((char*)s.c_str(), fmt.c_str(), stms);
-			int64_t tt = ::mktime(stms);
+			uint64_t tt = ::mktime(stms);
 			if (isms)
 			{
 				tt *= 1000;
@@ -1020,77 +1037,142 @@ namespace hz {
 			}
 			return tt;
 		}
-		static int64_t dateDiff(const Date &dtStart, const Date &dtEnd, char strInterval)
+		static int64_t dateDiff(const Date& _left, const Date& _right, char strInterval)
 		{
-			int64_t tempDate = 0;
-			auto dtS = (dtStart);
-			auto dtE = (dtEnd);
-			// Math.abs
-			// console.log('\n---------------------dtStart', dtS, dtE);
-			switch (strInterval) {
-			case 's': // Ãë
-				tempDate = (((dtE.getTime() - dtS.getTime()) / 1000));
+			double tempDate = 0;
+			char ch = strInterval;
+			static std::string ms = "snhdwmy";
+			if (ms.find(strInterval) == std::string::npos)
+			{
+				ch = _left.get2_ch(_right);
+			}
+			switch (ch) {
+			case 's': // ç§’
+				tempDate = _left.getTime() / 1000 - _right.getTime() / 1000;
 				break;
-			case 'n': // ·Ö
-				tempDate = (((dtE.getTime() - dtS.getTime()) / 60000));
+			case 'n': // åˆ†
+				tempDate = _left.getTime() / 60000 - _right.getTime() / 60000;
 				break;
-			case 'h': // Ê±
-				tempDate = (((dtE.getTime() - dtS.getTime()) / 3600000));
+			case 'h': // æ—¶
+				tempDate = _left.getTime() / 3600000 - _right.getTime() / 3600000;
 				break;
-			case 'd': // Ìì
-				tempDate = (((dtE.getTime() - dtS.getTime()) / 86400000));
+			case 'd': // å¤©
+			{
+				auto t1 = Date(_left.getTime(), "%Y-%m-%d");
+				auto t2 = Date(_right.getTime(), "%Y-%m-%d");
+				tempDate = difftime(t1, t2) / 86400000;
 				break;
-			case 'w': // ÖÜ
-				tempDate = (((dtE.getTime() - dtS.getTime()) / (86400000 * 7)));
+			}
+			case 'w': // å‘¨
+				tempDate = _left.getTime() - _right.getTime();
+				tempDate /= (86400000 * 7);
 				break;
-			case 'm': // ÔÂ
-				tempDate = ((dtE.getMonth() + 1) + ((dtE.getFullYear() - dtS.getFullYear()) * 12) - (dtS.getMonth() + 1));
+			case 'm': // æœˆ
+				tempDate = ((_left.getMonth() + 1) + ((_left.getFullYear() - _right.getFullYear()) * 12) - (_right.getMonth() + 1));
 				break;
-			case 'y': // Äê
-				tempDate = (dtE.getFullYear() - dtS.getFullYear());
+			case 'y': // å¹´
+				tempDate = (_left.getFullYear() - _right.getFullYear());
 				break;
 			}
 			return tempDate;
-
 		}
 
-		static int64_t dateDiff(const std::string &dtStart, const std::string & dtEnd, char strInterval)
+		static int64_t dateDiff_s(const std::string& _left, const std::string& _right, char strInterval)
 		{
-			int64_t tempDate = 0;
-			Date dtS(dtStart);
-			Date dtE(dtEnd);
-			// Math.abs
-			// console.log('\n---------------------dtStart', dtS, dtE);
-			switch (strInterval) {
-			case 's': // Ãë
-				tempDate = (((dtE.getTime() - dtS.getTime()) / 1000));
-				break;
-			case 'n': // ·Ö
-				tempDate = (((dtE.getTime() - dtS.getTime()) / 60000));
-				break;
-			case 'h': // Ê±
-				tempDate = (((dtE.getTime() - dtS.getTime()) / 3600000));
-				break;
-			case 'd': // Ìì
-				tempDate = (((dtE.getTime() - dtS.getTime()) / 86400000));
-				break;
-			case 'w': // ÖÜ
-				tempDate = (((dtE.getTime() - dtS.getTime()) / (86400000 * 7)));
-				break;
-			case 'm': // ÔÂ
-				tempDate = ((dtE.getMonth() + 1) + ((dtE.getFullYear() - dtS.getFullYear()) * 12) - (dtS.getMonth() + 1));
-				break;
-			case 'y': // Äê
-				tempDate = (dtE.getFullYear() - dtS.getFullYear());
-				break;
-			}
-			return tempDate;
-
+			return dateDiff(Date(_left), Date(_right), strInterval);
 		}
 
-		// »ñÈ¡ÍøÂçÊ±¼ä
+		static std::string get_n(const Date& d)
+		{
+			auto v = hstring::split_m(d.str(), "- :");
+			std::string ret;
+			for (auto& it : v)
+				ret += it;
+			return ret;
+		}
+
+		//%Y4-%m2-%d2 %H2:%M2:%S2
+		char get2_ch(const Date& r) const
+		{
+			char ret = 's';
+			auto s = std::min(get_n(*this).size(), get_n(r).size());
+			if (s >= 14)
+			{
+				ret = 's';
+			}
+			else if (s >= 12)
+			{
+				ret = 'n';
+			}
+			else if (s >= 10)
+			{
+				ret = 'h';
+			}
+			else if (s >= 8)
+			{
+				ret = 'd';
+			}
+			else if (s >= 6)
+			{
+				ret = 'm';
+			}
+			else if (s >= 4)
+			{
+				ret = 'y';
+			}
+			return ret;
+		}
+		int64_t compare(const std::string& right)const
+		{
+			return dateDiff(*this, right, 0);
+		}
+		int64_t compare(const Date& right)const
+		{
+			return dateDiff(*this, right, 0);
+		}
+		// ç­‰äº
+		bool operator==(const std::string& right) {
+			return compare(right) == 0;
+		}
+		bool operator==(const char* const right) {
+			return compare(right) == 0;
+		}
+		bool operator==(const Date& right) {
+			return compare(right) == 0;
+		}
+		// ä¸ç­‰äº
+		bool operator!=(const std::string& right) {
+			return compare(right) != 0;
+		}
+		bool operator!=(const char* const right) {
+			return compare(right) != 0;
+		}
+		bool operator!=(const Date& right) {
+			return compare(right) != 0;
+		}
+		// å°äº
+		bool operator<(const std::string& right) {
+			return compare(right) < 0;
+		}
+		bool operator<(const char* const right) {
+			return compare(right) < 0;
+		}
+		bool operator<(const Date& right) {
+			return compare(right) < 0;
+		}
+		// å¤§äº
+		bool operator>(const std::string& right) {
+			return compare(right) > 0;
+		}
+		bool operator>(const char* const right) {
+			return compare(right) > 0;
+		}
+		bool operator>(const Date& right) {
+			return compare(right) > 0;
+		}
+		// è·å–ç½‘ç»œæ—¶é—´
 #if 0
-		static std::string getDateNet(const std::string &url = "http://time.tianqi.com/")
+		static std::string getDateNet(const std::string& url = "http://time.tianqi.com/")
 		{
 			nlohmann::json res;
 			auto str = Net::get(url, &res);
@@ -1101,24 +1183,24 @@ namespace hz {
 				ts = res["headers"]["Date"].get<std::string>();
 			}
 			hz::time::strptime_((char*)ts.c_str(), "%a, %d %b %Y %T %Z", &stms);
-			int64_t tt = ::mktime(&stms);
+			uint64_t tt = ::mktime(&stms);
 			tt += 28800;
 			return hz::time::getFormat(tt, "%Y-%m-%d %H:%M:%S", false);
 		}
 #endif
-		/*ÅĞ¶ÏÊÇÆ½Äê»¹ÊÇÈòÄê*/
+		/*åˆ¤æ–­æ˜¯å¹³å¹´è¿˜æ˜¯é—°å¹´*/
 		static int IsLeap(int year) {
 			if ((year % 4 == 0) && (year % 100 != 0) || (year % 400 == 0))
 				return 1;
 			else
 				return 0;
 		}
-		/*¼ÆËã½ñÄêµÄµÚÒ»ÌìÊÇĞÇÆÚ¼¸*/
+		/*è®¡ç®—ä»Šå¹´çš„ç¬¬ä¸€å¤©æ˜¯æ˜ŸæœŸå‡ */
 		static int FirstWeeday(int year) {
 			int days = (year - 1) * 365 + (year - 1) / 4 - (year - 100) / 100 + (year - 1) / 400;
 			return days % 7;
 		}
-		/*´òÓ¡ĞÇÆÚ*/
+		/*æ‰“å°æ˜ŸæœŸ*/
 		static void PrintWeedTitl() {
 			int i;
 			for (i = 0; i < 7; i++) {
@@ -1135,16 +1217,16 @@ namespace hz {
 			}
 			printf("\n");
 		}
-		/*´òÓ¡ÔÂ·İ*/
+		/*æ‰“å°æœˆä»½*/
 		static void PrintMonTitl(int month) {
-			static const char* mstr[] = { "JanÒ»", "Feb¶ş", "MarÈı", "AprËÄ",
-				"MayÎå", "JunÁù", "JulÆß", "Aug°Ë", "Sep¾Å", "OctÊ®", "NovÊ®Ò»", "DecÊ®¶ş", };
+			static const char* mstr[] = { "Janä¸€", "FebäºŒ", "Marä¸‰", "Aprå››",
+				"Mayäº”", "Junå…­", "Julä¸ƒ", "Augå…«", "Sepä¹", "Octå", "Novåä¸€", "DecåäºŒ", };
 			if (month < 12 && month >= 0)
 			{
-				printf("%sÔÂ\n", mstr[month]);
+				printf("%sæœˆ\n", mstr[month]);
 			}
 		}
-		/*¸ñÊ½»¯Êä³öÈÕÀú*/
+		/*æ ¼å¼åŒ–è¾“å‡ºæ—¥å†*/
 		static void PrintYear(int year) {
 			int m, i, d;
 			char c = ' ';
@@ -1182,38 +1264,100 @@ namespace hz {
 			int iWeek = (d + 2 * m + 3 * (m + 1) / 5 + y + y / 4 - y / 100 + y / 400) % 7;
 			switch (iWeek)
 			{
-			case 0:  "ĞÇÆÚÒ»";
-			case 1:  "ĞÇÆÚ¶ş";
-			case 2:  "ĞÇÆÚÈı";
-			case 3:  "ĞÇÆÚËÄ";
-			case 4:  "ĞÇÆÚÎå";
-			case 5:  "ĞÇÆÚÁù";
-			case 6:  "ĞÇÆÚÈÕ";
+			case 0:  "æ˜ŸæœŸä¸€";
+			case 1:  "æ˜ŸæœŸäºŒ";
+			case 2:  "æ˜ŸæœŸä¸‰";
+			case 3:  "æ˜ŸæœŸå››";
+			case 4:  "æ˜ŸæœŸäº”";
+			case 5:  "æ˜ŸæœŸå…­";
+			case 6:  "æ˜ŸæœŸæ—¥";
 			}
 			return iWeek;
 		}
 	private:
 
 	};
+#if 0
+	// å°äº
+	static bool operator<(const Date& left, const std::string& right) {
+		return left.compare(right) < 0;
+	}
+	static bool operator<(const std::string& left, const Date& right) {
+		return right.compare(left) > 0;
+	}
+	static bool operator<(const Date& left, const char* const right) {
+		return left.compare(right) < 0;
+	}
+	static bool operator<(const char* const left, const Date& right) {
+		return right.compare(left) > 0;
+	}
+	static bool operator<(const Date& left, const Date& right) {
+		return left.compare(right) < 0;
+	}
+	// å¤§äº
+	static bool operator>(const Date& left, const std::string& right) {
+		return left.compare(right) > 0;
+	}
+	static bool operator>(const std::string& left, const Date& right) {
+		return right.compare(left) < 0;
+	}
+	static bool operator>(const Date& left, const char* const right) {
+		return left.compare(right) > 0;
+	}
+	static bool operator>(const char* const left, const Date& right) {
+		return right.compare(left) < 0;
+	}
+	static bool operator>(const Date& left, const Date& right) {
+		return left.compare(right) > 0;
+	}
+	static bool operator==(const Date& _Left, const char* _Right) {
+		return Date::dateDiff(_Left, _Right, 'c') == 0;
+	}
+	static bool operator==(const char* _Left, const Date& _Right) {
+		return Date::dateDiff(_Left, _Right, 'c') == 0;
+	}
+	static bool operator==(const Date& _Left, const Date& _Right) {
+		return Date::dateDiff(_Left, _Right, 'c') == 0;
+	}
 
+	static bool operator<(const Date& _Left, const char* _Right) {
+		return Date::dateDiff(_Left, _Right, 'c') < 0;
+	}
+	static bool operator<(const char* _Left, const Date& _Right) {
+		return Date::dateDiff(_Left, _Right, 'c') < 0;
+	}
+	static bool operator<(const Date& _Left, const Date& _Right) {
+		return Date::dateDiff(_Left, _Right, 'c') < 0;
+	}
+
+	static bool operator>(const Date& _Left, const char* _Right) {
+		return Date::dateDiff(_Left, _Right, 'c') > 0;
+	}
+	static bool operator>(const char* _Left, const Date& _Right) {
+		return Date::dateDiff(_Left, _Right, 'c') > 0;
+	}
+	static bool operator>(const Date& _Left, const Date& _Right) {
+		return Date::dateDiff(_Left, _Right, 'c') > 0;
+	}
+#endif
 	/*
-	Timer·µ»ØÁ½¸öÊ±¼ä²î
-	resetº¯ÊıÖØÖÃ
+	Timerè¿”å›ä¸¤ä¸ªæ—¶é—´å·®
+	resetå‡½æ•°é‡ç½®
 
 	void fun()
 	{
-	cout << ¡±hello word¡± << endl;
+	cout << â€hello wordâ€ << endl;
 	}
 	int main()
 	{
-	Timer t; //¿ªÊ¼¼ÆÊ±
+	Timer t; //å¼€å§‹è®¡æ—¶
 	fun();
-	cout << t.elapsed() << endl; //´òÓ¡funº¯ÊıºÄÊ±¶àÉÙºÁÃë
-	cout << t.elapsed_micro() << endl; //´òÓ¡Î¢Ãë
-	cout << t.elapsed_nano() << endl; //´òÓ¡ÄÉÃë
-	cout << t.elapsed_seconds() << endl; //´òÓ¡Ãë
-	cout << t.elapsed_minutes() << endl; //´òÓ¡·ÖÖÓ
-	cout << t.elapsed_hours() << endl; //´òÓ¡Ğ¡Ê±
+	cout << t.elapsed() << endl; //æ‰“å°funå‡½æ•°è€—æ—¶å¤šå°‘æ¯«ç§’
+	cout << t.elapsed_micro() << endl; //æ‰“å°å¾®ç§’
+	cout << t.elapsed_nano() << endl; //æ‰“å°çº³ç§’
+	cout << t.elapsed_seconds() << endl; //æ‰“å°ç§’
+	cout << t.elapsed_minutes() << endl; //æ‰“å°åˆ†é’Ÿ
+	cout << t.elapsed_hours() << endl; //æ‰“å°å°æ—¶
 	}
 	*/
 
@@ -1230,38 +1374,38 @@ namespace hz {
 		Timer() : m_begin(std::chrono::high_resolution_clock::now()) {}
 		void reset() { m_begin = std::chrono::high_resolution_clock::now(); }
 #if 0
-		//Ä¬ÈÏÊä³öºÁÃë
-		int64_t elapsed() const
+		//é»˜è®¤è¾“å‡ºæ¯«ç§’
+		uint64_t elapsed() const
 		{
 			return (std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now())
 				- std::chrono::time_point_cast<std::chrono::milliseconds>(m_begin)).count();
 		}
-		//Î¢Ãë
-		int64_t elapsed_micro()const
+		//å¾®ç§’
+		uint64_t elapsed_micro()const
 		{
 			return (std::chrono::time_point_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now())
 				- std::chrono::time_point_cast<std::chrono::microseconds>(m_begin)).count();
 		}
-		//ÄÉÃë
-		int64_t elapsed_nano()const
+		//çº³ç§’
+		uint64_t elapsed_nano()const
 		{
 			return (std::chrono::time_point_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now())
 				- std::chrono::time_point_cast<std::chrono::nanoseconds>(m_begin)).count();
 		}
-		//Ãë
-		int64_t elapsed_seconds()const
+		//ç§’
+		uint64_t elapsed_seconds()const
 		{
 			return (std::chrono::time_point_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now())
 				- std::chrono::time_point_cast<std::chrono::seconds>(m_begin)).count();
 		}
-		//·Ö
-		int64_t elapsed_minutes()const
+		//åˆ†
+		uint64_t elapsed_minutes()const
 		{
 			return (std::chrono::time_point_cast<std::chrono::minutes>(std::chrono::high_resolution_clock::now())
 				- std::chrono::time_point_cast<std::chrono::minutes>(m_begin)).count();
 		}
-		//Ê±
-		int64_t elapsed_hours()const
+		//æ—¶
+		uint64_t elapsed_hours()const
 		{
 #ifdef _WIN32
 			return std::chrono::duration_cast<std::chrono::hours>(std::chrono::high_resolution_clock::now() - m_begin).count();
@@ -1271,70 +1415,70 @@ namespace hz {
 #endif
 		}
 #else
-		//Ä¬ÈÏÊä³öºÁÃë
-		int64_t elapsed() const
+		//é»˜è®¤è¾“å‡ºæ¯«ç§’
+		uint64_t elapsed() const
 		{
 			return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - m_begin).count();
 		}
-		//Î¢Ãë
-		int64_t elapsed_micro() const
+		//å¾®ç§’
+		uint64_t elapsed_micro() const
 		{
 			return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - m_begin).count();
 		}
-		//ÄÉÃë
-		int64_t elapsed_nano() const
+		//çº³ç§’
+		uint64_t elapsed_nano() const
 		{
 			return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - m_begin).count();
 		}
-		//Ãë
-		int64_t elapsed_seconds() const
+		//ç§’
+		uint64_t elapsed_seconds() const
 		{
 			return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - m_begin).count();
 		}
-		//·Ö
-		int64_t elapsed_minutes() const
+		//åˆ†
+		uint64_t elapsed_minutes() const
 		{
 			return std::chrono::duration_cast<std::chrono::minutes>(std::chrono::high_resolution_clock::now() - m_begin).count();
 		}
-		//Ê±
-		int64_t elapsed_hours() const
+		//æ—¶
+		uint64_t elapsed_hours() const
 		{
 			return std::chrono::duration_cast<std::chrono::hours>(std::chrono::high_resolution_clock::now() - m_begin).count();
 		}
 
 #endif
 #if 1
-		//ºÁÃë
-		static int64_t get_ms()
+		//æ¯«ç§’
+		static uint64_t get_ms()
 		{
 			return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 		}
-		//Î¢Ãë
-		static int64_t get_micro()
+		//å¾®ç§’
+		static uint64_t get_micro()
 		{
 			return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 		}
-		//ÄÉÃë
-		static int64_t get_nano()
+		//çº³ç§’
+		static uint64_t get_nano()
 		{
 			return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 		}
-		//Ãë
-		static int64_t get_seconds()
+		//ç§’
+		static uint64_t get_seconds()
 		{
 			return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 		}
-		//·Ö
-		static int64_t get_minutes()
+		//åˆ†
+		static uint64_t get_minutes()
 		{
 			return std::chrono::duration_cast<std::chrono::minutes>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 		}
-		//Ê±
-		static int64_t get_hours()
+		//æ—¶
+		static uint64_t get_hours()
 		{
 			return std::chrono::duration_cast<std::chrono::hours>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 		}
-		static int64_t get_now()
+		static uint64_t get_now()
 		{
 			return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 		}

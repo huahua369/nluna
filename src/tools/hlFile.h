@@ -1,6 +1,6 @@
-#ifndef __FILE__h__
+ï»¿#ifndef __FILE__h__
 #define __FILE__h__
-
+#define HZ_FILE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -83,34 +83,45 @@ namespace hz {
 		}
 		static std::string getAP()
 		{
-			std::string ret;
+			static std::string ret;
+			static std::once_flag flag;
+			std::call_once(flag, [=]() {
 #ifdef _WIN32
-			char szAppPath[1024] = { 0 };
-			GetModuleFileNameA(GetModuleHandleA(""), (char*)szAppPath, 1024);
-			(strrchr((char*)szAppPath, '\\'))[1] = 0;
-			ret = szAppPath;
+#ifdef __EXEFILE__
+				char szAppPath[1024] = { 0 };
+				GetModuleFileNameA(GetModuleHandleA(""), (char*)szAppPath, 1024);
+				(strrchr((char*)szAppPath, '\\'))[1] = 0;
+				ret = szAppPath;
 #else
-			// linux»ñÈ¡±¾½ø³ÌÄ¿Â¼
-			size_t len = PATH_MAX;
-			char processdir[PATH_MAX];
-			char processname[1024];
-			char* path_end;
-			std::vector<std::string> vs;
-			if (readlink("/proc/self/exe", processdir, len) <= 0)
-				return ret;
-			path_end = strrchr(processdir, '/');
-			if (path_end == NULL)
-				return ret;
-			++path_end;
-			strcpy(processname, path_end);
-			*path_end = '\0';
-			size_t l = (size_t)(path_end - processdir);
-			vs.push_back(processdir);
-			vs.push_back(processname);
-			ret = processdir;
-			//ret = getenv("HOME");
-			//ret += "/";
+				//å¯ä»¥è·å¾—DLLè‡ªèº«çš„è·¯å¾„
+				char dllpath[MAX_PATH];
+				::memset(dllpath, 0, sizeof(dllpath));
+				::GetModuleFileNameA(ModuleFromAddress(ModuleFromAddress), dllpath, MAX_PATH);
+				ret = getDic(dllpath);
+#endif // __EXEFILE__
+#else
+				// linuxè·å–æœ¬è¿›ç¨‹ç›®å½•
+				size_t len = PATH_MAX;
+				char processdir[PATH_MAX];
+				char processname[1024];
+				char* path_end;
+				std::vector<std::string> vs;
+				if (readlink("/proc/self/exe", processdir, len) <= 0)
+					return ret;
+				path_end = strrchr(processdir, '/');
+				if (path_end == NULL)
+					return ret;
+				++path_end;
+				strcpy(processname, path_end);
+				*path_end = '\0';
+				size_t l = (size_t)(path_end - processdir);
+				vs.push_back(processdir);
+				vs.push_back(processname);
+				ret = processdir;
+				//ret = getenv("HOME");
+				//ret += "/";
 #endif
+				});
 			return ret;
 		}
 		static std::string getAP(std::string name, std::string pat = "")
@@ -124,7 +135,22 @@ namespace hz {
 			rap += name;
 			return rap;
 		}
-		// »ñÈ¡Â·¾¶£¬È¥µôÎ²²¿n¸öÎÄ¼ş¼Ğ
+#ifdef _WIN32
+		// ä¸€ä¸ªé€šè¿‡å†…å­˜åœ°å€å–å¾—æ¨¡å—å¥æŸ„çš„å¸®åŠ©å‡½æ•°
+		static HMODULE WINAPI ModuleFromAddress(PVOID pv)
+		{
+			MEMORY_BASIC_INFORMATION mbi;
+			if (::VirtualQuery(pv, &mbi, sizeof(mbi)) != 0)
+			{
+				return (HMODULE)mbi.AllocationBase;
+			}
+			else
+			{
+				return NULL;
+			}
+		}
+#endif
+		// è·å–è·¯å¾„ï¼Œå»æ‰å°¾éƒ¨nä¸ªæ–‡ä»¶å¤¹
 		static std::string getDic(const std::string& dic, int last = 1)
 		{
 			auto drs = hz::hstring::split_m(dic, "\\/");
@@ -133,11 +159,35 @@ namespace hz {
 			{
 				drs.pop_back();
 			}
-			auto rdic = hz::jsonT::join(drs, sfg) + sfg;
+			auto rdic = hz::jsont::join(drs, sfg) + sfg;
 			return rdic;
 		}
+		// è·å–åŸŸå
+		static std::string get_domain_name(const std::string& str, const std::string& hstr = "http")
+		{
+			std::string ret;
+			auto pos = str.find(hstr);
+			if (pos == -1)
+			{
+				return ret;
+			}
+			const char* t0 = str.c_str() + pos;
+			auto t = t0;
+			for (; *t; t++)
+			{
+				if (*t == '/')
+				{
+					if (t[1] != '/')
+						break;
+					else
+						t++;
+				}
+			}
+			ret.assign(t0, t);
+			return ret;
+		}
 
-		// ºóÌ¨ÔËĞĞ
+		// åå°è¿è¡Œ
 		static void init_daemon()
 		{
 			int pid;
@@ -145,16 +195,16 @@ namespace hz {
 #ifndef _WIN32
 			pid = fork();
 			if (pid < 0)
-				exit(1);  //´´½¨´íÎó£¬ÍË³ö
-			else if (pid > 0) //¸¸½ø³ÌÍË³ö
+				exit(1);  //åˆ›å»ºé”™è¯¯ï¼Œé€€å‡º
+			else if (pid > 0) //çˆ¶è¿›ç¨‹é€€å‡º
 				exit(0);
-			setsid(); //Ê¹×Ó½ø³Ì³ÉÎª×é³¤
+			setsid(); //ä½¿å­è¿›ç¨‹æˆä¸ºç»„é•¿
 			pid = fork();
 			if (pid > 0)
-				exit(0); //ÔÙ´ÎÍË³ö£¬Ê¹½ø³Ì²»ÊÇ×é³¤£¬ÕâÑù½ø³Ì¾Í²»»á´ò¿ª¿ØÖÆÖÕ¶Ë
+				exit(0); //å†æ¬¡é€€å‡ºï¼Œä½¿è¿›ç¨‹ä¸æ˜¯ç»„é•¿ï¼Œè¿™æ ·è¿›ç¨‹å°±ä¸ä¼šæ‰“å¼€æ§åˆ¶ç»ˆç«¯
 			else if (pid < 0)
 				exit(1);
-			//¹Ø±Õ½ø³Ì´ò¿ªµÄÎÄ¼ş¾ä±ú
+			//å…³é—­è¿›ç¨‹æ‰“å¼€çš„æ–‡ä»¶å¥æŸ„
 			for (i = 0; i < NOFILE; i++)
 				close(i);
 			signal(SIGHUP, SIG_IGN);
@@ -311,33 +361,34 @@ namespace hz {
 			if (ty & pathext)ret += ext;
 			return ret;
 		}
-		//Èç¹ûÎÄ¼ş¾ßÓĞÖ¸¶¨µÄ·ÃÎÊÈ¨ÏŞ£¬Ôòº¯Êı·µ»Ø0  
-		//Èç¹ûÎÄ¼ş²»´æÔÚ»òÕß²»ÄÜ·ÃÎÊÖ¸¶¨µÄÈ¨ÏŞ£¬Ôò·µ»Ø-1  
+		//å¦‚æœæ–‡ä»¶å…·æœ‰æŒ‡å®šçš„è®¿é—®æƒé™ï¼Œåˆ™å‡½æ•°è¿”å›0  
+		//å¦‚æœæ–‡ä»¶ä¸å­˜åœ¨æˆ–è€…ä¸èƒ½è®¿é—®æŒ‡å®šçš„æƒé™ï¼Œåˆ™è¿”å›-1  
 
-		//±¸×¢  
-		//µ±pathÎªÎÄ¼şÊ±£¬_accessº¯ÊıÅĞ¶ÏÎÄ¼şÊÇ·ñ´æÔÚ£¬²¢ÅĞ¶ÏÎÄ¼şÊÇ·ñ¿ÉÒÔÓÃmodeÖµÖ¸¶¨µÄÄ£Ê½½øĞĞ·ÃÎÊ  
-		//µ±pathÎªÄ¿Â¼Ê±£¬_accessÖ»ÅĞ¶ÏÖ¸¶¨µÄÄ¿Â¼ÊÇ·ñ´æÔÚ£¬ÔÚWindowsNTºÍWindows2000ÖĞ£¬ËùÓĞÄ¿Â¼¶¼ÓĞ¶ÁĞ´È¨ÏŞ  
+		//å¤‡æ³¨  
+		//å½“pathä¸ºæ–‡ä»¶æ—¶ï¼Œ_accesså‡½æ•°åˆ¤æ–­æ–‡ä»¶æ˜¯å¦å­˜åœ¨ï¼Œå¹¶åˆ¤æ–­æ–‡ä»¶æ˜¯å¦å¯ä»¥ç”¨modeå€¼æŒ‡å®šçš„æ¨¡å¼è¿›è¡Œè®¿é—®  
+		//å½“pathä¸ºç›®å½•æ—¶ï¼Œ_accessåªåˆ¤æ–­æŒ‡å®šçš„ç›®å½•æ˜¯å¦å­˜åœ¨ï¼Œåœ¨WindowsNTå’ŒWindows2000ä¸­ï¼Œæ‰€æœ‰ç›®å½•éƒ½æœ‰è¯»å†™æƒé™  
 
-		//modeÖµ  
-		//00    Ö»¼ì²éÎÄ¼şÊÇ·ñ´æÔÚ  
-		//02    Ğ´È¨ÏŞ  
-		//04    ¶ÁÈ¨ÏŞ  
-		//06    ¶ÁĞ´È¨ÏŞ
+		//modeå€¼  
+		//00    åªæ£€æŸ¥æ–‡ä»¶æ˜¯å¦å­˜åœ¨  
+		//02    å†™æƒé™  
+		//04    è¯»æƒé™  
+		//06    è¯»å†™æƒé™
 
 		static bool fn_access(const char* fn)
 		{
 			return (access(fn, 0) != -1);
 		}
-		//ÑéÖ¤
+		//éªŒè¯
 		static std::string getFn(std::string fnc, bool isutf8 = false)
 		{
 			std::string tem = fnc;
 #ifndef __ANDROID__
+			auto sp = s();
 			if (0 != access(fnc.c_str(), 0))
 			{
 				std::set<std::string> fv;
 				fv.insert(getAP(fnc));
-				for (auto it : s()->dv)
+				for (auto it : sp->dv)
 					fv.insert(getAP(fnc, it));
 				fnc = "";
 				for (auto& it : fv)
@@ -360,10 +411,13 @@ namespace hz {
 			return fnc;
 #endif
 		}
-		// ÑéÖ¤Ä¿Â¼ÊÇ·ñ´æÔÚ£¬²»´æÔÚÔò´´½¨
+		// éªŒè¯ç›®å½•æ˜¯å¦å­˜åœ¨ï¼Œä¸å­˜åœ¨åˆ™åˆ›å»º
 		static void check_make_path(const std::string& filename, unsigned int mod = S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)
 		{
 			char* file_name = (char*)filename.c_str();
+#ifndef nnDEBUG
+			printf("check_make_path: %s\n", file_name);
+#endif // DEBUG
 			char* t = file_name;
 			char chr = '/';
 			char* ch = strchr(t, '\\');
@@ -376,11 +430,11 @@ namespace hz {
 			{
 				t = strchr(++t, chr);
 				if (t)
-					* t = 0;
+					*t = 0;
 				if (access(file_name, 0) != -1)
 				{
 					if (t)
-						* t = chr;
+						*t = chr;
 					continue;
 				}
 #ifdef _WIN32
@@ -389,8 +443,28 @@ namespace hz {
 				mkdir(file_name, mod);
 #endif
 				if (t)
-					* t = chr;
+					*t = chr;
 			}
+		}
+		// åˆ é™¤æ–‡ä»¶
+		static bool remove_file(std::string filename)
+		{
+			int ret = remove(filename.c_str());
+			if (ret != 0)
+			{
+				switch (errno)
+				{
+				case EROFS: printf("æ–‡ä»¶[%s]ä¸ºåªè¯»æ–‡ä»¶ã€‚\n", filename.c_str()); break;
+				case EFAULT: printf("å‚æ•°[%s] æŒ‡é’ˆè¶…å‡ºå¯å­˜å–å†…å­˜ç©ºé—´ã€‚\n", filename.c_str()); break;
+				case ENAMETOOLONG: printf("å‚æ•°[%s] å¤ªé•¿ã€‚\n", filename.c_str()); break;
+				case ENOMEM: printf("æ ¸å¿ƒå†…å­˜ä¸è¶³ã€‚æ–‡ä»¶[%s]\n", filename.c_str()); break;
+				case ELOOP: printf("å‚æ•°[%s] æœ‰è¿‡å¤šç¬¦å·è¿æ¥é—®é¢˜ã€‚\n", filename.c_str()); break;
+				case EIO: printf("I/O å­˜å–é”™è¯¯ã€‚æ–‡ä»¶[%s]\n", filename.c_str()); break;
+				default:
+					break;
+				}
+			}
+			return ret == 0;
 		}
 		static bool read_binary_file(std::string filename, std::vector<char>& result, bool ismv = false)
 		{
@@ -431,12 +505,12 @@ namespace hz {
 				LOGW("read_binary_file1: %d", (int)size);
 				return true;
 #else
-#ifdef _WIN32
-				hz::MapView mv;
-				if (mv.openfile(fn))			//´ò¿ªÎÄ¼ş					
+#ifdef MAPVIEW
+				MapView mv;
+				if (mv.openfile(fn))			//æ‰“å¼€æ–‡ä»¶					
 				{
 					size = mv.getFileSize();
-					char* buf = (char*)mv.mapview();	//»ñÈ¡Ó³ÉäÄÚÈİ
+					char* buf = (char*)mv.mapview();	//è·å–æ˜ å°„å†…å®¹
 					if (buf)
 					{
 						result.resize(size);
@@ -487,12 +561,12 @@ namespace hz {
 
 			if (!fp && !is_plus)
 			{
-#ifdef _WIN32 
-				hz::MapView mv;
-				if (mv.openfile(fn) || mv.createfile(fn))			//´ò¿ªÎÄ¼ş					
+#ifdef MAPVIEW 
+				MapView mv;
+				if (mv.openfile(fn) || mv.createfile(fn))			//æ‰“å¼€æ–‡ä»¶					
 				{
 					mv.creatmap(size);
-					char* buf = (char*)mv.mapview();	//»ñÈ¡Ó³ÉäÄÚÈİ
+					char* buf = (char*)mv.mapview();	//è·å–æ˜ å°„å†…å®¹
 					if (buf)
 					{
 						memcpy(buf, data, size);
@@ -528,12 +602,12 @@ namespace hz {
 			switch (uMsg)
 			{
 			case BFFM_INITIALIZED:
-				::SendMessage(hwnd, BFFM_SETSELECTION, TRUE, lpData);   //´«µİÄ¬ÈÏ´ò¿ªÂ·¾¶ break;  
-			case BFFM_SELCHANGED:    //Ñ¡ÔñÂ·¾¶±ä»¯£¬BFFM_SELCHANGED  
+				::SendMessage(hwnd, BFFM_SETSELECTION, TRUE, lpData);   //ä¼ é€’é»˜è®¤æ‰“å¼€è·¯å¾„ break;  
+			case BFFM_SELCHANGED:    //é€‰æ‹©è·¯å¾„å˜åŒ–ï¼ŒBFFM_SELCHANGED  
 			{
 				char curr[MAX_PATH];
 				SHGetPathFromIDList((LPCITEMIDLIST)lParam, (LPSTR)(LPCTSTR)curr);
-				::SendMessage(hwnd, BFFM_SETSTATUSTEXT, 0, (LPARAM)& curr[0]);
+				::SendMessage(hwnd, BFFM_SETSTATUSTEXT, 0, (LPARAM)&curr[0]);
 			}
 			break;
 			default:
@@ -552,27 +626,27 @@ namespace hz {
 			HWND hWnd = GetForegroundWindow();
 			SHGetSpecialFolderLocation(hWnd, CSIDL_DRIVES, &ppidl);
 			if (ppidl == NULL)
-				MessageBox(hWnd, "Æô¶¯Â·¾¶ä¯ÀÀÊ§°Ü", "ÌáÊ¾", MB_OK);
+				MessageBox(hWnd, "å¯åŠ¨è·¯å¾„æµè§ˆå¤±è´¥", "æç¤º", MB_OK);
 
-			//³õÊ¼»¯Èë¿Ú²ÎÊıbi¿ªÊ¼  
+			//åˆå§‹åŒ–å…¥å£å‚æ•°biå¼€å§‹  
 			bi.hwndOwner = hWnd;
-			bi.pidlRoot = ppidl;//¸ùÄ¿Â¼  
-			bi.pszDisplayName = Buffer;//´Ë²ÎÊıÈçÎªNULLÔò²»ÄÜÏÔÊ¾¶Ô»°¿ò  
-			bi.lpszTitle = title.c_str();//\0ä¯ÀÀÎÄ¼ş¼Ğ";//ÏÂ±êÌâ  
+			bi.pidlRoot = ppidl;//æ ¹ç›®å½•  
+			bi.pszDisplayName = Buffer;//æ­¤å‚æ•°å¦‚ä¸ºNULLåˆ™ä¸èƒ½æ˜¾ç¤ºå¯¹è¯æ¡†  
+			bi.lpszTitle = title.c_str();//\0æµè§ˆæ–‡ä»¶å¤¹";//ä¸‹æ ‡é¢˜  
 			bi.ulFlags = //BIF_DONTGOBELOWDOMAIN | BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
-				BIF_RETURNONLYFSDIRS | BIF_USENEWUI /*°üº¬Ò»¸ö±à¼­¿ò ÓÃ»§¿ÉÒÔÊÖ¶¯ÌîĞ´Â·¾¶ ¶Ô»°¿ò¿ÉÒÔµ÷Õû´óĞ¡Ö®ÀàµÄ..*/ |
-				BIF_UAHINT /*´øTIPSÌáÊ¾*/ | BIF_NONEWFOLDERBUTTON /*²»´øĞÂ½¨ÎÄ¼ş¼Ğ°´Å¥*/;
+				BIF_RETURNONLYFSDIRS | BIF_USENEWUI /*åŒ…å«ä¸€ä¸ªç¼–è¾‘æ¡† ç”¨æˆ·å¯ä»¥æ‰‹åŠ¨å¡«å†™è·¯å¾„ å¯¹è¯æ¡†å¯ä»¥è°ƒæ•´å¤§å°ä¹‹ç±»çš„..*/ |
+				BIF_UAHINT /*å¸¦TIPSæç¤º*/ | BIF_NONEWFOLDERBUTTON /*ä¸å¸¦æ–°å»ºæ–‡ä»¶å¤¹æŒ‰é’®*/;
 			bi.lpfn = _SHBrowseForFolderCallbackProc;
 			//bi.iImage=IDR_MAINFRAME;  
-			bi.lParam = LPARAM(strCurrentPath.c_str());    //ÉèÖÃÄ¬ÈÏÂ·¾¶  
+			bi.lParam = LPARAM(strCurrentPath.c_str());    //è®¾ç½®é»˜è®¤è·¯å¾„  
 
-														   //³õÊ¼»¯Èë¿Ú²ÎÊıbi½áÊø  
-			LPITEMIDLIST pIDList = SHBrowseForFolder(&bi);//µ÷ÓÃÏÔÊ¾Ñ¡Ôñ¶Ô»°¿ò  
+														   //åˆå§‹åŒ–å…¥å£å‚æ•°biç»“æŸ  
+			LPITEMIDLIST pIDList = SHBrowseForFolder(&bi);//è°ƒç”¨æ˜¾ç¤ºé€‰æ‹©å¯¹è¯æ¡†  
 			if (pIDList)
 			{
-				//È¡µÃÎÄ¼ş¼ĞÂ·¾¶µ½BufferÀï  
+				//å–å¾—æ–‡ä»¶å¤¹è·¯å¾„åˆ°Bufferé‡Œ  
 				SHGetPathFromIDList(pIDList, szResult);
-				//sFolderPath¾ÍÊÇÎÒÃÇÑ¡ÔñµÄÂ·¾¶  
+				//sFolderPathå°±æ˜¯æˆ‘ä»¬é€‰æ‹©çš„è·¯å¾„  
 
 				rfunc((std::string)szResult);
 				printf("Select path %s\n", szResult);
@@ -590,27 +664,27 @@ namespace hz {
 		static int openFileName(const std::string& strCurrentPath, const char* filter, HWND hWnd, std::function<void(const std::vector<std::string>&)> rfunc)
 		{
 			OPENFILENAME opfn;
-			CHAR strFilename[MAX_PATH * 100];//´æ·ÅÎÄ¼şÃû  
-											 //³õÊ¼»¯  
+			CHAR strFilename[MAX_PATH * 100];//å­˜æ”¾æ–‡ä»¶å  
+											 //åˆå§‹åŒ–  
 			ZeroMemory(&opfn, sizeof(OPENFILENAME));
-			opfn.lStructSize = sizeof(OPENFILENAME);//½á¹¹Ìå´óĞ¡  
+			opfn.lStructSize = sizeof(OPENFILENAME);//ç»“æ„ä½“å¤§å°  
 			opfn.hwndOwner = hWnd;
 
-			//ÉèÖÃ¹ıÂË  
-			opfn.lpstrFilter = filter ? filter : "ËùÓĞÎÄ¼ş\0*.*\0\0ÎÄ±¾ÎÄ¼ş\0*.txt\0";
-			//Ä¬ÈÏ¹ıÂËÆ÷Ë÷ÒıÉèÎª1  
+			//è®¾ç½®è¿‡æ»¤  
+			opfn.lpstrFilter = filter ? filter : "æ‰€æœ‰æ–‡ä»¶\0*.*\0\0æ–‡æœ¬æ–‡ä»¶\0*.txt\0";
+			//é»˜è®¤è¿‡æ»¤å™¨ç´¢å¼•è®¾ä¸º1  
 			opfn.nFilterIndex = 1;
-			//ÎÄ¼şÃûµÄ×Ö¶Î±ØĞëÏÈ°ÑµÚÒ»¸ö×Ö·ûÉèÎª \0  
+			//æ–‡ä»¶åçš„å­—æ®µå¿…é¡»å…ˆæŠŠç¬¬ä¸€ä¸ªå­—ç¬¦è®¾ä¸º \0  
 			opfn.lpstrFile = strFilename;
 			opfn.lpstrFile[0] = '\0';
 			opfn.nMaxFile = sizeof(strFilename);
-			//ÉèÖÃ±êÖ¾Î»£¬¼ì²éÄ¿Â¼»òÎÄ¼şÊÇ·ñ´æÔÚ  
+			//è®¾ç½®æ ‡å¿—ä½ï¼Œæ£€æŸ¥ç›®å½•æˆ–æ–‡ä»¶æ˜¯å¦å­˜åœ¨  
 			opfn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_EXPLORER | OFN_NOCHANGEDIR | OFN_ALLOWMULTISELECT;
 			opfn.lpstrInitialDir = strCurrentPath.c_str();
-			// ÏÔÊ¾¶Ô»°¿òÈÃÓÃ»§Ñ¡ÔñÎÄ¼ş  
+			// æ˜¾ç¤ºå¯¹è¯æ¡†è®©ç”¨æˆ·é€‰æ‹©æ–‡ä»¶  
 			if (GetOpenFileName(&opfn))
 			{
-				//ÔÚÎÄ±¾¿òÖĞÏÔÊ¾ÎÄ¼şÂ·¾¶  
+				//åœ¨æ–‡æœ¬æ¡†ä¸­æ˜¾ç¤ºæ–‡ä»¶è·¯å¾„  
 				if (rfunc)
 				{
 					char* t = strFilename;
@@ -644,13 +718,13 @@ namespace hz {
 		{
 			//UTF-8
 			char utf8[] = { 0xEF ,0xBB ,0xBF };
-			//UTF-16£¨´ó¶ËĞò£©
+			//UTF-16ï¼ˆå¤§ç«¯åºï¼‰
 			char utf16d[] = { 0xFE ,0xFF };
-			//UTF-16£¨Ğ¡¶ËĞò£©
+			//UTF-16ï¼ˆå°ç«¯åºï¼‰
 			char utf16[] = { 0xFF ,0xFE };
-			//UTF-32£¨´ó¶ËĞò£©
+			//UTF-32ï¼ˆå¤§ç«¯åºï¼‰
 			char utf32d[] = { 0x00 ,0x00 ,0xFE ,0xFF };
-			//UTF-32£¨Ğ¡¶ËĞò£©
+			//UTF-32ï¼ˆå°ç«¯åºï¼‰
 			char utf32[] = { 0xFF ,0xFE ,0x00 ,0x00 };
 
 			int bomlen[] = { 3,2,2,4,4 };
@@ -667,7 +741,7 @@ namespace hz {
 				str.replace(0, bomlen[u], "");
 		}*/
 
-		bool isFileExistInternal(const std::string& strFilePath) const
+		static bool isFileExistInternal(const std::string& strFilePath)
 		{
 			if (strFilePath.empty())
 			{
@@ -707,7 +781,7 @@ namespace hz {
 		}
 
 #ifdef __ANDROID__
-		bool isDirectoryExistInternal(const std::string& dirPath) const
+		static bool isDirectoryExistInternal(const std::string& dirPath)
 		{
 			if (dirPath.empty())
 			{
@@ -743,17 +817,17 @@ namespace hz {
 			return false;
 		}
 #endif
-		// ·µ»ØÖµ:  
-		// 0:³É¹¦,Ö¸¶¨µÄÎÄ¼ş»òÄ¿Â¼Â·¾¶´æÔÚ  
-		// ENOENT(2):Ö¸¶¨µÄÎÄ¼ş»òÄ¿Â¼Â·¾¶²»´æÔÚ  
-		// EINVAL(22):²ÎÊı·Ç·¨  
-		// ENODEV(19):Ö¸¶¨µÄÂ·¾¶´æÔÚ,µ«ÊÇÀàĞÍÓëÖ¸¶¨µÄÀàĞÍ²»Ò»ÖÂ  
-		// ÆäËû:ÆäËû´íÎó  
-		int IsPathExist(std::string strPathName, bool bCheckFilePath = true)
+		// è¿”å›å€¼:  
+		// 0:æˆåŠŸ,æŒ‡å®šçš„æ–‡ä»¶æˆ–ç›®å½•è·¯å¾„å­˜åœ¨  
+		// ENOENT(2):æŒ‡å®šçš„æ–‡ä»¶æˆ–ç›®å½•è·¯å¾„ä¸å­˜åœ¨  
+		// EINVAL(22):å‚æ•°éæ³•  
+		// ENODEV(19):æŒ‡å®šçš„è·¯å¾„å­˜åœ¨,ä½†æ˜¯ç±»å‹ä¸æŒ‡å®šçš„ç±»å‹ä¸ä¸€è‡´  
+		// å…¶ä»–:å…¶ä»–é”™è¯¯  
+		static int IsPathExist(std::string strPathName, bool bCheckFilePath = true)
 		{
 			std::string strPathTmp(strPathName);
 #ifdef _WIN32			
-			if (1 == strPathTmp.length()) // Çı¶¯Æ÷ÅÌ·û  
+			if (1 == strPathTmp.length()) // é©±åŠ¨å™¨ç›˜ç¬¦  
 			{
 				strPathTmp += (":\\");
 			}
@@ -820,7 +894,7 @@ namespace hz {
 			return(NULL);
 		}
 
-		static int IterFiles(std::string srcPath, std::vector<std::string>* vfn = 0, njson * sundry = 0, std::string ext = "")//std::function<void(const char*fn, const char* dirfn)> func)
+		static int IterFiles(std::string srcPath, std::vector<std::string>* vfn = 0, njson* sundry = 0, std::string ext = "")//std::function<void(const char*fn, const char* dirfn)> func)
 		{
 			int Status = 0; int inc = 0;
 #ifdef _WIN32
@@ -883,7 +957,7 @@ namespace hz {
 											ii++;
 										}
 									}
-									catch (const std::exception& e)
+									catch (const std::exception & e)
 									{
 										printf("router message: %s\n", e.what());
 									}
@@ -949,7 +1023,7 @@ namespace hz {
 				struct stat file_stat;
 				// if ( strncmp(d_ent->d_name, ".", 1) == 0 )  
 				// {  
-				//  continue;   // ºöÂÔ"."Ä¿Â¼  
+				//  continue;   // å¿½ç•¥"."ç›®å½•  
 				// }  			
 
 				memset(fullpath, '\0', sizeof(fullpath));
@@ -965,7 +1039,7 @@ namespace hz {
 					//assert(false);
 					return Status;
 				}
-				//±£´æĞÅÏ¢µ½×Ô¼ºµÄÊı¾İ½á¹¹£¬ÔÚº¯ÊıÍâÃæ±£´æÎÄ¼şÃû  
+				//ä¿å­˜ä¿¡æ¯åˆ°è‡ªå·±çš„æ•°æ®ç»“æ„ï¼Œåœ¨å‡½æ•°å¤–é¢ä¿å­˜æ–‡ä»¶å  
 				if (sundry)
 				{
 					njson fit;
@@ -973,11 +1047,11 @@ namespace hz {
 					fit["name"] = d_ent->d_name;
 					fit["blksize"] = file_stat.st_blksize;
 					fit["size"] = file_stat.st_size;
-					// ·ÃÎÊÊ±¼ä
+					// è®¿é—®æ—¶é—´
 					fit["time_access"] = file_stat.st_atime;
-					// ĞŞ¸ÄÎÄ¼şÈ¨ÏŞÊ±¼ä
+					// ä¿®æ”¹æ–‡ä»¶æƒé™æ—¶é—´
 					fit["ctime"] = file_stat.st_ctime;
-					// ĞŞ¸ÄÊ±¼ä
+					// ä¿®æ”¹æ—¶é—´
 					fit["time_write"] = file_stat.st_mtime;
 					fit["mode"] = file_stat.st_mode;
 					sundry->push_back(fit);
@@ -1025,7 +1099,7 @@ namespace hz {
 #ifdef _WATCH_H_
 		static int inotify(const std::vector<std::string>& pathname, uint32_t mask = 0)
 		{
-			CDirectoryWatch::createWatchFile(jsonT::AtoW(pathname[0]));
+			CDirectoryWatch::createWatchFile(jsont::AtoW(pathname[0]));
 			return 0;
 		}
 #endif
@@ -1103,7 +1177,7 @@ namespace hz {
 
 
 
-	//DLL¶¯Ì¬¼ÓÔØ
+	//DLLåŠ¨æ€åŠ è½½
 #ifdef _WIN32
 	class DllLoader
 	{
@@ -1126,7 +1200,7 @@ namespace hz {
 				if (vecfunc)
 				{
 					dt->second->GetFuncs(*vecfunc);
-					//LOGPrint(1, "DLL[%s]º¯ÊıÊıÁ¿£º%d", d.c_str(), (int)vecfunc->size());
+					//LOGPrint(1, "DLL[%s]å‡½æ•°æ•°é‡ï¼š%d", d.c_str(), (int)vecfunc->size());
 				}
 				return dt->second;
 			}
@@ -1141,7 +1215,7 @@ namespace hz {
 						ds = njson::from_cbor(dsd.begin(), dsd.end());
 						//ds = njson::parse(dsd.data());
 					}
-					catch (njson::exception& e)
+					catch (njson::exception & e)
 					{
 						// output exception information  
 						njson errordata = { {"error","json error"},{"message",e.what()},{"exception_id",e.id} };
@@ -1176,14 +1250,14 @@ namespace hz {
 			}
 			DllLoader* dl = new DllLoader();
 			dl->dllname = d;
-			//LOGPrint(1, "Ã¶¾ÙDLL[%s]", d.c_str());
+			//LOGPrint(1, "æšä¸¾DLL[%s]", d.c_str());
 			std::string dllname = dln.rbegin()->second;
 			dl->dll = LoadLibraryA(dllname.c_str());
 			//dl->enumFile(isOrigin);
 			if (vecfunc)
 			{
 				dl->GetFuncs(*vecfunc);
-				//LOGPrint(1, "DLL[%s]º¯ÊıÊıÁ¿£º%d", d.c_str(), (int)vecfunc->size());
+				//LOGPrint(1, "DLL[%s]å‡½æ•°æ•°é‡ï¼š%d", d.c_str(), (int)vecfunc->size());
 			}
 			return dl;
 		}
@@ -1215,7 +1289,7 @@ namespace hz {
 				FreeLibrary((HMODULE)dll);
 		}
 	private:
-		//²»Çø·Ö´óĞ¡×Ö·û´®±È½Ï
+		//ä¸åŒºåˆ†å¤§å°å­—ç¬¦ä¸²æ¯”è¾ƒ
 		char* stristr(const char* str1, const char* str2)
 		{
 			char* cp = (char*)str1;
@@ -1324,32 +1398,32 @@ namespace hz {
 		}
 		kvNode* InsertSort(kvNode* head, kvNode* n)
 		{
-			kvNode* first; /*ÎªÔ­Á´±íÊ£ÏÂÓÃÓÚÖ±½Ó²åÈëÅÅĞòµÄ½ÚµãÍ·Ö¸Õë*/
-			kvNode* t; /*ÁÙÊ±Ö¸Õë±äÁ¿£º²åÈë½Úµã*/
-			kvNode* p; /*ÁÙÊ±Ö¸Õë±äÁ¿*/
-			kvNode* q; /*ÁÙÊ±Ö¸Õë±äÁ¿*/
+			kvNode* first; /*ä¸ºåŸé“¾è¡¨å‰©ä¸‹ç”¨äºç›´æ¥æ’å…¥æ’åºçš„èŠ‚ç‚¹å¤´æŒ‡é’ˆ*/
+			kvNode* t; /*ä¸´æ—¶æŒ‡é’ˆå˜é‡ï¼šæ’å…¥èŠ‚ç‚¹*/
+			kvNode* p; /*ä¸´æ—¶æŒ‡é’ˆå˜é‡*/
+			kvNode* q; /*ä¸´æ—¶æŒ‡é’ˆå˜é‡*/
 
-			first = n;// head->next; /*Ô­Á´±íÊ£ÏÂÓÃÓÚÖ±½Ó²åÈëÅÅĞòµÄ½ÚµãÁ´±í£º¿É¸ù¾İÍ¼12À´Àí½â¡£*/
-					  //head->next = NULL; /*Ö»º¬ÓĞÒ»¸ö½ÚµãµÄÁ´±íµÄÓĞĞòÁ´±í£º¿É¸ù¾İÍ¼11À´Àí½â¡£*/
+			first = n;// head->next; /*åŸé“¾è¡¨å‰©ä¸‹ç”¨äºç›´æ¥æ’å…¥æ’åºçš„èŠ‚ç‚¹é“¾è¡¨ï¼šå¯æ ¹æ®å›¾12æ¥ç†è§£ã€‚*/
+					  //head->next = NULL; /*åªå«æœ‰ä¸€ä¸ªèŠ‚ç‚¹çš„é“¾è¡¨çš„æœ‰åºé“¾è¡¨ï¼šå¯æ ¹æ®å›¾11æ¥ç†è§£ã€‚*/
 
-			while (first != NULL) /*±éÀúÊ£ÏÂÎŞĞòµÄÁ´±í*/
+			while (first != NULL) /*éå†å‰©ä¸‹æ— åºçš„é“¾è¡¨*/
 			{
-				/*×¢Òâ£ºÕâÀïforÓï¾ä¾ÍÊÇÌåÏÖÖ±½Ó²åÈëÅÅĞòË¼ÏëµÄµØ·½*/
-				for (t = first, q = head; ((q != NULL) && KVless(q, t)); p = q, q = q->next); /*ÎŞĞò½ÚµãÔÚÓĞĞòÁ´±íÖĞÕÒ²åÈëµÄÎ»ÖÃ*/
+				/*æ³¨æ„ï¼šè¿™é‡Œforè¯­å¥å°±æ˜¯ä½“ç°ç›´æ¥æ’å…¥æ’åºæ€æƒ³çš„åœ°æ–¹*/
+				for (t = first, q = head; ((q != NULL) && KVless(q, t)); p = q, q = q->next); /*æ— åºèŠ‚ç‚¹åœ¨æœ‰åºé“¾è¡¨ä¸­æ‰¾æ’å…¥çš„ä½ç½®*/
 
-																							  /*ÍË³öforÑ­»·£¬¾ÍÊÇÕÒµ½ÁË²åÈëµÄÎ»ÖÃ*/
-																							  /*×¢Òâ£º°´µÀÀíÀ´Ëµ£¬Õâ¾ä»°¿ÉÒÔ·Åµ½ÏÂÃæ×¢ÊÍÁËµÄÄÇ¸öÎ»ÖÃÒ²Ó¦¸Ã¶ÔµÄ£¬µ«ÊÇ¾ÍÊÇ²»ÄÜ¡£Ô­Òò£ºÄãÈôÀí½âÁËÉÏÃæµÄµÚ3Ìõ£¬¾ÍÖªµÀÁË¡£*/
-				first = first->next; /*ÎŞĞòÁ´±íÖĞµÄ½ÚµãÀë¿ª£¬ÒÔ±ãËü²åÈëµ½ÓĞĞòÁ´±íÖĞ¡£*/
+																							  /*é€€å‡ºforå¾ªç¯ï¼Œå°±æ˜¯æ‰¾åˆ°äº†æ’å…¥çš„ä½ç½®*/
+																							  /*æ³¨æ„ï¼šæŒ‰é“ç†æ¥è¯´ï¼Œè¿™å¥è¯å¯ä»¥æ”¾åˆ°ä¸‹é¢æ³¨é‡Šäº†çš„é‚£ä¸ªä½ç½®ä¹Ÿåº”è¯¥å¯¹çš„ï¼Œä½†æ˜¯å°±æ˜¯ä¸èƒ½ã€‚åŸå› ï¼šä½ è‹¥ç†è§£äº†ä¸Šé¢çš„ç¬¬3æ¡ï¼Œå°±çŸ¥é“äº†ã€‚*/
+				first = first->next; /*æ— åºé“¾è¡¨ä¸­çš„èŠ‚ç‚¹ç¦»å¼€ï¼Œä»¥ä¾¿å®ƒæ’å…¥åˆ°æœ‰åºé“¾è¡¨ä¸­ã€‚*/
 
-				if (q == head) /*²åÔÚµÚÒ»¸ö½ÚµãÖ®Ç°*/
+				if (q == head) /*æ’åœ¨ç¬¬ä¸€ä¸ªèŠ‚ç‚¹ä¹‹å‰*/
 				{
 					head = t;
 				}
-				else /*pÊÇqµÄÇ°Çı*/
+				else /*pæ˜¯qçš„å‰é©±*/
 				{
 					p->next = t;
 				}
-				t->next = q; /*Íê³É²åÈë¶¯×÷*/
+				t->next = q; /*å®Œæˆæ’å…¥åŠ¨ä½œ*/
 							 /*first = first->next;*/
 			}
 			return head;
@@ -1360,7 +1434,7 @@ namespace hz {
 			if (*head)
 			{
 				if (sort)
-					* head = InsertSort(*head, p);
+					*head = InsertSort(*head, p);
 			}
 			else
 			{
@@ -1370,17 +1444,17 @@ namespace hz {
 
 		//-----------------------------------------------------------------------------------------------------------
 		/*
-		_A_ARCH£¨´æµµ£©
+		_A_ARCHï¼ˆå­˜æ¡£ï¼‰
 
-		_A_HIDDEN£¨Òş²Ø£©
+		_A_HIDDENï¼ˆéšè—ï¼‰
 
-		_A_NORMAL£¨Õı³££©
+		_A_NORMALï¼ˆæ­£å¸¸ï¼‰
 
-		_A_RDONLY£¨Ö»¶Á£©
+		_A_RDONLYï¼ˆåªè¯»ï¼‰
 
-		_A_SUBDIR£¨ÎÄ¼ş¼Ğ£©
+		_A_SUBDIRï¼ˆæ–‡ä»¶å¤¹ï¼‰
 
-		_A_SYSTEM£¨ÏµÍ³£©
+		_A_SYSTEMï¼ˆç³»ç»Ÿï¼‰
 		*/
 #ifndef __cplusplus
 #ifdef _finddata_t
@@ -1422,7 +1496,7 @@ namespace hz {
 				else
 				{
 					/* do something */
-					//²éÕÒdll
+					//æŸ¥æ‰¾dll
 					if (stristr(fd.name, dllname.c_str()) && stristr(fd.name, ".dll"))
 					{
 						KVaddNode(headout, fd.time_write, fd.name, 1);

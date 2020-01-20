@@ -292,7 +292,7 @@ namespace hz
 	class Fonts :public Singleton<Fonts>
 	{
 	public:
-
+		typedef uint8_t byte;
 		typedef int32_t Fixed;
 #define FWord int16_t
 #define uFWord uint16_t
@@ -786,7 +786,7 @@ namespace hz
 
 			*codep = (*state != FONS_UTF8_ACCEPT) ?
 				(byte & 0x3fu) | (*codep << 6) :
-				(0xff >> type) & (byte);
+				(0xff >> type)& (byte);
 
 			*state = utf8d[256 + *state + type];
 			return *state;
@@ -1294,7 +1294,7 @@ namespace hz
 				int ret = 0;
 				uint8_t* data = info->data;
 				uint32_t index_map = info->index_map;
-				wchar_t wt[] = { codepoint, 0 };
+				wchar_t wt[] = { (wchar_t)codepoint, 0 };
 				uint16_t format = ttUSHORT(data + index_map + 0);
 				// 0*, 2, 4*, 6*, 8, 10, 12*, 13*, 14
 				if (format == 2) {
@@ -1303,7 +1303,7 @@ namespace hz
 					{
 						char st[4] = { 0 };
 						auto astr = w2a(wt, 1, st, 4);
-						char* t = (char*)& codepoint;
+						char* t = (char*)&codepoint;
 						t[0] = st[1]; t[1] = st[0];
 					}
 					ret = tt_cmap2_char_index(data + index_map, codepoint);
@@ -1491,7 +1491,7 @@ namespace hz
 			}
 #if 1
 
-			static uint16_t ttUSHORT(uint8_t * p) { return p[0] * 256 + p[1]; }
+			static uint16_t ttUSHORT(uint8_t* p) { return p[0] * 256 + p[1]; }
 			static uint16_t ttSHORT(uint8_t* p) { return p[0] * 256 + p[1]; }
 			static uint32_t ttULONG(uint8_t* p) { return (p[0] << 24) + (p[1] << 16) + (p[2] << 8) + p[3]; }
 			static int ttLONG(uint8_t* p) { return (p[0] << 24) + (p[1] << 16) + (p[2] << 8) + p[3]; }
@@ -1785,9 +1785,9 @@ namespace hz
 					{
 #ifdef __json_helper_h__
 #ifdef _STD_STR_
-						n = isu8 ? jsonT::wstring_to_utf8(to_wstr(name_, true)) : jsonT::wstring_to_ansi(to_wstr(name_, true));
+						n = isu8 ? jsont::wstring_to_utf8(to_wstr(name_, true)) : jsont::wstring_to_ansi(to_wstr(name_, true));
 #else
-						n = isu8 ? jsonT::wstring_to_utf8(name_.to_wstr(true)) : jsonT::wstring_to_ansi(name_.to_wstr(true));
+						n = isu8 ? jsont::wstring_to_utf8(name_.to_wstr(true)) : jsont::wstring_to_ansi(name_.to_wstr(true));
 #endif
 #else
 #ifdef _STD_STR_
@@ -1821,7 +1821,7 @@ namespace hz
 									auto it = *tw;
 									n.push_back(it);
 								}
-								n = jsonT::ansi_to_utf8(n);
+								n = jsont::ansi_to_utf8(n);
 							}
 							break;
 						default:
@@ -1965,6 +1965,7 @@ namespace hz
 			unsigned char freeData = 0;
 			head_table head;
 			hheaTbl hhea;
+			post_header post;
 			bool first_bitmap = false;
 			float ascender;
 			float descender;
@@ -2366,7 +2367,6 @@ namespace hz
 				if (post_table)
 				{
 					uint8_t* p = fc + post_table->offset;
-					post_header post = {};
 
 					post.format = stb_font::ttSHORT(p); p += 4;
 					post.italicAngle = stb_font::ttSHORT(p); p += 4;
@@ -2521,7 +2521,7 @@ namespace hz
 					printf("tt_sbit_decoder_load_byte_aligned:"
 						" invalid bitmap dimensions\n"); return 0;
 				}
-				if (p + ((line_bits + 7) >> 3) * height > limit)
+				if (p + ((line_bits + 7) >> 3)* height > limit)
 				{
 					printf("tt_sbit_decoder_load_byte_aligned: broken bitmap\n");
 					return 0;
@@ -2650,7 +2650,7 @@ namespace hz
 							nbits -= w;
 						}
 
-						*pwrite++ |= ((rval >> nbits) & 0xFF) &
+						*pwrite++ |= ((rval >> nbits) & 0xFF)&
 							(~(0xFFU << w) << (8 - w - x_pos));
 						rval <<= 8;
 						w = line_bits - w;
@@ -2671,14 +2671,14 @@ namespace hz
 						{
 							if (p < limit)
 								rval |= *p++;
-							*pwrite |= ((rval >> nbits) & 0xFF) & (0xFF00U >> w);
+							*pwrite |= ((rval >> nbits) & 0xFF)& (0xFF00U >> w);
 							nbits += 8 - w;
 
 							rval <<= 8;
 						}
 						else
 						{
-							*pwrite |= ((rval >> nbits) & 0xFF) & (0xFF00U >> w);
+							*pwrite |= ((rval >> nbits) & 0xFF)& (0xFF00U >> w);
 							nbits -= w;
 						}
 					}
@@ -3101,9 +3101,11 @@ namespace hz
 				//std::vector<BitmapSizeTable> bsts;
 				//std::vector<std::vector<IndexSubTableArray>> index_sub_table;
 				njson ns = get_bitmap_size_table(b, count, _bsts, _index_sub_table, _msidx_table);
+#ifndef nnDEBUG
 				printf("<%s>包含位图大小\n", _aname.c_str());
 				for (auto& it : ns)
 					printf("%s\n", it.dump().c_str());
+#endif // !nnDEBUG
 				// 位图数据表ebdt
 				b = fc + ebdt_table->offset;
 				glm::ivec2 version = { stb_font::ttUSHORT(b + 0), stb_font::ttUSHORT(b + 2) };
@@ -3392,7 +3394,7 @@ namespace hz
 					{
 						*out = ret;
 						if (is)
-							* is = true;
+							*is = true;
 					}
 				}
 				return ret;
@@ -3445,12 +3447,25 @@ namespace hz
 				overline = 8,//: 上划线
 				all_line = underline | line_through | overline,
 			};
+
+			// 横向对齐
+			enum class text_align :int
+			{
+				null, left, center, right, justify, inherit
+			};
+			// 纵向对齐
+			enum class vertical_align :int
+			{
+				null, top, middle, bottom, baseline
+			};
 		public:
 			unsigned int color = -1;
 			unsigned int color_blur = 0xff000000;
 			unsigned int outline_color = 0;
 			// 装饰线
 			unsigned int text_decoration = 0;
+			double underline_position = 0.0;
+			double underline_thickness = 1.0;
 			double line_thickness = 1.0;
 			double row_height = -1;
 			double row_base_y = 0;
@@ -3468,6 +3483,8 @@ namespace hz
 				int x = 0, y = 0;
 			} blur_pos;
 			double  _fzpace = 0.0, _flineSpacing = 0.0;
+			text_align _text_align = text_align::null;
+			vertical_align _vertical_align = vertical_align::null;
 			std::vector<glm::ivec3> colors;
 		private:
 			//tt_info* font = nullptr;
@@ -3651,27 +3668,47 @@ namespace hz
 				_fzpace = round((double)_zpace * dpi / 72.0);
 				_flineSpacing = round((double)_lineSpacing * dpi / 72.0);
 				fns = round(fns);
+				for (auto it : font_family)
+				{
+					underline_position = it->post.underlinePosition;
+					underline_thickness = it->post.underlineThickness;
+				}
 			}
 		};
 		// todo 字符宽高结构
 		class text_extent
 		{
-		public:
-			const char* next_char = nullptr;
-			int& x = _size.x;
-			int& y = _size.y;
-			int& z = _size.z;
 		private:
 			glm::ivec3 _size;
 		public:
+			const char* next_char = nullptr;
+			int& x = _size.x, & y = _size.y, & z = _size.z;
+		public:
 			text_extent()
 			{
+
+			}
+
+			text_extent(text_extent& te)
+			{
+				_size.x = te.x;
+				_size.y = te.y;
+				_size.z = te.z;
 			}
 
 			~text_extent()
 			{
 			}
-			glm::ivec2 size() { return glm::ivec2(x, z); };
+			glm::ivec2 size() {
+				auto ret = glm::ivec2(x, z);
+				return ret;
+			};
+			glm::ivec3 size3() {
+				return _size;
+			};
+			int& x1() { return _size.x; }
+			int& y1() { return _size.y; }
+			int& z1() { return _size.z; }
 		private:
 
 		};
@@ -4015,7 +4052,7 @@ namespace hz
 					font->descender = (float)descent / (float)fh;
 					font->lineh = (float)(fh + lineGap) / (float)fh;
 					font->_name = font->get_info_str(def_language_id);
-					font->_aname = jsonT::utf8_to_ansi(font->_name);
+					font->_aname = jsont::utf8_to_ansi(font->_name);
 					font->init_post_table();
 #ifndef _FONT_NO_BITMAP
 					font->init_sbit();
@@ -4379,7 +4416,6 @@ namespace hz
 
 		static int ft_bitmap_assure_buffer(Fonts::Bitmap* bitmap, unsigned int xpixels, unsigned int ypixels, std::vector<char>* nbuf)
 		{
-			int				error;
 			int             pitch;
 			int             new_pitch;
 			unsigned int         bpp;
@@ -5083,7 +5119,7 @@ namespace hz
 #define _NO_CACHE_0
 #if 1
 		// 获取单个u8字符宽高
-		glm::ivec3 get_extent_ch(css_text * csst, const char* str)
+		glm::ivec3 get_extent_ch(css_text* csst, const char* str)
 		{
 			glm::ivec3 ret;
 			tt_info* font = csst->get_font();
@@ -5127,7 +5163,7 @@ namespace hz
 				if (*t == '\t')
 				{
 					auto spc = get_extent_cp(csst, L' ');
-					ret.x += spc.z * csst->_tabs + csst->_fzpace;
+					ret.x += ((int64_t)spc.z) * csst->_tabs + csst->_fzpace;
 					t++;
 					continue;;
 				}
@@ -5136,17 +5172,28 @@ namespace hz
 				ret.x += k.z + csst->_fzpace;
 				ret.y = std::max(ret.y, k.y);
 			}
-			double rh = csst->get_line_height();
+			int rh = csst->get_line_height();
 			ret.z = rh;
 			ret.next_char = t;
 			return ret;
 		}
 		// todo		渲染到image
-		void build_text(Image* dst, Fonts::tt_info* font, const std::string& str, size_t count, size_t first_idx, double font_size, unsigned int color = -1
+		void build_text(Image* dst, tt_info* font, const std::string& str, size_t count, size_t first_idx, double font_size, unsigned int color = -1
 			, glm::ivec2 pos = { 0,0 }, unsigned char blur_size = 0, glm::ivec2 blur_pos = { 0,0 }, unsigned int color_blur = -1
 			, double dpi = 96, bool first_bitmap = true);
 		// todo		生成到draw_font_info
-		glm::ivec2 build_info(Fonts::css_text* csst, const std::string& str, size_t count, size_t first_idx, glm::ivec2 pos, draw_font_info* out);
+		glm::ivec2 build_info(css_text* csst, const std::string& str, size_t count, size_t first_idx, glm::ivec2 pos, draw_font_info* out);
+		void draw_image2(Image* dst, draw_image_info* info);
+		glm::ivec2 build_to_image(css_text* csst, const std::string& str, size_t count, size_t first_idx, glm::ivec2 pos, Image* dst);
+		css_text* create_ct(uint32_t n)
+		{
+			css_text* ret = new css_text[n];
+			return ret;
+		}
+		void free_ct(css_text* cts)
+		{
+			if (cts)delete[]cts;
+		}
 #endif
 	public:
 #ifndef _FONT_NO_BITMAP
@@ -5205,7 +5252,7 @@ namespace hz
 
 #if 0
 		// todo		文本渲染
-glm::ivec2 draw_text(Fonts::css_text * csst, glm::ivec2 pos, const std::string & str, size_t count = -1, size_t first_idx = 0, draw_font_info * out = nullptr)
+glm::ivec2 draw_text(Fonts::css_text* csst, glm::ivec2 pos, const std::string& str, size_t count = -1, size_t first_idx = 0, draw_font_info* out = nullptr)
 {
 	auto ft = Fonts::s();
 	draw_font_info dfi;

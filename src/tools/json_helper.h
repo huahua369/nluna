@@ -7,7 +7,18 @@
 #define MAXINT64    ((int64_t)(MAXUINT64 >> 1))
 #define MININT64    ((int64_t)~MAXINT64)
 #endif
+#ifndef _WIN32
+#include <unistd.h>  
+#include <sys/mman.h>
+#include <sys/types.h>  
+#include <sys/stat.h> 
+#include <fcntl.h>
+#include <cstdarg>
+#else
 #include <stdarg.h>
+#endif
+#include <stdlib.h>
+#include <stdio.h>
 #include <ctype.h>
 #include <algorithm>
 #include <set>
@@ -142,11 +153,11 @@ namespace hz
 				++sbc;
 			}
 			else if ((*sbc & 0xff) == 0xA3 && (*(sbc + 1) & 0xff) >= 0xA1 && (*(sbc + 1) & 0xff) <= 0xFE)    //ASCII码中其它可显示字符
-				* dbc++ = *++sbc - 0x80;
+				*dbc++ = *++sbc - 0x80;
 			else
 			{
 				if (*sbc < 0)    //如果是中文字符，则拷贝两个字节
-					* dbc++ = *sbc++;
+					*dbc++ = *sbc++;
 				*dbc++ = *sbc;
 			}
 		}
@@ -172,7 +183,7 @@ namespace hz
 			else
 			{
 				if (*dbc < 0)    //如果是中文字符，则拷贝两个字节
-					* sbc++ = *dbc++;
+					*sbc++ = *dbc++;
 				*sbc++ = *dbc;
 			}
 		}
@@ -243,13 +254,13 @@ namespace hz
 	}
 	inline unsigned int set_alpha(unsigned int c, unsigned int a)
 	{
-		u_col* t = (u_col*)& c;
+		u_col* t = (u_col*)&c;
 		t->c.a = a;
 		return c;
 	}
 	inline unsigned int multiply_alpha(unsigned int c, unsigned int a)
 	{
-		u_col* t = (u_col*)& c;
+		u_col* t = (u_col*)&c;
 		double af = a / 255.0;
 		t->c.r *= af;
 		t->c.g *= af;
@@ -260,25 +271,25 @@ namespace hz
 	inline unsigned int set_alpha_f(unsigned int c, double af)
 	{
 		unsigned int a = af * 255;
-		u_col* t = (u_col*)& c;
+		u_col* t = (u_col*)&c;
 		t->c.a = a;
 		return c;
 	}
 	inline unsigned int set_alpha_xf(unsigned int c, double af)
 	{
 		//unsigned int a = af * 255;
-		u_col* t = (u_col*)& c;
+		u_col* t = (u_col*)&c;
 		t->c.a *= af;
 		return c;
 	}
 	inline unsigned int get_alpha(unsigned int c)
 	{
-		u_col* t = (u_col*)& c;
+		u_col* t = (u_col*)&c;
 		return  t->c.a;
 	}
 	inline double get_alpha_f(unsigned int c)
 	{
-		u_col* t = (u_col*)& c;
+		u_col* t = (u_col*)&c;
 		return  t->c.a / 255.0;
 	}
 	// 灰度 r=g=b  a
@@ -333,7 +344,7 @@ namespace hz
 	}
 	inline glm::vec4 to_c4(unsigned int c)
 	{
-		u_col* t = (u_col*)& c;
+		u_col* t = (u_col*)&c;
 		glm::vec4 fc;
 		float* f = &fc.x;
 		for (int i = 0; i < 4; i++)
@@ -357,15 +368,15 @@ namespace hz
 	}
 	inline bool is_range(const glm::ivec2& v, int64_t n, bool is = true)
 	{
-		return is ? n >= v.x && n <= v.y : n > v.x && n < v.y;
+		return is ? n >= v.x && n <= v.y : n > v.x&& n < v.y;
 	}
 	inline bool is_range(const glm::ivec3& v, int64_t n, bool is = true)
 	{
-		return is ? n >= v.x && n <= v.y : n > v.x && n < v.y;
+		return is ? n >= v.x && n <= v.y : n > v.x&& n < v.y;
 	}
 	inline bool is_range(const glm::ivec4& v, int64_t n, bool is = true)
 	{
-		return is ? n >= v.x && n <= v.y : n > v.x && n < v.y;
+		return is ? n >= v.x && n <= v.y : n > v.x&& n < v.y;
 	}
 
 #endif
@@ -411,7 +422,7 @@ namespace hz
 	}
 	static int64_t get_utf8_count(const char* buffer, int64_t len)
 	{
-		const char* p = 0, *pend = buffer + len;
+		const char* p = 0, * pend = buffer + len;
 		int64_t count = 0;
 		if (!buffer || len <= 0)
 		{
@@ -437,7 +448,7 @@ namespace hz
 	// 获取第n个字符的位置
 	static const char* utf8_char_pos(const char* buffer, int64_t pos, uint64_t len = -1)
 	{
-		const char* p = 0, *pend = (len == -1 ? (char*)len : buffer + len);
+		const char* p = 0, * pend = (len == -1 ? (char*)len : buffer + len);
 		int64_t count = 0;
 		if (!buffer || len == 0)
 		{
@@ -583,9 +594,19 @@ namespace hz
 		}
 		return ret;
 	}
+	template<class T>
+	static std::vector<T> toVector(const njson& n)
+	{
+		std::vector<T> ret;
+		if (n.is_array())
+		{
+			ret = n.get<std::vector<T>>();
+		}
+		return ret;
+	}
 	static std::string doubleToString(double price, int n = 0)
 	{
-		auto res = n > 0 ? std::_Floating_to_string(("%." + std::to_string(n) + "f").c_str(), price) : std::to_string(price);
+		auto res = /*n > 0 ? std::_Floating_to_string(("%." + std::to_string(n) + "f").c_str(), price) :*/ std::to_string(price);
 		const std::string format("$1");
 		try {
 			std::regex r("(\\d*)\\.0{6}|");
@@ -593,14 +614,32 @@ namespace hz
 			res = std::regex_replace(res, r2, format);
 			res = std::regex_replace(res, r, format);
 		}
-		catch (const std::exception& e) {
+		catch (const std::exception & e) {
 			return res;
 		}
 		return res;
 	}
 	static std::string toStr(double price, int n = 0)
 	{
-		return n > 0 ? std::_Floating_to_string(("%." + std::to_string(n) + "f").c_str(), price) : std::to_string(price);
+		auto ret = std::to_string(price);
+		//return n > 0 ? std::_Floating_to_string(("%." + std::to_string(n) + "f").c_str(), price) : std::to_string(price);
+		if (n > 0)
+		{
+			auto pos = ret.find('.');
+			if (pos != std::string::npos)
+			{
+				auto c = pos + n + 1;
+				if (c < ret.size())
+				{
+					ret.resize(c);
+				}
+			}
+		}
+		return ret;
+	}
+	static std::string toStr(int64_t n)
+	{
+		return std::to_string(n);
 	}
 	static uint64_t toHex(const njson& v, uint64_t d = 0)
 	{
@@ -610,7 +649,29 @@ namespace hz
 			std::string buf = toStr(v);
 			char* str = 0;
 			//buf.resize(10);
-			ret = std::strtoll(buf.c_str(), &str, buf.find("0x") == 0 ? 16 : 10);
+			if (buf.find("#") != std::string::npos)
+			{
+				buf = hstring::replace(buf, "#", "0x");
+				int k = buf.size() - 2;
+				if (k == 6)
+				{
+					auto ff = "ff";
+					buf.insert(buf.begin() + 2, ff, ff + 2);
+				}
+				if (buf.size() == 10)
+				{
+					std::swap(*((short*)&buf[4]), *((short*)&buf[8]));
+				}
+				else {
+					return ret;
+				}
+			}
+			int cs = 10;
+			if (buf.find("0x") == 0)
+			{
+				cs = 16;
+			}
+			ret = std::strtoll(buf.c_str(), &str, cs);
 		}
 		else if (v.is_number())
 		{
@@ -644,27 +705,27 @@ namespace hz
 	static glm::vec2 toVec2(const njson& v, double d = -1)
 	{
 		std::vector<double> rv = { d, d };
-		if (v.is_array() && v.size() > 2)
+		if (v.is_array() && v.size() >= 2)
 		{
 			std::vector<double> trv = v;
 			rv.swap(trv);
 		}
-		return { rv[0],rv[1] };
+		return { rv[0], rv[1] };
 	}
 	static glm::vec3 toVec3(const njson& v, double d = -1)
 	{
 		std::vector<double> rv = { d, d ,d };
-		if (v.is_array() && v.size() > 3)
+		if (v.is_array() && v.size() >= 3)
 		{
 			std::vector<double> trv = v;
 			rv.swap(trv);
 		}
-		return { rv[0],rv[1] ,rv[2] };
+		return { rv[0], rv[1] ,rv[2] };
 	}
 	static glm::vec4 toVec4(const njson& v, double d = -1)
 	{
 		std::vector<double> rv = { d, d,d,d };
-		if (v.is_array() && v.size() > 4)
+		if (v.is_array() && v.size() >= 4)
 		{
 			std::vector<double> trv = v;
 			rv.swap(trv);
@@ -701,12 +762,46 @@ namespace hz
 		return (T*)toHex(v);
 #endif
 	}
+#ifndef _ui64toa_s
+	static char* _ui64toa_s(uint64_t num, char* str, int size, int radix)
+	{/*索引表*/
+		char index[] = "0123456789ABCDEF";
+		uint64_t unum = 0;/*中间变量*/
+		int i = 0, j, k;
+		/*确定unum的值*/
+		if (radix == 10 && num < 0)/*十进制负数*/
+		{
+			unum = (uint64_t)-num;
+			str[i++] = '-';
+		}
+		else unum = (uint64_t)num;/*其他情况*/
+		/*转换*/
+		do {
+			str[i++] = index[unum % (uint64_t)radix];
+			unum /= radix;
+		} while (unum);
+		str[i] = '\0';
+		/*逆序*/
+		if (str[0] == '-')
+			k = 1;/*十进制负数*/
+		else
+			k = 0;
 
-	template <typename T>
-	static std::string fromPtr(T* pv)
+		for (j = k; j <= (i - 1) / 2; j++)
+		{
+			char temp;
+			temp = str[j];
+			str[j] = str[i - 1 + k - j];
+			str[i - 1 + k - j] = temp;
+		}
+		return str;
+	}
+#endif // !_ui64toa_s
+	//template <typename T>
+	static std::string fromPtr(void* pv)
 	{
 		std::string buf = "0x";
-		buf.resize(sizeof(T*) * 4);
+		buf.resize(sizeof(void*) * 4);
 		_ui64toa_s((uint64_t)pv, (char*)(buf.data() + 2), buf.size() - 2, 16);
 		return buf.c_str();
 	}
@@ -714,7 +809,7 @@ namespace hz
 #endif
 
 	//------------------------------------------------------------------------------------------------------------------
-	class jsonT
+	class jsont
 	{
 	public:
 #ifndef _GLIBCXX_USE_C99_STDLIB
@@ -730,19 +825,19 @@ namespace hz
 			//if (errno == ERANGE)
 			//	_Xout_of_range("stoul argument out of range");
 			if (_Idx != 0)
-				* _Idx = (size_t)(_Eptr - _Ptr);
+				*_Idx = (size_t)(_Eptr - _Ptr);
 			return (_Ans);
 		}
 #else
 #define Stoul std::stoul
 #endif
 	public:
-		jsonT()
+		jsont()
 		{
 
 		}
 
-		~jsonT()
+		~jsont()
 		{
 		}
 		static std::string format(const char* strc, size_t len = 0, bool isN = false)
@@ -761,7 +856,7 @@ namespace hz
 			for (; *str && (str - strb) <= slen; str++)
 			{
 				//判断是否为空字符
-				if (isspace((unsigned char)* str))
+				if (isspace((unsigned char)*str))
 				{
 					o.push_back((*str != '\t') ? *str : ' ');
 					continue;
@@ -1019,11 +1114,11 @@ namespace hz
 		 * k string或数组
 		 *
 		 */
-		static njson array2map(const njson & arr, njson k)
+		static njson array2map(const njson& arr, njson k)
 		{
 			if (k.is_string())
 			{
-				std::string ks = jsonT::getStr(k);
+				std::string ks = jsont::getStr(k);
 				k = njson::array();
 				k.push_back(ks);
 			}
@@ -1034,7 +1129,7 @@ namespace hz
 				njson* dn = &ret;
 				for (auto kt : k)
 				{
-					dn = &(*dn)[jsonT::getStr(it[jsonT::getStr(kt)])];
+					dn = &(*dn)[jsont::getStr(it[jsont::getStr(kt)])];
 				}
 				dn->push_back(it);
 			}
@@ -1078,12 +1173,12 @@ namespace hz
 		static std::string get_keys(const njson& data, std::string s = "`")
 		{
 			std::string lstr;
-			jsonT::map_oa(data, [=, &lstr](njson k, njson v) {
+			jsont::map_oa(data, [=, &lstr](njson k, njson v) {
 				if (lstr.size())
 				{
 					lstr += ",";
 				}
-				lstr += s + jsonT::getStr(k) + s;
+				lstr += s + jsont::getStr(k) + s;
 				});
 			return lstr;
 		}
@@ -1092,7 +1187,7 @@ namespace hz
 			std::string values;
 			for (auto& it : data)
 			{
-				std::string its = jsonT::join(it, ",", nullptr, true);
+				std::string its = jsont::join(it, ",", nullptr, true);
 				if (values.size())
 				{
 					values += ",";
@@ -1194,6 +1289,43 @@ namespace hz
 				}
 			}
 			return isnum;
+		}
+		static int64_t str2int(const char* str, int64_t de = 0)
+		{
+			int64_t ret = de;
+			if (str)
+			{
+				for (; *str && !(*str == '-' || *str == '+' || *str == '.' || (*str >= '0' && *str <= '9')); str++);
+				if (*str)
+					ret = atoll(str);
+			}
+			return ret;
+		}
+		static njson str2ints(const std::string& s)
+		{
+			njson ret;
+			if (s.size())
+			{
+				auto str = s.c_str();
+				for (; *str; str++)
+				{
+					int d = 0;
+					if (*str == '-' || *str == '+' || *str == '.')
+					{
+						d++;
+						str++;
+					}
+					if (!(*str < '0' || *str > '9'))
+					{
+						auto t = str - d;
+						char* et = 0;
+						auto n = std::strtoll(t, &et, 10);//strtod
+						str = et;
+						ret.push_back(n);
+					}
+				}
+			}
+			return ret;
 		}
 		// 字符串转json value
 		static njson makeValue(const std::string& str)
@@ -1397,7 +1529,7 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			{
 				ret = myconv.from_bytes(str);
 			}
-			catch (const std::exception& e)
+			catch (const std::exception & e)
 			{
 				ret = ansi_to_wstring(str);
 			}
@@ -1408,65 +1540,16 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			return wstring_to_ansi(utf8_to_wstring(str));
 		}
 		// convert wstring to UTF-8 string  
-		static std::string wstring_to_utf8(const std::wstring& str)
+		static std::string wstring_to_utf8(const std::wstring& str, bool isbom = false)
 		{
 			std::wstring_convert<std::codecvt_utf8<wchar_t>> myconv;
-			return myconv.to_bytes(str);
-		}
-
-		static std::string wstring_to_ansi0(const std::wstring& src)
-		{
-			std::string str;
-			setlocale(LC_ALL, "");     //设置本地默认Locale
-			int64_t s = 100, inc = 100;
-			auto ws = src;
-			for (; s > 0; inc += 100)
+			char bom[] = { (char)0xEF ,(char)0xBB ,(char)0xBF ,0 };
+			const char* t = "";
+			if (isbom)
 			{
-				ws = src.substr(inc, 100);
-				s = wcstombs(nullptr, ws.c_str(), 0);
+				t = bom;
 			}
-			if (s > 0)
-			{
-				std::vector<char> tem;
-				tem.resize(s);
-				int64_t nRet = wcstombs(tem.data(), src.c_str(), src.size());
-				if (nRet <= 0)
-				{
-					printf("转换失败\n");
-				}
-				else
-				{
-					tem.push_back(0);
-					printf("转换成功%lld字符\n", nRet);
-					printf("%s\n", tem.data());
-					str = tem.data();
-				}
-			}
-			return str;
-		}
-
-		static std::wstring ansi_to_wstring0(const std::string& src)
-		{
-			std::wstring wstr;
-			auto s = mbstowcs(nullptr, src.c_str(), src.size());
-			if (s > 0)
-			{
-				std::vector<wchar_t> tem;
-				tem.resize(s);
-				int64_t nRet = mbstowcs(tem.data(), src.c_str(), src.size());
-				if (nRet <= 0)
-				{
-					printf("转换失败\n");
-				}
-				else
-				{
-					tem.push_back(0);
-					printf("转换成功%lld字符\n", nRet);
-					wprintf(L"%ls\n", tem.data());
-					wstr = tem.data();
-				}
-			}
-			return wstr;
+			return t + myconv.to_bytes(str);
 		}
 		// todo 部分转换失败
 		static std::string wstring_to_ansi(const std::wstring& src)
@@ -1529,11 +1612,138 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			}
 			return wstr;
 		}
+		static std::wstring ansi_to_wstring(const std::string& src, const char* code)
+		{
+			std::wstring wstr;
+			std::locale sys_locale(code);
+			const char* data_from = src.c_str();
+			const char* data_from_end = src.c_str() + src.size();
+			const char* data_from_next = 0;
+
+			std::vector<wchar_t> tem;
+			tem.resize(src.size() + 1);
+			wchar_t* data_to = (wchar_t*)tem.data();
+			wchar_t* data_to_end = data_to + src.size() + 1;
+			wchar_t* data_to_next = 0;
+
+			wmemset(data_to, 0, src.size() + 1);
+
+			typedef std::codecvt<wchar_t, char, mbstate_t> convert_facet;
+			mbstate_t in_state = { 0 };
+			auto result = std::use_facet<convert_facet>(sys_locale).in(
+				in_state, data_from, data_from_end, data_from_next,
+				data_to, data_to_end, data_to_next);
+
+			wstr = data_to;
+			if (result == convert_facet::ok)
+			{
+				return wstr;
+			}
+			return wstr;
+		}
+		std::string u2a(const std::wstring& wstr)
+		{
+			std::string ret;
+			std::mbstate_t state = {};
+			const wchar_t* src = wstr.data();
+			size_t len = std::wcsrtombs(nullptr, &src, 0, &state);
+			if (static_cast<size_t>(-1) != len)
+			{
+				std::vector< char > buff(len + 1);
+				len = std::wcsrtombs(buff.data(), &src, len, &state);
+				if (static_cast<size_t>(-1) != len)
+				{
+					ret.assign(buff.data(), len);
+				}
+			}
+			return ret;
+		}
+
+		std::wstring a2u(const std::string& str)
+		{
+			std::wstring ret;
+			std::mbstate_t state = {};
+			const char* src = str.data();
+			size_t len = std::mbsrtowcs(nullptr, &src, 0, &state);
+			if (static_cast<size_t>(-1) != len)
+			{
+				std::vector< wchar_t > buff(len + 1);
+				len = std::mbsrtowcs(buff.data(), &src, len, &state);
+				if (static_cast<size_t>(-1) != len)
+				{
+					ret.assign(buff.data(), len);
+				}
+			}
+			return ret;
+		}
 		static std::string ansi_to_utf8(const std::string& src)
 		{
 			return wstring_to_utf8(ansi_to_wstring(src));
 		}
+		static std::string ansi_jp_to_utf8(const std::string& src, bool isbom)
+		{
+			if (hz::hstring::IsTextUTF8(src.c_str()))return src;
+			return wstring_to_utf8(ansi_to_wstring(src, ".932"), isbom);
+		}
 
+#if 0
+
+		static std::string wstring_to_ansi0(const std::wstring& src)
+		{
+			std::string str;
+			setlocale(LC_ALL, "");     //设置本地默认Locale
+			int64_t s = 100, inc = 100;
+			auto ws = src;
+			for (; s > 0; inc += 100)
+			{
+				ws = src.substr(inc, 100);
+				s = wcstombs(nullptr, ws.c_str(), 0);
+			}
+			if (s > 0)
+			{
+				std::vector<char> tem;
+				tem.resize(s);
+				int64_t nRet = wcstombs(tem.data(), src.c_str(), src.size());
+				if (nRet <= 0)
+				{
+					printf("转换失败\n");
+				}
+				else
+				{
+					tem.push_back(0);
+					printf("转换成功%lld字符\n", nRet);
+					printf("%s\n", tem.data());
+					str = tem.data();
+				}
+			}
+			return str;
+		}
+
+		static std::wstring ansi_to_wstring0(const std::string& src)
+		{
+			std::wstring wstr;
+			auto s = mbstowcs(nullptr, src.c_str(), src.size());
+			if (s > 0)
+			{
+				std::vector<wchar_t> tem;
+				tem.resize(s);
+				int64_t nRet = mbstowcs(tem.data(), src.c_str(), src.size());
+				if (nRet <= 0)
+				{
+					printf("转换失败\n");
+				}
+				else
+				{
+					tem.push_back(0);
+					printf("转换成功%lld字符\n", nRet);
+					wprintf(L"%ls\n", tem.data());
+					wstr = tem.data();
+				}
+			}
+			return wstr;
+		}
+
+#endif
 		static std::wstring AtoW(const std::string& str)
 		{
 			if (hz::hstring::IsTextUTF8(str.c_str()))
@@ -1541,16 +1751,16 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 				std::string a = str.substr(0, 5);
 				int ic = deleteBom(a, false);
 				a = str.substr(ic);
-				return hz::jsonT::utf8_to_wstring(a);
+				return hz::jsont::utf8_to_wstring(a);
 			}
 			else
-				return hz::jsonT::ansi_to_wstring(str);
+				return hz::jsont::ansi_to_wstring(str);
 		}
 
 		static std::string AtoA(const std::string& str)
 		{
 			if (hz::hstring::IsTextUTF8(str.c_str()))
-				return hz::jsonT::utf8_to_ansi(str);
+				return hz::jsont::utf8_to_ansi(str);
 			else
 				return str;
 		}
@@ -1559,7 +1769,7 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			if (hz::hstring::IsTextUTF8(str.c_str()))
 				return str;
 			else
-				return hz::jsonT::ansi_to_utf8(str);
+				return hz::jsont::ansi_to_utf8(str);
 		}
 
 		static char exchange(char c)
@@ -1651,6 +1861,18 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 
 			return &unicode[0];
 		}
+		static std::string a2u8(const char* buf)
+		{
+			int len = ::MultiByteToWideChar(CP_ACP, 0, buf, -1, NULL, 0);
+			if (len <= 0) return "";
+			std::vector<wchar_t> unicode(len);
+			::MultiByteToWideChar(CP_ACP, 0, buf, -1, &unicode[0], len);
+			len = ::WideCharToMultiByte(CP_UTF8, 0, unicode.data(), -1, NULL, 0, NULL, NULL);
+			if (len <= 0) return "";
+			std::vector<char> str(len);
+			::WideCharToMultiByte(CP_UTF8, 0, unicode.data(), -1, &str[0], len, NULL, NULL);
+			return str.data();
+		}
 
 		static std::string UnicodeToAnsi(const wchar_t* buf)
 		{
@@ -1733,11 +1955,11 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 
 		//----数据操作-----------------------------------------------------------------------------------------
 		/*
-				std::string str = jsonT::formatbin("%d%d%f%lf", width, height, 0.2f, 0.3);
+				std::string str = jsont::formatbin("%d%d%f%lf", width, height, 0.2f, 0.3);
 				int n[2] = { 0 };
 				float f = 0.0f;
 				double lf = 0.0;
-				jsonT::sscanf(str.c_str(), "%d%d%f%lf", n, &n[1], &f, &lf);
+				jsont::sscanf(str.c_str(), "%d%d%f%lf", n, &n[1], &f, &lf);
 		*/
 		template <typename T>
 		static inline void copytostr(std::string& s, T n)
@@ -1759,7 +1981,7 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 		{
 			if (sizeof(t) > sizeof(int64_t) || (sizeof(t) & (sizeof(t) - 1)) != 0)
 			{
-				return **(t * *)((ap += sizeof(int64_t)) - sizeof(int64_t));
+				return **(t**)((ap += sizeof(int64_t)) - sizeof(int64_t));
 			}
 			else {
 				return *(t*)((ap += sizeof(int64_t)) - sizeof(int64_t));
@@ -1843,7 +2065,7 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			va_end(arg);
 			return rs;
 		}
-		static size_t sscanf(const char* data, char* fmt, ...)
+		static size_t sscanf(const char* data, const char* fmt, ...)
 		{
 			va_list arg;
 			char* dp = (char*)data;
@@ -1968,13 +2190,13 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			{
 				return;
 			}
-			jsonT::map_oa(d, [&](njson k, njson v)
+			jsont::map_oa(d, [&](njson k, njson v)
 				{
-					auto vstr = jsonT::get_value(v);
+					auto vstr = jsont::get_value(v);
 					if (vstr != "null")
 					{
-						//std::string qs = r + "->'$." + jsonT::getStr(k) + "' =" + vstr;
-						std::string qs = mjkey(r, jsonT::getStr(k)) + " =" + vstr;
+						//std::string qs = r + "->'$." + jsont::getStr(k) + "' =" + vstr;
+						std::string qs = mjkey(r, jsont::getStr(k)) + " =" + vstr;
 						push(qs, is_and);
 					}
 				});
@@ -1995,9 +2217,9 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			{
 				a = njson::array({ a });
 			}
-			auto kin = jsonT::join(k, " or ", [=](njson kt, size_t) {
-				auto ins = jsonT::join(a, ",", [=](njson it, size_t) {
-					return jsonT::get_value(it);
+			auto kin = jsont::join(k, " or ", [=](njson kt, size_t) {
+				auto ins = jsont::join(a, ",", [=](njson it, size_t) {
+					return jsont::get_value(it);
 					});
 				return ("JSON_CONTAINS(JSON_ARRAY(" + ins + "), JSON_EXTRACT(`" + r + "`, '$." + toStr(kt) + "'))");
 				});
@@ -2019,10 +2241,10 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			{
 				a = njson::array({ a });
 			}
-			auto kin = jsonT::join(k, " or ", [=](njson kt, size_t) {
+			auto kin = jsont::join(k, " or ", [=](njson kt, size_t) {
 				auto kstr = "`" + r + "` -> '$." + toStr(kt) + "'";
-				auto ins = jsonT::join(a, " or ", [=](njson it, size_t) {
-					return "JSON_CONTAINS(" + kstr + ",JSON_ARRAY(" + jsonT::get_value(it) + "))";
+				auto ins = jsont::join(a, " or ", [=](njson it, size_t) {
+					return "JSON_CONTAINS(" + kstr + ",JSON_ARRAY(" + jsont::get_value(it) + "))";
 					});
 				return "(" + ins + ")";
 				});
@@ -2042,8 +2264,8 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			{
 				a = njson::array({ a });
 			}
-			auto kin = jsonT::join(k, " or ", [=](njson kt, size_t) {
-				auto ins = jsonT::join(a, " or ", [=](njson it, size_t) {
+			auto kin = jsont::join(k, " or ", [=](njson kt, size_t) {
+				auto ins = jsont::join(a, " or ", [=](njson it, size_t) {
 					return ("(" + r + "->'$." + toStr(kt) + "' LIKE '%" + toStr(it) + "%')");
 					});
 				return("(" + ins + ")");
@@ -2061,7 +2283,7 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			{
 				arr.push_back("=");
 			}
-			auto ls = "(`" + jsonT::getStr(arr[0]) + "` " + jsonT::getStr(arr[2]) + " " + jsonT::get_value(arr[1], "'") + ")";
+			auto ls = "(`" + jsont::getStr(arr[0]) + "` " + jsont::getStr(arr[2]) + " " + jsont::get_value(arr[1], "'") + ")";
 			_where.push_back({ ls, is_and ? "AND" : "OR" });
 		}
 		void push_in(std::string key, njson a, bool is_and = true)
@@ -2070,8 +2292,8 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			{
 				key = "`" + key + "`";
 			}
-			auto ls = key + " IN(" + jsonT::join(a, ",", [](njson it, size_t idx) {
-				return jsonT::get_value(it);
+			auto ls = key + " IN(" + jsont::join(a, ",", [](njson it, size_t idx) {
+				return jsont::get_value(it);
 				}) + ")";
 			_where.push_back({ ls, is_and ? "AND" : "OR" });
 		}
@@ -2086,7 +2308,7 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			{
 				key = "`" + key + "`";
 			}
-			std::string fs = jsonT::get_value(first, "'", ""), ss = jsonT::get_value(second, "'", ts);
+			std::string fs = jsont::get_value(first, "'", ""), ss = jsont::get_value(second, "'", ts);
 			if (fs != "")
 			{
 				auto ls = "(" + key + " BETWEEN " + fs + " AND " + ss + ")";
@@ -2105,13 +2327,13 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 	private:
 		void make()
 		{
-			_data = jsonT::join(_where, " ", [](njson it, size_t idx) {
+			_data = jsont::join(_where, " ", [](njson it, size_t idx) {
 				std::string ret;
 				if (idx > 0)
 				{
-					ret = " " + jsonT::getStr(it[1]) + " ";
+					ret = " " + jsont::getStr(it[1]) + " ";
 				}
-				ret += jsonT::getStr(it[0]);
+				ret += jsont::getStr(it[0]);
 				return ret;
 				});
 			_data = hstring::replace_all<std::string>(_data, "  ", " ");

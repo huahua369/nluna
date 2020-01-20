@@ -1,4 +1,4 @@
-
+ï»¿
 #ifndef __hlUtil__H_
 #define __hlUtil__H_
 #ifdef _WIN32
@@ -7,10 +7,13 @@
 #endif
 #include <sstream>
 #include <string>
-#include <vector>
+#include <string_view>
+//#include <source_location>
 #include <algorithm>
+#include <vector>
 #include <set>
 #include <map>
+#include <unordered_map>
 #include <locale>
 #include <codecvt>
 #include <string>
@@ -44,11 +47,11 @@ typedef std::recursive_mutex Lock;
 #define LOCK(l) std::lock_guard<Lock> __locker_(l)
 #endif
 #if 0
-//¶¨ÒåËø
+//å®šä¹‰é”
 Lock lock_n;
-//¶ÁËø
+//è¯»é”
 LOCK(lock_n);
-//Ğ´Ëø
+//å†™é”
 LOCK(lock_n);
 #endif
 
@@ -85,7 +88,7 @@ namespace hz
 			}
 			return true;
 		}
-		//×Ö·û´®·Ö¸îº¯Êı
+		//å­—ç¬¦ä¸²åˆ†å‰²å‡½æ•°
 		template <typename T>
 		static int split_string(T str, T pattern, std::vector<T>* outvs)
 		{
@@ -117,14 +120,14 @@ namespace hz
 		}
 
 
-		//×Ö·û´®·Ö¸îº¯Êı
+		//å­—ç¬¦ä¸²åˆ†å‰²å‡½æ•°
 
 		template <typename T>
 		static std::vector<T> split_aw(T str, const T pattern)
 		{
 			std::vector<T> result;
 			size_t pos;
-			str += pattern;//À©Õ¹×Ö·û´®ÒÔ·½±ã²Ù×÷
+			str += pattern;//æ‰©å±•å­—ç¬¦ä¸²ä»¥æ–¹ä¾¿æ“ä½œ
 			int64_t size = str.size();
 			result.clear();
 			int ct = 0;
@@ -141,10 +144,10 @@ namespace hz
 			}
 			return result;
 		}
-		static void split(std::string str, const std::string & pattern, std::vector<std::string> & result)
+		static void split(std::string str, const std::string& pattern, std::vector<std::string>& result)
 		{
 			std::string::size_type pos;
-			str += pattern;//À©Õ¹×Ö·û´®ÒÔ·½±ã²Ù×÷
+			str += pattern;//æ‰©å±•å­—ç¬¦ä¸²ä»¥æ–¹ä¾¿æ“ä½œ
 			int size = str.size();
 			result.clear();
 			int ct = 0;
@@ -161,14 +164,14 @@ namespace hz
 			}
 		}
 
-		static std::vector<std::string> split(const std::string & str, const std::string & pattern)
+		static std::vector<std::string> split(const std::string& str, const std::string& pattern)
 		{
 			std::vector<std::string> vs;
 			hz::hstring::split(str, pattern, vs);
 			return vs;
 		}
-		// ¶à·Ö¸î·û
-		static std::vector<std::string> split_m(const std::string & str, const std::string & pattern)
+		// å¤šåˆ†å‰²ç¬¦
+		static std::vector<std::string> split_m(const std::string& str, const std::string& pattern, bool is_space = true)
 		{
 			std::vector<std::string> vs;
 			std::string tem;
@@ -180,6 +183,8 @@ namespace hz
 				}
 				else
 				{
+					if (tem == "" && !is_space)
+						continue;
 					vs.push_back(tem);
 					tem = "";
 				}
@@ -190,7 +195,7 @@ namespace hz
 			}
 			return vs;
 		}
-		static void forSplit(const std::string & str, const std::string & pattern, std::function<void(const std::string&)> func)
+		static void forSplit(const std::string& str, const std::string& pattern, std::function<void(const std::string&)> func)
 		{
 			std::vector<std::string> vs;
 			hz::hstring::split(str, pattern, vs);
@@ -201,7 +206,7 @@ namespace hz
 				}
 			}
 		}
-		static std::vector<std::vector<std::string>> csv_to_v(const std::string & str)
+		static std::vector<std::vector<std::string>> csv_to_v(const std::string& str)
 		{
 			std::vector<std::vector<std::string>> ret;
 			std::vector<std::string> lines = split(str, "\n");
@@ -215,67 +220,67 @@ namespace hz
 			return ret;
 		}
 		// -----------------------------------------------------------------------------------
-		// ×ªĞ¡Ğ´
-		static void toLower_(std::string & str)
+		// è½¬å°å†™
+		static void toLower_(std::string& str)
 		{
 			std::transform(str.begin(), str.end(), str.begin(), ::tolower);
 		}
-		// ×ª´óĞ´
-		static void toUpper_(std::string & str)
+		// è½¬å¤§å†™
+		static void toUpper_(std::string& str)
 		{
 			std::transform(str.begin(), str.end(), str.begin(), ::toupper);
 		}
-		// ×ªĞ¡Ğ´
-		static void toLower_(std::wstring & str)
+		// è½¬å°å†™
+		static void toLower_(std::wstring& str)
 		{
 			transform(str.begin(), str.end(), str.begin(), ::towlower);
 		}
-		// ×ª´óĞ´
-		static void toUpper_(std::wstring & str)
+		// è½¬å¤§å†™
+		static void toUpper_(std::wstring& str)
 		{
 			std::transform(str.begin(), str.end(), str.begin(), ::towupper);
 		}
 #if 1
-		// ×ªĞ¡Ğ´
-		static std::string toLower(const std::string & str_)
+		// è½¬å°å†™
+		static std::string toLower(const std::string& str_)
 		{
 			auto str = str_;
 			std::transform(str.begin(), str.end(), str.begin(), ::tolower);
 			return str;
 		}
-		// ×ª´óĞ´
-		static std::string toUpper(const std::string & str_)
+		// è½¬å¤§å†™
+		static std::string toUpper(const std::string& str_)
 		{
 			auto str = str_;
 			std::transform(str.begin(), str.end(), str.begin(), ::toupper);
 			return str;
 		}
-		// ×ªĞ¡Ğ´
-		static std::wstring toLower(const std::wstring & str_)
+		// è½¬å°å†™
+		static std::wstring toLower(const std::wstring& str_)
 		{
 			auto str = str_;
 			std::transform(str.begin(), str.end(), str.begin(), ::towlower);
 			return str;
 		}
-		// ×ª´óĞ´
-		static std::wstring toUpper(const std::wstring & str_)
+		// è½¬å¤§å†™
+		static std::wstring toUpper(const std::wstring& str_)
 		{
 			auto str = str_;
 			std::transform(str.begin(), str.end(), str.begin(), ::towupper);
 			return str;
 		}
 #else
-		// ×ªĞ¡Ğ´
+		// è½¬å°å†™
 		template<typename T>
-		static T toLower(T & str_)
+		static T toLower(T& str_)
 		{
 			auto str = str_;
 			std::transform(str.begin(), str.end(), str.begin(), sizeof(str[0]) == sizeof(char) ? ::tolower : ::towlower);
 			return str;
 		}
-		// ×ª´óĞ´
+		// è½¬å¤§å†™
 		template<typename T>
-		static T toUpper(T & str_)
+		static T toUpper(T& str_)
 		{
 			auto str = str_;
 			std::transform(str.begin(), str.end(), str.begin(), sizeof(str[0]) == sizeof(char) ? ::toupper : ::towupper);
@@ -283,7 +288,7 @@ namespace hz
 		}
 #endif
 
-		static std::string replace_trim(std::string & strBase, const std::string & strSrc, const std::string & strDes)
+		static std::string replace_trim(std::string& strBase, const std::string& strSrc, const std::string& strDes)
 		{
 			std::string::size_type pos = 0;
 			std::string::size_type srcLen = strSrc.size();
@@ -300,7 +305,7 @@ namespace hz
 			}
 			return strBase;
 		}
-		static void string_replace(std::string & strBase, const std::string & strSrc, const std::string & strDes)
+		static void string_replace(std::string& strBase, const std::string& strSrc, const std::string& strDes)
 		{
 			std::string::size_type pos = 0;
 			std::string::size_type srcLen = strSrc.size();
@@ -312,7 +317,7 @@ namespace hz
 				pos = strBase.find(strSrc, (pos + desLen));
 			}
 		}
-		static std::string replace(const std::string & instr, std::string src, std::string dst)
+		static std::string replace(const std::string& instr, std::string src, std::string dst)
 		{
 			std::string ret = instr;
 			if (ret.size() > 1024 && src.size() > 16)
@@ -327,7 +332,7 @@ namespace hz
 		}
 
 		template<typename Str>
-		static Str& replace_all(Str & str, const Str & old_value, const Str & new_value)
+		static Str& replace_all(Str& str, const Str& old_value, const Str& new_value)
 		{
 			while (true) {
 				uint64_t pos(0);
@@ -338,7 +343,7 @@ namespace hz
 			return str;
 		}
 		template<typename Str>
-		static Str& replace_d(Str & str, const Str & old_value, const Str & new_value)
+		static Str& replace_d(Str& str, const Str& old_value, const Str& new_value)
 		{
 			for (uint64_t pos(0); pos != Str::npos; pos += new_value.length()) {
 				if ((pos = str.find(old_value, pos)) != Str::npos)
@@ -347,7 +352,7 @@ namespace hz
 			}
 			return str;
 		}
-		static std::string& replace_ds(std::string & str, const std::string & old_value, const std::string & new_value)
+		static std::string& replace_ds(std::string& str, const std::string& old_value, const std::string& new_value)
 		{
 			for (uint64_t pos(0); pos != std::string::npos; pos += new_value.length()) {
 				if ((pos = str.find(old_value, pos)) != std::string::npos)
@@ -356,8 +361,8 @@ namespace hz
 			}
 			return str;
 		}
-		// È¥µôÍ·Î²¿Õ¸ñ
-		static std::string trim(const std::string & str, const char* pch = " ")
+		// å»æ‰å¤´å°¾ç©ºæ ¼
+		static std::string trim(const std::string& str, const char* pch = " ")
 		{
 			auto s = str;
 			if (s.empty())
@@ -368,8 +373,8 @@ namespace hz
 			s.erase(s.find_last_not_of(pch) + 1);
 			return s;
 		}
-		//²éÕÒ×Ö·û´®ÊıÁ¿
-		static size_t find_num(const std::string & s, const std::string & c)
+		//æŸ¥æ‰¾å­—ç¬¦ä¸²æ•°é‡
+		static size_t find_num(const std::string& s, const std::string& c)
 		{
 			std::string::size_type pos = 0;
 			std::string::size_type srcLen = c.size();
@@ -383,7 +388,7 @@ namespace hz
 			return ret;
 		}
 
-		static size_t Replace(std::string & instr, std::string src, std::string dst, std::string * temp = nullptr)
+		static size_t Replace(std::string& instr, std::string src, std::string dst, std::string* temp = nullptr)
 		{
 			size_t slen = src.length();
 			size_t dlen = dst.length();
@@ -398,7 +403,7 @@ namespace hz
 				str += dst;
 				is = pos + slen;
 				return 0;
-			});
+				});
 			if (n)
 			{
 				instr = str + is;
@@ -410,43 +415,43 @@ namespace hz
 			char* pi, * po, * p;
 			int nSrcLen, nDstLen, nLen;
 
-			// Ö¸ÏòÊäÈë×Ö·û´®µÄÓÎ¶¯Ö¸Õë.   
+			// æŒ‡å‘è¾“å…¥å­—ç¬¦ä¸²çš„æ¸¸åŠ¨æŒ‡é’ˆ.   
 			pi = pInput;
-			// Ö¸ÏòÊä³ö×Ö·û´®µÄÓÎ¶¯Ö¸Õë.   
+			// æŒ‡å‘è¾“å‡ºå­—ç¬¦ä¸²çš„æ¸¸åŠ¨æŒ‡é’ˆ.   
 			po = pOutput;
-			// ¼ÆËã±»Ìæ»»´®ºÍÌæ»»´®µÄ³¤¶È.   
+			// è®¡ç®—è¢«æ›¿æ¢ä¸²å’Œæ›¿æ¢ä¸²çš„é•¿åº¦.   
 			nSrcLen = strlen(pSrc);
 			nDstLen = strlen(pDst);
 
-			// ²éÕÒpiÖ¸Ïò×Ö·û´®ÖĞµÚÒ»´Î³öÏÖÌæ»»´®µÄÎ»ÖÃ,²¢·µ»ØÖ¸Õë(ÕÒ²»µ½Ôò·µ»Ønull).   
+			// æŸ¥æ‰¾piæŒ‡å‘å­—ç¬¦ä¸²ä¸­ç¬¬ä¸€æ¬¡å‡ºç°æ›¿æ¢ä¸²çš„ä½ç½®,å¹¶è¿”å›æŒ‡é’ˆ(æ‰¾ä¸åˆ°åˆ™è¿”å›null).   
 			p = strstr(pi, pSrc);
 			if (p)
 			{
-				// ÕÒµ½.   
+				// æ‰¾åˆ°.   
 				while (p)
 				{
-					// ¼ÆËã±»Ìæ»»´®Ç°±ß×Ö·û´®µÄ³¤¶È.   
+					// è®¡ç®—è¢«æ›¿æ¢ä¸²å‰è¾¹å­—ç¬¦ä¸²çš„é•¿åº¦.   
 					nLen = (int)(p - pi);
-					// ¸´ÖÆµ½Êä³ö×Ö·û´®.   
+					// å¤åˆ¶åˆ°è¾“å‡ºå­—ç¬¦ä¸².   
 					memcpy(po, pi, nLen);
 					memcpy(po + nLen, pDst, nDstLen);
-					// Ìø¹ı±»Ìæ»»´®.   
+					// è·³è¿‡è¢«æ›¿æ¢ä¸².   
 					pi = p + nSrcLen;
-					// µ÷ÕûÖ¸ÏòÊä³ö´®µÄÖ¸ÕëÎ»ÖÃ.   
+					// è°ƒæ•´æŒ‡å‘è¾“å‡ºä¸²çš„æŒ‡é’ˆä½ç½®.   
 					po = po + nLen + nDstLen;
-					// ¼ÌĞø²éÕÒ.   
+					// ç»§ç»­æŸ¥æ‰¾.   
 					p = strstr(pi, pSrc);
 				}
-				// ¸´ÖÆÊ£Óà×Ö·û´®.   
+				// å¤åˆ¶å‰©ä½™å­—ç¬¦ä¸².   
 				strcpy(po, pi);
 			}
 			else
 			{
-				// Ã»ÓĞÕÒµ½ÔòÔ­Ñù¸´ÖÆ.   
+				// æ²¡æœ‰æ‰¾åˆ°åˆ™åŸæ ·å¤åˆ¶.   
 				strcpy(po, pi);
 			}
 		}
-		static std::string sub_str(const std::string & src, const std::string & first, const std::string & second, size_t * ot = 0)
+		static std::string sub_str(const std::string& src, const std::string& first, const std::string& second, size_t* ot = 0)
 		{
 			std::string ret;
 			if (src.size() && first.size() && second.size())
@@ -464,7 +469,7 @@ namespace hz
 			}
 			return ret;
 		}
-		static std::string sub_str(const std::string & src, const std::string & first, size_t len, size_t * ot = 0)
+		static std::string sub_str(const std::string& src, const std::string& first, size_t len, size_t* ot = 0)
 		{
 			std::string ret;
 			if (src.size() && first.size())
@@ -489,7 +494,7 @@ namespace hz
 			return ret;
 		}
 
-		static std::vector<std::string> split_str(const std::string & src, const std::string & first, const std::string & sub = "\n")
+		static std::vector<std::string> split_str(const std::string& src, const std::string& first, const std::string& sub = "\n")
 		{
 			std::vector<std::string> ret;
 			auto lines = split(src, sub);
@@ -504,8 +509,8 @@ namespace hz
 			return ret;
 		}
 		/**************************************************************************
-		* SundayËã·¨²éÕÒ×Ö·û´®£¬Ô¤´¦ÀíÊ±¼äÊÇ¦¨(m + |¦²|)£¬Ê±¼ä¸´ÔÓ¶ÈÊÇ¦¸(n/m),
-		* O(mn)£¬ËüÔÚÒ»°ãÇé¿öÏÂ±ÈKMP¡¢BMÒª¿ì.
+		* Sundayç®—æ³•æŸ¥æ‰¾å­—ç¬¦ä¸²ï¼Œé¢„å¤„ç†æ—¶é—´æ˜¯Î˜(m + |Î£|)ï¼Œæ—¶é—´å¤æ‚åº¦æ˜¯Î©(n/m),
+		* O(mn)ï¼Œå®ƒåœ¨ä¸€èˆ¬æƒ…å†µä¸‹æ¯”KMPã€BMè¦å¿«.
 		**************************************************************************/
 		static int sunday_searchv(const char* txt, const char* pat, int offset[])
 		{
@@ -602,7 +607,7 @@ namespace hz
 			}
 			return ret;
 		}
-		static size_t ReplaceS(std::string & instr, std::string src, std::string dst, std::string * temp = nullptr)
+		static size_t ReplaceS(std::string& instr, std::string src, std::string dst, std::string* temp = nullptr)
 		{
 			size_t slen = src.length();
 			size_t dlen = dst.length();
@@ -625,7 +630,7 @@ namespace hz
 				str += dst;
 				is = pos + slen;
 				return 0;
-			});
+				});
 			if (n)
 			{
 				instr = str;
@@ -636,16 +641,16 @@ namespace hz
 		static void* mymemcpy(void* dst, const void* src, size_t num)
 		{
 			if ((dst == NULL) && (src == NULL))return dst;
-			size_t wordnum = num / sizeof(size_t);//¼ÆËãÓĞ¶àÉÙ¸ö32Î»£¬°´4×Ö½Ú¿½±´  
-			size_t slice = num % sizeof(size_t);//Ê£ÓàµÄ°´×Ö½Ú¿½±´  
-			size_t * pintsrc = (size_t*)src;
-			size_t * pintdst = (size_t*)dst;
-			while (wordnum--) * pintdst++ = *pintsrc++;
-			while (slice--) * ((char*)pintdst++) = *((char*)pintsrc++);
+			size_t wordnum = num / sizeof(size_t);//è®¡ç®—æœ‰å¤šå°‘ä¸ª32ä½ï¼ŒæŒ‰4å­—èŠ‚æ‹·è´  
+			size_t slice = num % sizeof(size_t);//å‰©ä½™çš„æŒ‰å­—èŠ‚æ‹·è´  
+			size_t* pintsrc = (size_t*)src;
+			size_t* pintdst = (size_t*)dst;
+			while (wordnum--)*pintdst++ = *pintsrc++;
+			while (slice--)*((char*)pintdst++) = *((char*)pintsrc++);
 			return dst;
 		}
-		//²éÕÒ×Ö·û´®ÊıÁ¿
-		static char* sunday_search_num(const char* str, int lens, const char* sub, size_t * num = nullptr, std::function<int(char* pos, char* begin)> func = nullptr)
+		//æŸ¥æ‰¾å­—ç¬¦ä¸²æ•°é‡
+		static char* sunday_search_num(const char* str, int lens, const char* sub, size_t* num = nullptr, std::function<int(char* pos, char* begin)> func = nullptr)
 		{
 			char* s = (char*)str;
 			char* rt = NULL;
@@ -676,23 +681,23 @@ namespace hz
 			}
 			auto isk = (s - (char*)str);
 			if (num)
-				* num = i;
+				*num = i;
 			return rt;
 		}
 	private:
 		static bool IsTextUTF8(char* str, uint64_t length)
 		{
-			unsigned long nBytes = 0;//UFT8¿ÉÓÃ1-6¸ö×Ö½Ú±àÂë,ASCIIÓÃÒ»¸ö×Ö½Ú  
+			unsigned long nBytes = 0;//UFT8å¯ç”¨1-6ä¸ªå­—èŠ‚ç¼–ç ,ASCIIç”¨ä¸€ä¸ªå­—èŠ‚  
 			auto tns = nBytes;
 			unsigned char chr;
-			bool bAllAscii = true; //Èç¹ûÈ«²¿¶¼ÊÇASCII, ËµÃ÷²»ÊÇUTF-8  
+			bool bAllAscii = true; //å¦‚æœå…¨éƒ¨éƒ½æ˜¯ASCII, è¯´æ˜ä¸æ˜¯UTF-8  
 			bool isu = true;
 			for (int i = 0; i < length; ++i)
 			{
 				chr = *(str + i);
-				if ((chr & 0x80) != 0) // ÅĞ¶ÏÊÇ·ñASCII±àÂë,Èç¹û²»ÊÇ,ËµÃ÷ÓĞ¿ÉÄÜÊÇUTF-8,ASCIIÓÃ7Î»±àÂë,µ«ÓÃÒ»¸ö×Ö½Ú´æ,×î¸ßÎ»±ê¼ÇÎª0,o0xxxxxxx  
+				if ((chr & 0x80) != 0) // åˆ¤æ–­æ˜¯å¦ASCIIç¼–ç ,å¦‚æœä¸æ˜¯,è¯´æ˜æœ‰å¯èƒ½æ˜¯UTF-8,ASCIIç”¨7ä½ç¼–ç ,ä½†ç”¨ä¸€ä¸ªå­—èŠ‚å­˜,æœ€é«˜ä½æ ‡è®°ä¸º0,o0xxxxxxx  
 					bAllAscii = false;
-				if (nBytes == 0) //Èç¹û²»ÊÇASCIIÂë,Ó¦¸ÃÊÇ¶à×Ö½Ú·û,¼ÆËã×Ö½ÚÊı  
+				if (nBytes == 0) //å¦‚æœä¸æ˜¯ASCIIç ,åº”è¯¥æ˜¯å¤šå­—èŠ‚ç¬¦,è®¡ç®—å­—èŠ‚æ•°  
 				{
 					if (chr >= 0x80)
 					{
@@ -712,7 +717,7 @@ namespace hz
 						nBytes--;
 					}
 				}
-				else //¶à×Ö½Ú·ûµÄ·ÇÊ××Ö½Ú,Ó¦Îª 10xxxxxx  
+				else //å¤šå­—èŠ‚ç¬¦çš„éé¦–å­—èŠ‚,åº”ä¸º 10xxxxxx  
 				{
 					if ((chr & 0xC0) != 0x80)
 						return false;
@@ -720,9 +725,9 @@ namespace hz
 					nBytes--;
 				}
 			}
-			if (nBytes > 0) //Î¥·µ¹æÔò  
+			if (nBytes > 0) //è¿è¿”è§„åˆ™  
 				return false;
-			if (bAllAscii) //Èç¹ûÈ«²¿¶¼ÊÇASCII, ËµÃ÷²»ÊÇUTF-8  
+			if (bAllAscii) //å¦‚æœå…¨éƒ¨éƒ½æ˜¯ASCII, è¯´æ˜ä¸æ˜¯UTF-8  
 				return false;
 
 			return true;
@@ -731,8 +736,15 @@ namespace hz
 
 		static bool IsTextUTF8(const char* str)
 		{
-			size_t len = strlen(str);
-			return (len > 2) && (beUtf8(str) /*|| IsTextUTF8((char*)str, len)*/);
+			char utf8[] = { (char)0xEF ,(char)0xBB ,(char)0xBF };
+			if (str[0] != utf8[0] || str[1] != utf8[1] || str[2] != utf8[2])
+			{
+				size_t len = strlen(str);
+				return (len > 2) && (beUtf8(str) /*|| IsTextUTF8((char*)str, len)*/);
+			}
+			else {
+				return true;
+			}
 		}
 
 		static size_t countGBK(const char* str)
@@ -775,7 +787,7 @@ namespace hz
 					++wordLen;
 					tmpHead >>= 1;
 				}
-				if (wordLen <= 1)continue; //utf8×îĞ¡³¤¶ÈÎª2
+				if (wordLen <= 1)continue; //utf8æœ€å°é•¿åº¦ä¸º2
 				wordLen--;
 				if (wordLen + i >= len)break;
 				for (tPos = 1; tPos <= wordLen; ++tPos)
@@ -878,7 +890,7 @@ namespace hz
 	public:
 
 		template <typename T>
-		static void deleteAllMark(T & s, const T & mark)
+		static void deleteAllMark(T& s, const T& mark)
 		{
 			unsigned int nSize = mark.size();
 			while (1)
@@ -893,7 +905,7 @@ namespace hz
 		}
 	private:
 
-		};
+	};
 	//!hstring
 #ifdef ICONV
 	class stru {
@@ -1026,7 +1038,7 @@ namespace hz
 
 
 	template<class T>
-	T BinarySearch(T k, std::vector<T> & a, int& len)//kÊäÈë ,  aÒÑ¾­ÅÅĞòµÍµ½¸ßµÄÊı×é £¬lenÊı×é³¤¶È
+	T BinarySearch(T k, std::vector<T>& a, int& len)//kè¾“å…¥ ,  aå·²ç»æ’åºä½åˆ°é«˜çš„æ•°ç»„ ï¼Œlenæ•°ç»„é•¿åº¦
 	{
 		int high = len > 0 ? len : a.size(), low = 0;
 		int& m = len, alen = len;
@@ -1091,7 +1103,7 @@ namespace hz
 	}
 	//-----------------------------------------------------------------------------
 	template<class T>
-	T BinarySearch(T k, std::vector<T> & a, int& len, T er)//kÊäÈë ,  aÒÑ¾­ÅÅĞòµÍµ½¸ßµÄÊı×é £¬lenÊı×é³¤¶È
+	T BinarySearch(T k, std::vector<T>& a, int& len, T er)//kè¾“å…¥ ,  aå·²ç»æ’åºä½åˆ°é«˜çš„æ•°ç»„ ï¼Œlenæ•°ç»„é•¿åº¦
 	{
 		int64_t m = 0, left = 0, right = a.size();
 		while (left <= right)
@@ -1112,9 +1124,9 @@ namespace hz
 		m = std::min((int64_t)a.size() - 1, m);
 		return a[m];
 	}
-	//kĞèÒªËÑË÷µÄÖµ ,  aÅÅÉıĞòµÄÊı×é, is_less=trueÓÅÏÈÑ¡Ğ¡ÓÚkµÄÖµ,falseÔòÑ¡×î½üµÄ
+	//kéœ€è¦æœç´¢çš„å€¼ ,  aæ’å‡åºçš„æ•°ç»„, is_less=trueä¼˜å…ˆé€‰å°äºkçš„å€¼,falseåˆ™é€‰æœ€è¿‘çš„
 	template<class T>
-	T binary_search_vague(T k, std::vector<T> & a, int64_t * idx, bool is_less = true)
+	T binary_search_vague(T k, std::vector<T>& a, int64_t* idx, bool is_less = true)
 	{
 		std::map<T, int64_t> ers;
 		int64_t m = 0, left = 0, right = a.size();
@@ -1148,7 +1160,7 @@ namespace hz
 		}
 		if (ers.size())
 			m = ers.begin()->second;
-		if (idx)* idx = m;
+		if (idx)*idx = m;
 		return a[m];
 	}
 	//-----------------------------------------------------------------------------
@@ -1166,9 +1178,9 @@ namespace hz
 		{
 			const char* t = str;
 			int value = 0;
-			bool b_plus = true; //ÅĞ¶Ï·ûºÅ
+			bool b_plus = true; //åˆ¤æ–­ç¬¦å·
 
-			while (*str) //¹ıÂË·ûºÅ
+			while (*str) //è¿‡æ»¤ç¬¦å·
 			{
 				if (*str == '+')
 				{
@@ -1202,8 +1214,8 @@ namespace hz
 			}
 			return value;
 		}
-		//------------×Ö·û´®ÅúÁ¿×ª»»³É¸¡µãÊı-----------------------------------------------------------------
-		static char* strTofloatv(const char* str, float* f, int num)//×Ö·û´®£¬±£´æÎ»ÖÃ£¬×ª»»µÄ¸öÊı¡£·µ»Ø³É¹¦×ª»»µÄÊıÁ¿
+		//------------å­—ç¬¦ä¸²æ‰¹é‡è½¬æ¢æˆæµ®ç‚¹æ•°-----------------------------------------------------------------
+		static char* strTofloatv(const char* str, float* f, int num)//å­—ç¬¦ä¸²ï¼Œä¿å­˜ä½ç½®ï¼Œè½¬æ¢çš„ä¸ªæ•°ã€‚è¿”å›æˆåŠŸè½¬æ¢çš„æ•°é‡
 		{
 			char* st = (char*)str;
 			int i = 0;
@@ -1220,7 +1232,7 @@ namespace hz
 			return st;
 		}
 
-		static char* strTointv(const char* str, int* f, int num)//×Ö·û´®£¬±£´æÎ»ÖÃ£¬×ª»»µÄ¸öÊı¡£·µ»Ø³É¹¦×ª»»µÄÊıÁ¿
+		static char* strTointv(const char* str, int* f, int num)//å­—ç¬¦ä¸²ï¼Œä¿å­˜ä½ç½®ï¼Œè½¬æ¢çš„ä¸ªæ•°ã€‚è¿”å›æˆåŠŸè½¬æ¢çš„æ•°é‡
 		{
 			char* st = (char*)str;
 			int i = 0;
@@ -1236,7 +1248,7 @@ namespace hz
 			}
 			return st;
 		}
-		static std::wstring AtoW(const std::string & text)
+		static std::wstring AtoW(const std::string& text)
 		{
 			return (hz::hstring::IsTextUTF8(text.c_str())) ?
 				utf8_to_wstring(text) :
@@ -1245,23 +1257,23 @@ namespace hz
 
 
 		// convert UTF-8 string to wstring  
-		static std::wstring utf8_to_wstring(const std::string & str)
+		static std::wstring utf8_to_wstring(const std::string& str)
 		{
 			std::wstring_convert<std::codecvt_utf8<wchar_t>> myconv;
 			return myconv.from_bytes(str);
 		}
-		static std::string utf8_to_ansi(const std::string & str)
+		static std::string utf8_to_ansi(const std::string& str)
 		{
 			return wstring_to_ansi(utf8_to_wstring(str));
 		}
 		// convert wstring to UTF-8 string  
-		static std::string wstring_to_utf8(const std::wstring & str)
+		static std::string wstring_to_utf8(const std::wstring& str)
 		{
 			std::wstring_convert<std::codecvt_utf8<wchar_t>> myconv;
 			return myconv.to_bytes(str);
 		}
 
-		static std::string wstring_to_ansi(const std::wstring & src)
+		static std::string wstring_to_ansi(const std::wstring& src)
 		{
 			std::string str;
 			std::locale sys_locale("");
@@ -1292,7 +1304,7 @@ namespace hz
 			return str;
 		}
 
-		static std::wstring ansi_to_wstring(const std::string & src)
+		static std::wstring ansi_to_wstring(const std::string& src)
 		{
 			std::wstring wstr;
 			std::locale sys_locale("");
@@ -1320,7 +1332,7 @@ namespace hz
 			}
 			return wstr;
 		}
-		static std::string ansi_to_utf8(const std::string & src)
+		static std::string ansi_to_utf8(const std::string& src)
 		{
 			return wstring_to_utf8(ansi_to_wstring(src));
 		}
@@ -1330,7 +1342,7 @@ namespace hz
 		//-----------------------------------------------------------------------------
 		static void setClipboard(const char* text, int len)
 		{
-			//´ò¿ª¼ôÇĞ°å
+			//æ‰“å¼€å‰ªåˆ‡æ¿
 			if (OpenClipboard(0) & len > 0)
 			{
 				HGLOBAL hClip;
@@ -1340,31 +1352,31 @@ namespace hz
 					CloseClipboard();
 					return;
 				}
-				//Çå¿Õ¼ôÇĞ°åÄÚÈİ
+				//æ¸…ç©ºå‰ªåˆ‡æ¿å†…å®¹
 				EmptyClipboard();
-				//·ÖÅäĞÂÈ«¾ÖÄÚ´æ¿Õ¼ä
+				//åˆ†é…æ–°å…¨å±€å†…å­˜ç©ºé—´
 				hClip = GlobalAlloc(GHND, len + 1);
-				//Ëø×¡È«¾ÖÄÚ´æ¿Õ¼ä
+				//é”ä½å…¨å±€å†…å­˜ç©ºé—´
 				pBuf = (TCHAR*)GlobalLock(hClip);
-				//½«ÄÚÈİĞ´ÈëÈ«¾ÖÄÚ´æ¿Õ¼ä
+				//å°†å†…å®¹å†™å…¥å…¨å±€å†…å­˜ç©ºé—´
 				memcpy(pBuf, text, len);
-				//½«¿Õ¼äÖĞµÄÄÚÈİĞ´Èë¼ôÇĞ°å
+				//å°†ç©ºé—´ä¸­çš„å†…å®¹å†™å…¥å‰ªåˆ‡æ¿
 #ifndef UNICODE
-				SetClipboardData(CF_TEXT, hClip);         //ÉèÖÃÊı¾İ
+				SetClipboardData(CF_TEXT, hClip);         //è®¾ç½®æ•°æ®
 #else
-				SetClipboardData(CF_UNICODETEXT, hClip);         //ÉèÖÃÊı¾İ
+				SetClipboardData(CF_UNICODETEXT, hClip);         //è®¾ç½®æ•°æ®
 #endif
-																 //½âËøÈ«¾ÖÄÚ´æ¿Õ¼ä
-				GlobalUnlock(hClip);         //½âËø
-											 //ÊÍ·ÅÈ«¾ÖÄÚ´æ¿Õ¼ä
+																 //è§£é”å…¨å±€å†…å­˜ç©ºé—´
+				GlobalUnlock(hClip);         //è§£é”
+											 //é‡Šæ”¾å…¨å±€å†…å­˜ç©ºé—´
 				GlobalFree(hClip);
-				//¹Ø±Õ¼ôÇĞ°å
+				//å…³é—­å‰ªåˆ‡æ¿
 				CloseClipboard();
 			}
 		}
-		static void setClipboardW(const std::wstring & text)
+		static void setClipboardW(const std::wstring& text)
 		{
-			//´ò¿ª¼ôÇĞ°å
+			//æ‰“å¼€å‰ªåˆ‡æ¿
 			if (!text.empty() && OpenClipboard(0))
 			{
 				HGLOBAL hClip;
@@ -1374,22 +1386,22 @@ namespace hz
 					CloseClipboard();
 					return;
 				}
-				//Çå¿Õ¼ôÇĞ°åÄÚÈİ
+				//æ¸…ç©ºå‰ªåˆ‡æ¿å†…å®¹
 				EmptyClipboard();
-				//·ÖÅäĞÂÈ«¾ÖÄÚ´æ¿Õ¼ä
+				//åˆ†é…æ–°å…¨å±€å†…å­˜ç©ºé—´
 				size_t len = (text.length() + 1) * sizeof(wchar_t);
 				hClip = GlobalAlloc(GHND, len);
-				//Ëø×¡È«¾ÖÄÚ´æ¿Õ¼ä
+				//é”ä½å…¨å±€å†…å­˜ç©ºé—´
 				pBuf = (TCHAR*)GlobalLock(hClip);
-				//½«ÄÚÈİĞ´ÈëÈ«¾ÖÄÚ´æ¿Õ¼ä
+				//å°†å†…å®¹å†™å…¥å…¨å±€å†…å­˜ç©ºé—´
 				memcpy(pBuf, text.c_str(), len);
-				//½«¿Õ¼äÖĞµÄÄÚÈİĞ´Èë¼ôÇĞ°å
-				SetClipboardData(CF_UNICODETEXT, hClip);         //ÉèÖÃÊı¾İ
-																 //½âËøÈ«¾ÖÄÚ´æ¿Õ¼ä
-				GlobalUnlock(hClip);         //½âËø
-											 //ÊÍ·ÅÈ«¾ÖÄÚ´æ¿Õ¼ä
+				//å°†ç©ºé—´ä¸­çš„å†…å®¹å†™å…¥å‰ªåˆ‡æ¿
+				SetClipboardData(CF_UNICODETEXT, hClip);         //è®¾ç½®æ•°æ®
+																 //è§£é”å…¨å±€å†…å­˜ç©ºé—´
+				GlobalUnlock(hClip);         //è§£é”
+											 //é‡Šæ”¾å…¨å±€å†…å­˜ç©ºé—´
 				GlobalFree(hClip);
-				//¹Ø±Õ¼ôÇĞ°å
+				//å…³é—­å‰ªåˆ‡æ¿
 				CloseClipboard();
 			}
 		}
@@ -1412,7 +1424,7 @@ namespace hz
 		}
 #endif
 #endif
-		// ¼¯ºÏ
+		// é›†åˆ
 /*
 		template<class _InIt1,
 			class _InIt2,
@@ -1429,7 +1441,78 @@ namespace hz
 	};
 	//!util
 
+	static int boms(const char* str)
+	{
+		//UTF-8
+		char utf8[] = { (char)0xEF ,(char)0xBB ,(char)0xBF };
+		//UTF-16ï¼ˆå¤§ç«¯åºï¼‰
+		char utf16d[] = { (char)0xFE ,(char)0xFF };
+		//UTF-16ï¼ˆå°ç«¯åºï¼‰
+		char utf16[] = { (char)0xFF ,(char)0xFE };
+		//UTF-32ï¼ˆå¤§ç«¯åºï¼‰
+		char utf32d[] = { (char)0x00 ,(char)0x00 ,(char)0xFE ,(char)0xFF };
+		//UTF-32ï¼ˆå°ç«¯åºï¼‰
+		char utf32[] = { (char)0xFF ,(char)0xFE ,(char)0x00 ,(char)0x00 };
 
+		int bomlen[] = { 3,2,2,4,4 };
+		char* bom[] = { utf8,utf16d,utf16,utf32d,utf32 };
+		int u = -1;
+		for (int i = 0; i < 5; ++i)
+		{
+			if (0 == memcmp(str, bom[i], bomlen[i]))
+			{
+				u = i;
+			}
+		}
+		int ret = 0;
+		if (u >= 0)
+		{
+			ret = bomlen[u];
+		}
+		return ret;
+	}
+	static int vkcode(const std::string& vks)
+	{
+		static std::unordered_map<std::string, int> vk_code = {
+			{ "back",0x08}, { "tab" ,0x09}, { "clear" ,0x0C}
+			,{ "enter" ,0x0D},{ "shift" ,0x10},{ "ctrl" ,0x11},{ "alt" ,0x12}
+			,{ "pause" ,0x13},{ "caps_lock" ,0x14},{ "esc" ,0x1B}
+			,{ "space" ,0x20}
+			,{ "page_up" ,0x21},{ "page_down" ,0x22},{ "end" ,0x23},{ "home" ,0x24}
+			,{ "left_arrow" ,0x25},{ "up_arrow" ,0x26},{ "right_arrow" ,0x27},{ "down_arrow" ,0x28}
+			,{ "select" ,0x29},{ "print" ,0x2A},{ "execute" ,0x2B},{ "print_screen" ,0x2C}
+			,{ "ins" ,0x2D},{ "del" ,0x2E},{ "help" ,0x2F}
+			,{ "0" ,0x30},{ "1" ,0x31},{ "2" ,0x32},{ "3" ,0x33},{ "4" ,0x34},{ "5" ,0x35},{ "6" ,0x36},{ "7" ,0x37},{ "8" ,0x38},{ "9" ,0x39}
+			,{ "a" ,0x41},{ "b" ,0x42},{ "c" ,0x43},{ "d" ,0x44},{ "e" ,0x45},{ "f" ,0x46},{ "g" ,0x47},{ "h" ,0x48},{ "i" ,0x49},{ "j" ,0x4A},{ "k" ,0x4B},{ "l" ,0x4C},{ "m" ,0x4D},{ "n" ,0x4E},{ "o" ,0x4F},{ "p" ,0x50},{ "q" ,0x51},{ "r" ,0x52},{ "s" ,0x53},{ "t" ,0x54},{ "u" ,0x55},{ "v" ,0x56},{ "w" ,0x57},{ "x" ,0x58},{ "y" ,0x59},{ "z" ,0x5A}
+			,{ "lwin", 0x5b },{ "rwin", 0x5c },{ "apps", 0x5d },{ "sleep", 0x5f }
+			,{ "numpad_0" ,0x60},{ "numpad_1" ,0x61},{ "numpad_2" ,0x62},{ "numpad_3" ,0x63},{ "numpad_4" ,0x64},{ "numpad_5" ,0x65},{ "numpad_6" ,0x66},{ "numpad_7" ,0x67},{ "numpad_8" ,0x68},{ "numpad_9" ,0x69}
+			,{ "multiply_key" ,0x6A},{ "add_key" ,0x6B},{ "separator_key" ,0x6C},{ "subtract_key" ,0x6D},{ "decimal_key" ,0x6E},{ "divide_key" ,0x6F}
+			,{ "F1" ,0x70},{ "F2" ,0x71},{ "F3" ,0x72},{ "F4" ,0x73},{ "F5" ,0x74},{ "F6" ,0x75},{ "F7" ,0x76},{ "F8" ,0x77},{ "F9" ,0x78},{ "F10" ,0x79},{ "F11" ,0x7A},{ "F12" ,0x7B}
+			,{ "F13" ,0x7C},{ "F14" ,0x7D},{ "F15" ,0x7E},{ "F16" ,0x7F},{ "F17" ,0x80},{ "F18" ,0x81},{ "F19" ,0x82},{ "F20" ,0x83},{ "F21" ,0x84},{ "F22" ,0x85},{ "F23" ,0x86},{ "F24" ,0x87}
+			,{ "num_lock" ,0x90},{ "scroll_lock" ,0x91}
+			,{ "left_shift" ,0xA0},{ "right_shift " ,0xA1}
+			,{ "left_control" ,0xA2},{ "right_control" ,0xA3}
+			,{ "left_menu" ,0xA4},{ "right_menu" ,0xA5}
+			,{ "browser_back" ,0xA6},{ "browser_forward" ,0xA7},{ "browser_refresh" ,0xA8},{ "browser_stop" ,0xA9},{ "browser_search" ,0xAA},{ "browser_favorites" ,0xAB},{ "browser_start_and_home" ,0xAC}
+			,{ "volume_mute" ,0xAD},{ "volume_Down" ,0xAE},{ "volume_up" ,0xAF}
+			,{ "next_track" ,0xB0},{ "previous_track" ,0xB1},{ "stop_media" ,0xB2},{ "play/pause_media" ,0xB3}
+			,{ "start_mail" ,0xB4},{ "select_media" ,0xB5},{ "start_application_1" ,0xB6},{ "start_application_2" ,0xB7}
+			,{ "attn_key" ,0xF6},{ "crsel_key" ,0xF7},{ "exsel_key" ,0xF8},{ "play_key" ,0xFA},{ "zoom_key" ,0xFB},{ "clear_key" ,0xFE}
+			,{ "+" ,0xBB},{ "=" ,0xBB}
+			,{ "," ,0xBC},{ "<" ,0xBC}
+			,{ "-" ,0xBD},{ "_" ,0xBD}
+			,{ "." ,0xBE} ,{ ">" ,0xBE}
+			,{ "/" ,0xBF},{ "?" ,0xBF}
+			,{ "`" ,0xC0},{ "~" ,0xC0}
+			,{ ";" ,0xBA},{ ":" ,0xBA}
+			,{ "[" ,0xDB},{ "{" ,0xDB}
+			,{ "\\" ,0xDC},{ "|" ,0xDC}
+			,{ "]" ,0xDD},{ "}" ,0xDD}
+			,{ "'" ,0xDE},{ "\"" ,0xde}
+		};
+		auto it = vk_code.find(vks);
+		return it != vk_code.end() ? it->second : 0;
+	}
 
 }//!hz
 

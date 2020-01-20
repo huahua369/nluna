@@ -1,9 +1,9 @@
-#include "tools.h"
+ï»¿#include "tools.h"
 #include "font.h"
 
 namespace hz
 {
-	// todo		äÖÈ¾µ½image
+	// todo		æ¸²æŸ“åˆ°image
 
 	void Fonts::build_text(Image* dst, Fonts::tt_info* font, const std::string& str, size_t count, size_t first_idx, double font_size, unsigned int color, glm::ivec2 pos, unsigned char blur_size, glm::ivec2 blur_pos, unsigned int color_blur, double dpi, bool first_bitmap)
 	{
@@ -20,13 +20,13 @@ namespace hz
 		double base_line = font->get_base_line(fns);
 		double adv = 0; int kern = 0;
 #ifdef _NO_CACHE_
-		// ÔöÇ¿ÁÁ¶È
+		// å¢žå¼ºäº®åº¦
 		float brightness = 0.0;
 		glm::ivec4 rc;
 		Fonts::Bitmap bitmap[1] = {};
 		Fonts::Bitmap blur[1] = {};
 		std::vector<char> bit_buf[2];
-		// ·ÖÅä»º´æÇø
+		// åˆ†é…ç¼“å­˜åŒº
 		bit_buf[0].resize(line_height * line_height);
 		bit_buf[1].resize(line_height * line_height);
 #else
@@ -64,7 +64,7 @@ namespace hz
 					py += line_height;
 				}
 				double dbl = ftit->_baseline_f > 0 ? ftit->_baseline_f : base_line;
-				// »º´æÍ¼»­µ½Ä¿±êÍ¼Ïñ
+				// ç¼“å­˜å›¾ç”»åˆ°ç›®æ ‡å›¾åƒ
 				if (blur_size > 0 && ftits.size() > 1)
 				{
 					auto bft = ftits[1];
@@ -97,7 +97,7 @@ namespace hz
 				if (bit)
 				{
 					double dbl = ftit->_baseline_f > 0 ? ftit->_baseline_f : base_line;
-					// »Ò¶ÈÍ¼×ªRGBA
+					// ç°åº¦å›¾è½¬RGBA
 					if (blur_size > 0)
 					{
 						glm::ivec4 brc = { kern + tpx + rc.x + blur_pos.x - blur_size, py + dbl + rc.y + blur_pos.y - blur_size,
@@ -119,7 +119,7 @@ namespace hz
 		return;
 	}
 
-	// todo		Éú³Éµ½draw_font_info
+	// todo		ç”Ÿæˆåˆ°draw_font_info
 
 	glm::ivec2 Fonts::build_info(Fonts::css_text* csst, const std::string& str, size_t count, size_t first_idx, glm::ivec2 pos, draw_font_info* out)
 	{
@@ -196,6 +196,12 @@ namespace hz
 		vitem->reserve(std::min(count, str.size()));
 		std::wstring twstr;
 		css_text_info* ctip = nullptr;
+		int spaces = csst->_fzpace;
+		if (csst->_text_align == css_text::text_align::justify)
+		{
+			//spaces = ;
+		}
+
 		for (int i = 0; i < count && t && *t; i++)
 		{
 			const char* t1 = t, * t2;
@@ -229,7 +235,7 @@ namespace hz
 			{
 				ch = ch;
 			}
-			if (ftits.size())
+			if (ftits.size() && ftits[0])
 			{
 				auto ftit = ftits[0];
 				rfont = (tt_info*)ftit->renderfont;
@@ -242,22 +248,25 @@ namespace hz
 					tpy += line_height;
 				}
 				double dbl = ctip->base_line;
-				// »º´æÍ¼»­µ½Ä¿±êÍ¼Ïñ
+				// ç¼“å­˜å›¾ç”»åˆ°ç›®æ ‡å›¾åƒ
 				adv = ftit->_advance + kern;
 				if (fk.blur_size > 0 && ftits.size() > 1)
 				{
 					auto bft = ftits[1];
-					glm::ivec2 dps = { tpx + bft->_baseline.x + csst->blur_pos.x - fk.blur_size,
-						py + dbl + bft->_baseline.y + csst->blur_pos.y - fk.blur_size };
-					draw_image_info dii;
-					dii.user_image = bft->_image;
-					dii.a = { dps.x + kern, dps.y, bft->_rect.z, bft->_rect.w };
-					dii.rect = bft->_rect;
-					dii.col = csst->color_blur;
-					dii.unser_data = (void*)unicode_codepoint;
-					dii.adv = adv;
-					dii.unser_data1 = ctip;
-					vblurs.push_back(dii);
+					if (bft)
+					{
+						glm::ivec2 dps = { tpx + bft->_baseline.x + csst->blur_pos.x - fk.blur_size,
+							py + dbl + bft->_baseline.y + csst->blur_pos.y - fk.blur_size };
+						draw_image_info dii;
+						dii.user_image = bft->_image;
+						dii.a = { dps.x + kern, dps.y, bft->_rect.z, bft->_rect.w };
+						dii.rect = bft->_rect;
+						dii.col = csst->color_blur;
+						dii.unser_data = (void*)unicode_codepoint;
+						dii.adv = adv;
+						dii.unser_data1 = ctip;
+						vblurs.push_back(dii);
+					}
 				}
 				glm::ivec2 dps = { tpx + ftit->_baseline.x,py + dbl + ftit->_baseline.y };
 				draw_image_info dii;
@@ -274,7 +283,7 @@ namespace hz
 				vitem->push_back(dii);
 			}
 			vpos->push_back({ adv, py });
-			tpx += adv + csst->_fzpace;
+			tpx += adv + spaces;
 		}
 		njson posn, dif;
 		mx = std::max(tpx, mx);
@@ -325,6 +334,45 @@ namespace hz
 			}
 			i++;
 		}
+		return ret;
+	}
+
+	void Fonts::draw_image2(Image* dst, draw_image_info* info)
+	{
+		if (!dst || !info || !info->user_image)
+		{
+			return;
+		}
+		glm::vec2 texsize = { info->user_image->width , info->user_image->height };
+		auto rect = info->rect;
+		auto a = info->a;
+		auto sliced = info->sliced;
+		if (rect.z < 1)
+		{
+			rect.x = rect.y = 0;
+			rect.z = a.z;
+		}
+		if (rect.w < 1)
+		{
+			rect.w = a.w;
+		}
+		int ret = 0;
+		glm::ivec2 dpos = { a.x, a.y };
+		dst->draw_image2(info->user_image, rect, dpos, info->col);
+
+		if (info->out)
+			*(info->out) = ret;
+	}
+	glm::ivec2 Fonts::build_to_image(Fonts::css_text* csst, const std::string& str, size_t count, size_t first_idx, glm::ivec2 pos, Image* dst)
+	{
+		draw_font_info tem;
+		glm::ivec2 ret = build_info(csst, str, count, first_idx, pos, &tem);
+		// æ˜¾ç¤ºæ–‡æœ¬
+		for (auto& it : tem.vitem)
+		{
+			draw_image2(dst, &it);
+		}
+		//tem.vitem[0].user_image->saveImage("fontchach.png");
 		return ret;
 	}
 }

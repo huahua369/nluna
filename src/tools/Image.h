@@ -1,8 +1,8 @@
-/*
- Í¼Ïñ²Ù×÷
- Ö§³Ö´ò¿ªÍ¼Æ¬¸ñÊ½
- JPEG¡¢PNG¡¢ BMP¡¢ PSD¡¢ TGA¡¢ GIF¡¢ HDR¡¢ PIC¡¢ PNM(.ppmand.pgm)
- Ö§³Ö±£´æbmp¡¢png¡¢jpg¡¢tga¡¢hdr
+ï»¿/*
+ å›¾åƒæ“ä½œ
+ æ”¯æŒæ‰“å¼€å›¾ç‰‡æ ¼å¼
+ JPEGã€PNGã€ BMPã€ PSDã€ TGAã€ GIFã€ HDRã€ PICã€ PNM(.ppmand.pgm)
+ æ”¯æŒä¿å­˜bmpã€pngã€jpgã€tgaã€hdr
 
 Image(std::string &imgfn)
 static Image* create()
@@ -14,19 +14,19 @@ void loadImage(std::string imgfn)
 void loadMemImage(const char *data, size_t len)
 int saveImage(std::string fn, int comp = 4)
 
-Ê¾Àı£º
-¼ÓÔØÍ¼Æ¬£º
+ç¤ºä¾‹ï¼š
+åŠ è½½å›¾ç‰‡ï¼š
 hz::Image *img = hz::Image::create("f.png");//"border.png");//
 if (!img || img->datasize() == 0)
 {
-//¼ÓÔØ³É¹¦
+//åŠ è½½æˆåŠŸ
 }
-»òÕß
+æˆ–è€…
 hz::Image img1,img2("a.png");
 img1.loadImage("f.png");
 if (img1.datasize() == 0)
 {
-//¼ÓÔØ³É¹¦
+//åŠ è½½æˆåŠŸ
 }
 */
 
@@ -73,7 +73,7 @@ if (img1.datasize() == 0)
 #define HZ_COL32_A_MASK     0xFF000000
 #endif
 #ifndef HZ_BIT
-//Î»×óÒÆ
+//ä½å·¦ç§»
 #define HZ_BIT(x) (1<<x)
 #endif
 
@@ -113,8 +113,9 @@ typedef struct tagRECT
 	long    bottom;
 } RECT;
 #endif
-namespace hz {
-
+namespace hz
+{
+	typedef unsigned char byte;
 	enum GuiDir
 	{
 		GuiDir_None = 0,
@@ -176,7 +177,7 @@ namespace hz {
 			hists[c]++;
 		}
 
-		//±È½ÏÁ½¸öÖ±·½Í¼
+		//æ¯”è¾ƒä¸¤ä¸ªç›´æ–¹å›¾
 		bool diff(yHist* p, int dmin = 1500, int dmax = 2000)
 		{
 			mset.clear();
@@ -195,13 +196,13 @@ namespace hz {
 		}
 
 	public:
-		//´´½¨Ö±·½Í¼
+		//åˆ›å»ºç›´æ–¹å›¾
 		std::vector<int> hists;
 		std::set<int> mset;
 		int hmin = 0, hmax = 0;
 	};
 
-	//Í¼ÏñÀà
+	//å›¾åƒç±»
 	class Image :public Res
 	{
 	public:
@@ -240,29 +241,29 @@ namespace hz {
 
 	public:
 		std::string _filename;
-		//ÇëÇóµÄÍ¨µÀÊı
+		//è¯·æ±‚çš„é€šé“æ•°
 		int requested_components = 4;
 		size_t width = 0, height = 0;// , data_size = 0;
 		uint32_t mipLevels = 1;
 		uint32_t layerCount = 1;
 		std::vector<item> _levels_info;
 		// gif
-		// ÑÓ³Ù
+		// å»¶è¿Ÿ
 		std::vector<int> _delays;
 		int _layers = 1;
 		int _delays_cu = 0, _cur_idx = -1;
 
 		std::string savefilename;
 #ifndef M_RES
-		// ÊÇ·ñ¸üĞÂ
+		// æ˜¯å¦æ›´æ–°
 		std::atomic_int64_t _upt = 0;
 #endif // !__RES__H__
-		
+
 		LockS _locks, _lock_upt, _lk_gif;
 		BITMAPINFO bmpInfo;
-		RGBQUAD    bmiColors[2];	// ÎªBITMAPINFOµÄm_bmiColors²¹³äÁ½¸öÔªËØ¿Õ¼ä
+		RGBQUAD    bmiColors[2];	// ä¸ºBITMAPINFOçš„m_bmiColorsè¡¥å……ä¸¤ä¸ªå…ƒç´ ç©ºé—´
 		uint64_t user_data = 0;
-		//Í¼ÏñÎÄ¼şµÄÍ¨µÀ
+		//å›¾åƒæ–‡ä»¶çš„é€šé“
 		size_t components = 0;
 	private:
 		std::vector<unsigned int> _data, _arrayimg;
@@ -273,7 +274,7 @@ namespace hz {
 
 		Timer _giftime;
 		yHist _yh;
-		// ÏñËØÇøÓò
+		// åƒç´ åŒºåŸŸ
 		glm::ivec4 _prc;
 	public:
 		Image()
@@ -302,7 +303,7 @@ namespace hz {
 			return p;
 			//return new Image(imgfn);
 		}
-		static Image* createMem(const char* data, size_t len)
+		static Image* create_mem(const char* data, size_t len)
 		{
 			Image* p = getRC((Image*)nullptr);
 			if (!p->loadMemImage(data, len) || !(p->width > 0 && p->height > 0))
@@ -312,6 +313,7 @@ namespace hz {
 			}
 			return p;// new Image(data, len);
 		}
+#define createMem create_mem
 		static Image* create_null(int w, int h)
 		{
 			Image* p = getRC((Image*)nullptr);
@@ -320,6 +322,77 @@ namespace hz {
 			p->components = 4;
 			return p;
 		}
+		static Image* create_px(const char* data, int w, int h, int comp, int stride)
+		{
+			Image* p = getRC((Image*)nullptr);
+			if (w * h > 0)
+			{
+				p->resize(w, h);
+				p->clearColor(0);
+				if (data)
+				{
+					int width = p->width;
+					unsigned int* pc = p->data();
+					if (stride < 0)
+					{
+						stride = width * 4;
+					}
+					if (comp == 4)
+					{
+						for (size_t y = 0; y < h; y++)
+						{
+							const char* src = data + stride * y;
+							for (size_t x = 0; x < w; x++)
+							{
+								memcpy(&pc[y * width], src, comp * width);
+								//pc[x + y * width] |= 0xff000000;
+							}
+						}
+					}
+				}
+
+			}
+			p->components = comp;
+			return p;
+		}
+		// åˆ›å»ºæ”¾å¤§å€æ•° 2
+		static Image* create_zoom(Image* dst, Image* src, int z)
+		{
+			if (src && z > 0)
+			{
+				dst = src->copy_to_zoom(dst, z);
+			}
+			return dst;
+		}
+		Image* copy_to_zoom(Image* dstimg, int z)
+		{
+			Image* ret = dstimg;
+			if (z > 0)
+			{
+				if (!ret)
+				{
+					ret = create_null(width * z, height * z);
+				}
+				else
+				{
+					ret->resize(width * z, height * z);
+				}
+				unsigned int* dst = ret->data();
+				unsigned int* src = data();
+				for (size_t y = 0; y < ret->height; y++)
+				{
+					auto d = dst + ret->width * y;
+					for (size_t x = 0; x < ret->width; x++)
+					{
+						int idx = (x / z) + (y / z) * width;
+						d[x] = src[idx];
+					}
+				}
+			}
+			return ret;
+		}
+
+
 #ifndef M_RES
 		static void destroy(Image* p)
 		{
@@ -342,24 +415,24 @@ namespace hz {
 #endif // !M_RES
 		Image& operator=(const Image& img)
 		{
-			copy((Image*)& img);
+			copy((Image*)&img);
 			return *this;
 		}
 		Image(const Image& img)
 		{
-			copy((Image*)& img);
+			copy((Image*)&img);
 		}
 		void clear_img()
 		{
 			LOCK_W(_locks);
 			_filename = "";
-			//ÇëÇóµÄÍ¨µÀÊı
+			//è¯·æ±‚çš„é€šé“æ•°
 			requested_components = 4;
 			width = 0; height = 0;// , data_size = 0;
 			mipLevels = 0;
 			layerCount = 0;
 			// gif
-			// ÑÓ³Ù
+			// å»¶è¿Ÿ
 			_delays.clear();
 			_layers = 1;
 			_delays_cu = 0;
@@ -369,7 +442,7 @@ namespace hz {
 
 			user_data = 0;
 
-			//Í¼ÏñÎÄ¼şµÄÍ¨µÀ
+			//å›¾åƒæ–‡ä»¶çš„é€šé“
 			components = 0;
 			_data.clear();
 			_arrayimg.clear();
@@ -409,7 +482,7 @@ namespace hz {
 			}
 		}
 	public:
-		// gif¸üĞÂ
+		// gifæ›´æ–°
 		int get_gif_idx()
 		{
 			LOCK_W(_lk_gif);
@@ -687,7 +760,7 @@ namespace hz {
 
 
 		//LOCK_W(_lock_upt);
-		//_uptime = Timer::get_micro();//Î¢Ãë
+		//_uptime = Timer::get_micro();//å¾®ç§’
 		void copy(Image* src)
 		{
 			if (!(src->width * src->height > 0))
@@ -714,9 +787,9 @@ namespace hz {
 		std::wstring AtoW(const std::string str)
 		{
 			if (hz::hstring::IsTextUTF8(str.c_str()))
-				return hz::jsonT::utf8_to_wstring(str);
+				return hz::jsont::utf8_to_wstring(str);
 			else
-				return hz::jsonT::ansi_to_wstring(str);
+				return hz::jsont::ansi_to_wstring(str);
 		}
 	public:
 		void draw_line(const glm::ivec4& p, unsigned int color)
@@ -896,7 +969,7 @@ namespace hz {
 
 		};
 		static   int istupian(char* entry, int len = 0)
-			/*·µ¼ÓÖµÎª
+			/*è¿”åŠ å€¼ä¸º
 			bmp;
 			jpg;
 			png;
@@ -912,7 +985,7 @@ namespace hz {
 			FILE* fis;
 			short int i = 0;
 			unsigned short pis[5];
-			int flag = 0;//Ã¿´Îµ÷ÓÃ¶¼½øĞĞ³õÊ¼»¯
+			int flag = 0;//æ¯æ¬¡è°ƒç”¨éƒ½è¿›è¡Œåˆå§‹åŒ–
 			if (len == 0)
 			{
 				if ((fis = fopen(entry, "rb")) == NULL)
@@ -992,7 +1065,7 @@ namespace hz {
 				size_t offset = 0;
 				bufferCopyRegions.clear();
 				clearArray();
-				char* tem = (char*)& _arrayimg[0];
+				char* tem = (char*)&_arrayimg[0];
 				std::string fn = File::getPath(filename.c_str(), File::pathdrive | File::pathdir | File::pathfname);
 				for (uint32_t layer = 0; layer < layerCount; layer++)
 				{
@@ -1263,12 +1336,12 @@ namespace hz {
 			glm::ivec2 outsize = { width, height };
 			unsigned int* bdata = _data.data();
 			int r = rgb ? 0 : 2, b = rgb ? 2 : 0;
-			//if (pixel_mode == 5)				/*lcd»Ò¶ÈÍ¼*/
+			//if (pixel_mode == 5)				/*lcdç°åº¦å›¾*/
 			{
 				for (j = 0; j < h && (j + posy) < outsize.y; j++)
 				{
 					auto pj = pitch * j;
-					UCHAR* pixel = bit + pj;
+					unsigned char* pixel = bit + pj;
 					auto jp = j + posy;
 					int64_t psy = (jp * outsize.x);
 					if (psy < 0 || jp >= height)
@@ -1280,7 +1353,7 @@ namespace hz {
 					for (int i = 0; (i < w) && ((i + posx) < outsize.x); i++)
 					{
 						unsigned int uc = 0;
-						unsigned char* pc = (unsigned char*)& uc;
+						unsigned char* pc = (unsigned char*)&uc;
 						pc[r] = *pixel++; //r	
 						pc[1] = *pixel++; //g	
 						pc[b] = *pixel++; //b
@@ -1313,12 +1386,12 @@ namespace hz {
 			glm::ivec2 outsize = { width, height };
 			color &= 0x00ffffff;
 			unsigned int* bdata = _data.data();
-			if (pixel_mode == 2)				/*256»Ò¶ÈÍ¼*/
+			if (pixel_mode == 2)				/*256ç°åº¦å›¾*/
 			{
 				for (j = 0; j < h && (j + posy) < outsize.y; j++)
 				{
 					auto pj = pitch * j;
-					UCHAR* pixel = bit + pj;
+					unsigned char* pixel = bit + pj;
 					auto jp = j + posy;
 					int64_t psy = (jp * outsize.x);
 					if (psy < 0 || jp >= height)
@@ -1334,7 +1407,7 @@ namespace hz {
 						{
 							unsigned int uc = 0, ut = std::min(255.0f, brightness * c + c);
 #ifndef UF_COLOR
-							unsigned char* pc = (unsigned char*)& uc;
+							unsigned char* pc = (unsigned char*)&uc;
 							pc[3] = ut; //a	
 							uc |= color;
 #else
@@ -1356,7 +1429,7 @@ namespace hz {
 					}
 				}
 			}
-			else if (pixel_mode == 1)			/*µ¥É«Î»Í¼1Î»*/
+			else if (pixel_mode == 1)			/*å•è‰²ä½å›¾1ä½*/
 			{
 				for (j = 0; j < h && (j + posy) < outsize.y; j++)
 				{
@@ -1366,7 +1439,7 @@ namespace hz {
 					{
 						continue;
 					}
-					UCHAR* pixel = bit + pitch * j;
+					unsigned char* pixel = bit + pitch * j;
 					expanded_data = bdata + psy;
 					unsigned int* dc = (unsigned int*)expanded_data;
 					for (int i = 0; (i < w) && ((i + posx) < outsize.x); i++)
@@ -1375,7 +1448,7 @@ namespace hz {
 						if (c)
 						{
 							unsigned int uc = 0;
-							unsigned char* pc = (unsigned char*)& uc;
+							unsigned char* pc = (unsigned char*)&uc;
 							pc += 3;
 							//*pc++ = 255 - c;	//r
 							//*pc++ = 255 - c;	//g
@@ -1440,8 +1513,8 @@ namespace hz {
 		}
 #if 1
 		/*
-			.hdr.bmp¿ÉÑ¡compÍ¨µÀÊı
-			qualityÎªjpegÆ·ÖÊ£¬1-100
+			.hdr.bmpå¯é€‰compé€šé“æ•°
+			qualityä¸ºjpegå“è´¨ï¼Œ1-100
 
 		*/
 		int saveImage(std::string fn, int comp = 4, int quality = 100)
@@ -1460,7 +1533,7 @@ namespace hz {
 				if (comp == 4)
 					comp = 3;
 				getCompdata(comp);
-				void* d = temp_data.empty() ? (void*)& _data[0] : (void*)& temp_data[0];
+				void* d = temp_data.empty() ? (void*)&_data[0] : (void*)&temp_data[0];
 				return stbi_write_bmp(fn.c_str(), (int)width, (int)height, comp, d);
 			}
 			if (ext == ".tga")
@@ -1474,7 +1547,7 @@ namespace hz {
 			if (ext == ".hdr")
 			{
 				temp_data.resize(width * height * comp * sizeof(float));
-				float* t = (float*)& temp_data[0];
+				float* t = (float*)&temp_data[0];
 				for (size_t y = 0; y < height; ++y)
 				{
 					for (size_t x = 0; x < width; ++x)
@@ -1485,10 +1558,10 @@ namespace hz {
 						*t++ = G / 255.0f;
 						*t++ = B / 255.0f;
 						if (comp == 4)
-							* t++ = A / 255.0f;
+							*t++ = A / 255.0f;
 					}
 				}
-				return stbi_write_hdr(fn.c_str(), (int)width, (int)height, comp, (float*)& temp_data[0]);
+				return stbi_write_hdr(fn.c_str(), (int)width, (int)height, comp, (float*)&temp_data[0]);
 			}
 			savefilename = fn;
 #ifdef LIBPNG
@@ -1566,7 +1639,7 @@ namespace hz {
 					*p++ = GetGValue(it);
 					*p++ = GetBValue(it);
 				}
-				svpng(fp, (int)width, (int)height, ((unsigned char*)& rgb[0]), 0);
+				svpng(fp, (int)width, (int)height, ((unsigned char*)&rgb[0]), 0);
 				fclose(fp);
 			}
 			return fp ? true : false;
@@ -1576,7 +1649,7 @@ namespace hz {
 			FILE* fp = fopen(savefilename.c_str(), "wb");
 			if (fp)
 			{
-				svpng(fp, (int)width, (int)height, ((unsigned char*)& _data[0]), 1);
+				svpng(fp, (int)width, (int)height, ((unsigned char*)&_data[0]), 1);
 				fclose(fp);
 			}
 			return fp ? true : false;
@@ -1613,7 +1686,7 @@ namespace hz {
 
 #endif // 0
 	public:
-		// ¶ÁËø
+		// è¯»é”
 		void lock_r()
 		{
 			_locks.lock_shared();
@@ -1622,7 +1695,7 @@ namespace hz {
 		{
 			_locks.unlock_shared();
 		}
-		// Ğ´Ëø
+		// å†™é”
 		void lock_w()
 		{
 			_locks.lock();
@@ -1681,7 +1754,7 @@ namespace hz {
 			return _levels_info[Level];
 		}
 	public:
-		void Horizontal()//Ë®Æ½·­×ª
+		void Horizontal()//æ°´å¹³ç¿»è½¬
 		{
 			unsigned int* ps = (unsigned int*)_data.data();
 			int y = 0;
@@ -1697,7 +1770,7 @@ namespace hz {
 			}
 			set_update();
 		}
-		void Vertical()//´¹Ö±·­×ª
+		void Vertical()//å‚ç›´ç¿»è½¬
 		{
 			unsigned int* ps = 0;
 			unsigned int* pd = 0;
@@ -1722,21 +1795,24 @@ namespace hz {
 			const unsigned int* pBmp = src->data();
 			RECT srcRect = { st.x, st.y, st.x + st.z - 1, st.y + st.w - 1 };
 			RECT dstRect = { dstpos.x, dstpos.y, 0, 0 };
-
-			// ±ß½çĞ£Õı
+			if (st.z <= 0 || st.w <= 0)
+			{
+				return;
+			}
+			// è¾¹ç•Œæ ¡æ­£
 			{
 				if (srcRect.right >= src->width)
 					srcRect.right = src->width - 1;
 				if (srcRect.bottom >= src->height)
 					srcRect.bottom = src->height - 1;
 
-				// ³¬³ö×ó±ß½ç
+				// è¶…å‡ºå·¦è¾¹ç•Œ
 				if (dstRect.left < 0)
 				{
 					srcRect.left += -dstRect.left;
 					dstRect.left = 0;
 				}
-				// ³¬³öÉÏ±ß½ç
+				// è¶…å‡ºä¸Šè¾¹ç•Œ
 				if (dstRect.top < 0)
 				{
 					srcRect.top += -dstRect.top;
@@ -1746,13 +1822,13 @@ namespace hz {
 				int visibleW = srcRect.right - srcRect.left + 1;
 				int visibleH = srcRect.bottom - srcRect.top + 1;
 
-				// ³¬³öÓÒ±ß½ç
+				// è¶…å‡ºå³è¾¹ç•Œ
 				if (dstRect.left + visibleW > width)
 				{
 					visibleW = width - dstRect.left;
 					srcRect.right = srcRect.left + visibleW - 1;
 				}
-				// ³¬³öÏÂ±ß½ç
+				// è¶…å‡ºä¸‹è¾¹ç•Œ
 				if (dstRect.top + visibleH > height)
 				{
 					visibleH = height - dstRect.top;
@@ -1775,7 +1851,7 @@ namespace hz {
 		// ************************************************************ //
 		// GetImageData                                                 //
 		//                                                              //
-		// ´ÓÄÚ´æ»òÎÄ¼ş¼ÓÔØÍ¼ÏñÊı¾İ½âÎö									//
+		// ä»å†…å­˜æˆ–æ–‡ä»¶åŠ è½½å›¾åƒæ•°æ®è§£æ									//
 		// ************************************************************ //
 		bool GetImageData(const char* filename, size_t len = 0)
 		{
@@ -1798,7 +1874,7 @@ namespace hz {
 				}
 				_filename = filename;
 			}
-			int img_type = istupian((char*)& file_data[0], file_data.size());
+			int img_type = istupian((char*)&file_data[0], file_data.size());
 			if (img_type == E_PNG)
 			{
 #ifdef LIBPNG
@@ -1810,9 +1886,9 @@ namespace hz {
 					resize(ipng.getWidth(), ipng.getHeight());
 					memcpy(&_data[0], ipng.data(), ipng.datasize());
 					return true;
-		}
+				}
 #endif
-	}
+			}
 			int tmp_width = 0, tmp_height = 0, tmp_z = 0, tmp_components = 0;
 			int* delays = 0;
 			unsigned char* image_data = 0;
@@ -1858,13 +1934,13 @@ namespace hz {
 			_levels_info[0]._size = size;
 			set_update();
 			return true;
-}
+		}
 
 		void ab32(unsigned int* pDstBmp, int dst_width, const unsigned int* pSrcBmp, int src_width, int blend_width, int blend_height, unsigned int col)
 		{
-			// CÊµÏÖ
+			// Cå®ç°
 			{
-				const int nextLineOffset_src = (src_width - blend_width);	// »ìºÏÍêÒ»ĞĞÏñËØºó£¬Í¨¹ı¼ÓÉÏ¸ÃÖµ£¬±ã¿ÉÖ±½Ó¶¨Î»µ½ÏÂĞĞÆğÊ¼ÏñËØ
+				const int nextLineOffset_src = (src_width - blend_width);	// æ··åˆå®Œä¸€è¡Œåƒç´ åï¼Œé€šè¿‡åŠ ä¸Šè¯¥å€¼ï¼Œä¾¿å¯ç›´æ¥å®šä½åˆ°ä¸‹è¡Œèµ·å§‹åƒç´ 
 				const int nextLineOffset_dst = (dst_width - blend_width);
 				unsigned int* pSrc = (unsigned int*)pSrcBmp;
 				unsigned int* pDst = pDstBmp;
@@ -1924,10 +2000,10 @@ namespace hz {
 		{
 			float s = 1.0f / 255.0f;
 			return glm::vec4(
-				((in >> COL32_R_SHIFT) & 0xFF) * s,
-				((in >> COL32_G_SHIFT) & 0xFF) * s,
-				((in >> COL32_B_SHIFT) & 0xFF) * s,
-				((in >> COL32_A_SHIFT) & 0xFF) * s);
+				((in >> COL32_R_SHIFT) & 0xFF)* s,
+				((in >> COL32_G_SHIFT) & 0xFF)* s,
+				((in >> COL32_B_SHIFT) & 0xFF)* s,
+				((in >> COL32_A_SHIFT) & 0xFF)* s);
 		}
 
 		unsigned int ColorConvertFloat4ToU32(const glm::vec4& in)
@@ -1943,9 +2019,9 @@ namespace hz {
 		void AlphaBlend32(UINT* pDstBmp, int dst_width, const UINT* pSrcBmp, int src_width, int blend_width, int blend_height)
 		{
 #ifndef _ASM_AB
-			// CÊµÏÖ
+			// Cå®ç°
 			{
-				const int nextLineOffset_src = (src_width - blend_width) * 4;	// »ìºÏÍêÒ»ĞĞÏñËØºó£¬Í¨¹ı¼ÓÉÏ¸ÃÖµ£¬±ã¿ÉÖ±½Ó¶¨Î»µ½ÏÂĞĞÆğÊ¼ÏñËØ
+				const int nextLineOffset_src = (src_width - blend_width) * 4;	// æ··åˆå®Œä¸€è¡Œåƒç´ åï¼Œé€šè¿‡åŠ ä¸Šè¯¥å€¼ï¼Œä¾¿å¯ç›´æ¥å®šä½åˆ°ä¸‹è¡Œèµ·å§‹åƒç´ 
 				const int nextLineOffset_dst = (dst_width - blend_width) * 4;
 				unsigned char* pSrc = (unsigned char*)pSrcBmp;
 				unsigned char* pDst = (unsigned char*)pDstBmp;
@@ -1977,7 +2053,7 @@ namespace hz {
 						*pDst++ = below_R - (below_R - above_R) * above_A / 255;
 
 						if (below_A == 255)
-							* pDst++ = 255;
+							*pDst++ = 255;
 						else
 							*pDst++ = below_A - (below_A - above_A) * above_A / 255;
 					}
@@ -1988,74 +2064,74 @@ namespace hz {
 				return;
 			}
 #else
-			const int nextLineOffset_src = (src_width - blend_width) * 4;	// »ìºÏÍêÒ»ĞĞÏñËØºó£¬Í¨¹ı¼ÓÉÏ¸ÃÖµ£¬±ã¿ÉÖ±½Ó¶¨Î»µ½ÏÂĞĞÆğÊ¼ÏñËØ
+			const int nextLineOffset_src = (src_width - blend_width) * 4;	// æ··åˆå®Œä¸€è¡Œåƒç´ åï¼Œé€šè¿‡åŠ ä¸Šè¯¥å€¼ï¼Œä¾¿å¯ç›´æ¥å®šä½åˆ°ä¸‹è¡Œèµ·å§‹åƒç´ 
 			const int nextLineOffset_dst = (dst_width - blend_width) * 4;
 
 			__asm
 			{
-				mov			edi, pDstBmp; Ä¿µÄÏñËØ
-				mov			esi, pSrcBmp; Ô´ÏñËØ
-				xor ebx, ebx; ÒÑ»ìºÏµÄ¸ß¶È
-				mov			ecx, blend_width; Òª»ìºÏµÄ¿í¶È
+				mov			edi, pDstBmp; ç›®çš„åƒç´ 
+				mov			esi, pSrcBmp; æºåƒç´ 
+				xor ebx, ebx; å·²æ··åˆçš„é«˜åº¦
+				mov			ecx, blend_width; è¦æ··åˆçš„å®½åº¦
 
 				BLEND_BEGIN :
-				cmp			dword ptr[esi], 0x00FFFFFF; Èç¹ûalphaÎª0, ÔòÌø¹ı»ìºÏ²¿·Ö
+				cmp			dword ptr[esi], 0x00FFFFFF; å¦‚æœalphaä¸º0, åˆ™è·³è¿‡æ··åˆéƒ¨åˆ†
 					jna			BLEND_END
 
-					movd		mm0, [edi]; °ÑÄ¿µÄÏñËØÖµÒÆÈëmm0¼Ä´æÆ÷µÄµÍ32Î»
-					movd		mm1, [esi]; °ÑÔ´ÏñËØÖµÒÆÈëmm1¼Ä´æÆ÷µÄµÍ32Î»
+					movd		mm0, [edi]; æŠŠç›®çš„åƒç´ å€¼ç§»å…¥mm0å¯„å­˜å™¨çš„ä½32ä½
+					movd		mm1, [esi]; æŠŠæºåƒç´ å€¼ç§»å…¥mm1å¯„å­˜å™¨çš„ä½32ä½
 
-					; Core Begin£ºresult = b - (b - a) * a_alpha / 255 £¨aÎªÔ´ÏñËØ·ÖÁ¿, bÎªÄ¿µÄÏñËØ·ÖÁ¿£©
-					pxor		mm2, mm2; ¢Ù °ÑMM2Çå0
-					punpcklbw	mm0, mm2;    ½«mm0Óëmm2°´×Ö½Ú½»²æ×éºÏ£¬´æÈëmm0£¬mm0 = 0x00AA00BB00GG00RR
-					punpcklbw	mm1, mm2;    ½«mm1Óëmm2°´×Ö½Ú½»²æ×éºÏ£¬´æÈëmm1£¬mm1 = 0x00AA00BB00GG00RR
-					movq		mm3, mm1; ¢Ú mm3 = 0x00AA00BB00GG00RR
-					punpckhwd	mm3, mm3;    ½«¸ß32Î»°´16Î»½»´íÅÅÁĞ£¬mm3 = 0x00AA00AA00BB00BB
-					punpckhdq	mm3, mm3;    ½«¸ß32Î»°´32Î»½»´íÅÅÁĞ£¬mm3 = 0x00AA00AA00AA00AA
-					movq		mm4, mm0; ¢Û mm4 = Ä¿µÄÏñËØ = 0x00AA00BB00GG00RR
-					movq		mm5, mm1;    mm5 = Ô´ÏñËØ = 0x00AA00BB00GG00RR
-					psubusw		mm4, mm1; ¢Ü dst - src£¬°´×Ö±¥ºÍ¼õ£¬Ğ¡ÓÚ0Îª0
-					psubusw		mm5, mm0;    src - dst£¬°´×Ö±¥ºÍ¼õ£¬Ğ¡ÓÚ0Îª0
-					pmullw		mm4, mm3;    (dst - src)* alpha£¬Èôdst - srcÎª0£¬Ôòmm4Îª0
-					pmullw		mm5, mm3;    (src - dst)* alpha£¬Èôsrc - dstÎª0£¬Ôòmm5Îª0
-					psrlw		mm4, 8; °´×ÖÓÒÒÆ8Î»£¬¼´³ıÒÔ256
-					psrlw		mm5, 8; °´×ÖÓÒÒÆ8Î»£¬¼´³ıÒÔ256
-					paddusw		mm0, mm5; ±¥ºÍ¼Óµ½Ô­Í¼Ïó:D = Alpha * (O - S) + S£¬(src - dst) < 0 ²¿·Ö
-					psubusw		mm0, mm4; ±¥ºÍ¼Óµ½Ô­Í¼ÏóD = S - Alpha * (S - O)£¬(dst - src) > 0 ²¿·Ö
-					packuswb	mm0, mm0; °´16Î»ÓĞ·ûºÅÊıÑ¹ËõÎª8Î»ÎŞ·ûºÅÊı
+					; Core Beginï¼šresult = b - (b - a) * a_alpha / 255 ï¼ˆaä¸ºæºåƒç´ åˆ†é‡, bä¸ºç›®çš„åƒç´ åˆ†é‡ï¼‰
+					pxor		mm2, mm2; â‘  æŠŠMM2æ¸…0
+					punpcklbw	mm0, mm2;    å°†mm0ä¸mm2æŒ‰å­—èŠ‚äº¤å‰ç»„åˆï¼Œå­˜å…¥mm0ï¼Œmm0 = 0x00AA00BB00GG00RR
+					punpcklbw	mm1, mm2;    å°†mm1ä¸mm2æŒ‰å­—èŠ‚äº¤å‰ç»„åˆï¼Œå­˜å…¥mm1ï¼Œmm1 = 0x00AA00BB00GG00RR
+					movq		mm3, mm1; â‘¡ mm3 = 0x00AA00BB00GG00RR
+					punpckhwd	mm3, mm3;    å°†é«˜32ä½æŒ‰16ä½äº¤é”™æ’åˆ—ï¼Œmm3 = 0x00AA00AA00BB00BB
+					punpckhdq	mm3, mm3;    å°†é«˜32ä½æŒ‰32ä½äº¤é”™æ’åˆ—ï¼Œmm3 = 0x00AA00AA00AA00AA
+					movq		mm4, mm0; â‘¢ mm4 = ç›®çš„åƒç´  = 0x00AA00BB00GG00RR
+					movq		mm5, mm1;    mm5 = æºåƒç´  = 0x00AA00BB00GG00RR
+					psubusw		mm4, mm1; â‘£ dst - srcï¼ŒæŒ‰å­—é¥±å’Œå‡ï¼Œå°äº0ä¸º0
+					psubusw		mm5, mm0;    src - dstï¼ŒæŒ‰å­—é¥±å’Œå‡ï¼Œå°äº0ä¸º0
+					pmullw		mm4, mm3;    (dst - src)* alphaï¼Œè‹¥dst - srcä¸º0ï¼Œåˆ™mm4ä¸º0
+					pmullw		mm5, mm3;    (src - dst)* alphaï¼Œè‹¥src - dstä¸º0ï¼Œåˆ™mm5ä¸º0
+					psrlw		mm4, 8; æŒ‰å­—å³ç§»8ä½ï¼Œå³é™¤ä»¥256
+					psrlw		mm5, 8; æŒ‰å­—å³ç§»8ä½ï¼Œå³é™¤ä»¥256
+					paddusw		mm0, mm5; é¥±å’ŒåŠ åˆ°åŸå›¾è±¡:D = Alpha * (O - S) + Sï¼Œ(src - dst) < 0 éƒ¨åˆ†
+					psubusw		mm0, mm4; é¥±å’ŒåŠ åˆ°åŸå›¾è±¡D = S - Alpha * (S - O)ï¼Œ(dst - src) > 0 éƒ¨åˆ†
+					packuswb	mm0, mm0; æŒ‰16ä½æœ‰ç¬¦å·æ•°å‹ç¼©ä¸º8ä½æ— ç¬¦å·æ•°
 					; Core End
 
-					movd[edi], mm0; »ìºÏ½á¹ûĞ´½øÄ¿µÄÏñËØ
+					movd[edi], mm0; æ··åˆç»“æœå†™è¿›ç›®çš„åƒç´ 
 
 					BLEND_END :
 				add			edi, 4
 					add			esi, 4
-					loop		BLEND_BEGIN; Ñ­»·
+					loop		BLEND_BEGIN; å¾ªç¯
 
-					add			esi, nextLineOffset_src; ¼ÓÉÏÆ«ÒÆÁ¿£¬Ê¹¶¨Î»µ½ÏÂĞĞÆğÊ¼´¦
+					add			esi, nextLineOffset_src; åŠ ä¸Šåç§»é‡ï¼Œä½¿å®šä½åˆ°ä¸‹è¡Œèµ·å§‹å¤„
 					add			edi, nextLineOffset_dst
 
 					inc			ebx
 					mov			ecx, blend_width
 
-					cmp			ebx, blend_height; ÈôebxĞ¡ÓÚblend_height, Ôò×ªÒÆµ½ÉÏÃæ¼ÌĞø»ìºÏ
+					cmp			ebx, blend_height; è‹¥ebxå°äºblend_height, åˆ™è½¬ç§»åˆ°ä¸Šé¢ç»§ç»­æ··åˆ
 					jb			BLEND_BEGIN
 
-					EMMS; ÒòÎª´Ómm0µ½mm7, ÕâĞ©¼Ä´æÆ÷ÊÇ¡°½èÓÃ¡±¸¡µã¼Ä´æÆ÷µÄµÍ64Î», ËùÒÔÃ¿´ÎÔÚÓÃÍêMMXÖ¸ÁîºóÒ»¶¨ÒªÓÃEMMSÖ¸Áî½«¼Ä´æÆ÷Çå¿Õ
+					EMMS; å› ä¸ºä»mm0åˆ°mm7, è¿™äº›å¯„å­˜å™¨æ˜¯â€œå€Ÿç”¨â€æµ®ç‚¹å¯„å­˜å™¨çš„ä½64ä½, æ‰€ä»¥æ¯æ¬¡åœ¨ç”¨å®ŒMMXæŒ‡ä»¤åä¸€å®šè¦ç”¨EMMSæŒ‡ä»¤å°†å¯„å­˜å™¨æ¸…ç©º
 			}
 #endif
 		}
 
 		void AlphaBlend32(UINT* pDstBmp, int dst_width, const UINT* pSrcBmp, int src_width, int blend_width, int blend_height, unsigned int col)
 		{
-			// CÊµÏÖ
+			// Cå®ç°
 
-			const int nextLineOffset_src = (src_width - blend_width) * 4;	// »ìºÏÍêÒ»ĞĞÏñËØºó£¬Í¨¹ı¼ÓÉÏ¸ÃÖµ£¬±ã¿ÉÖ±½Ó¶¨Î»µ½ÏÂĞĞÆğÊ¼ÏñËØ
+			const int nextLineOffset_src = (src_width - blend_width) * 4;	// æ··åˆå®Œä¸€è¡Œåƒç´ åï¼Œé€šè¿‡åŠ ä¸Šè¯¥å€¼ï¼Œä¾¿å¯ç›´æ¥å®šä½åˆ°ä¸‹è¡Œèµ·å§‹åƒç´ 
 			const int nextLineOffset_dst = (dst_width - blend_width) * 4;
 			unsigned char* pSrc = (unsigned char*)pSrcBmp;
 			unsigned char* pDst = (unsigned char*)pDstBmp;
-			int below_A, below_R, below_G, below_B;
-			int above_A, above_R, above_G, above_B;
+			unsigned int below_A, below_R, below_G, below_B;
+			unsigned int above_A, above_R, above_G, above_B;
 			glm::vec4 cf;
 			size_t count = 0;
 			for (int h = 0, w = 0; h < blend_height; h++)
@@ -2094,7 +2170,7 @@ namespace hz {
 					*pDst++ = below_R - (below_R - above_R) * above_A / 255;
 
 					if (below_A == 255)
-						* pDst++ = 255;
+						*pDst++ = 255;
 					else
 						*pDst++ = below_A - (below_A - above_A) * above_A / 255;
 				}
@@ -2127,8 +2203,8 @@ namespace hz {
 		unsigned int alpha_blend(int dst, int src)
 		{
 			const int alpha_max = 127;
-			auto st = ((u_col*)& src)->c;
-			auto dt = ((u_col*)& dst)->c;
+			auto st = ((u_col*)&src)->c;
+			auto dt = ((u_col*)&dst)->c;
 			int src_alpha = st.a;
 			int dst_alpha, alpha, red, green, blue;
 			int src_weight, dst_weight, tot_weight;
@@ -2193,8 +2269,8 @@ namespace hz {
 		static unsigned int layer_overlay(int dst, int src)
 		{
 			const int alpha_max = 127;
-			auto st = ((u_col*)& src)->c;
-			auto dt = ((u_col*)& dst)->c;
+			auto st = ((u_col*)&src)->c;
+			auto dt = ((u_col*)&dst)->c;
 			int a1, a2;
 			a1 = alpha_max - dt.a;
 			a2 = alpha_max - st.a;
@@ -2236,8 +2312,8 @@ namespace hz {
 		static unsigned int layer_multiply(int dst, int src)
 		{
 			const int alpha_max = 127;
-			auto st = ((u_col*)& src)->c;
-			auto dt = ((u_col*)& dst)->c;
+			auto st = ((u_col*)&src)->c;
+			auto dt = ((u_col*)&dst)->c;
 			int a1, a2, r1, r2, g1, g2, b1, b2;
 			a1 = alpha_max - st.a;
 			a2 = alpha_max - dt.a;
@@ -2259,11 +2335,11 @@ namespace hz {
 		}
 		void px_blend(UINT* pDstBmp, UINT src, unsigned int col = -1)
 		{
-			// CÊµÏÖ
-			unsigned char* pSrc = (unsigned char*)& src;
+			// Cå®ç°
+			unsigned char* pSrc = (unsigned char*)&src;
 			unsigned char* pDst = (unsigned char*)pDstBmp;
-			int below_A, below_R, below_G, below_B;
-			int above_A, above_R, above_G, above_B;
+			unsigned int below_A, below_R, below_G, below_B;
+			unsigned int above_A, above_R, above_G, above_B;
 			glm::vec4 cf;
 
 			above_B = *pSrc++;
@@ -2301,7 +2377,7 @@ namespace hz {
 			*pDst++ = below_R - (below_R - above_R) * above_A / 255;
 			auto lsa = pDst;
 			if (below_A == 255)
-				* pDst++ = 255;
+				*pDst++ = 255;
 			else
 				*pDst++ = below_A - (below_A - above_A) * above_A / 255;
 
@@ -2314,20 +2390,20 @@ namespace hz {
 			RECT srcRect = { x, y, x + w - 1, y + h - 1 };
 			RECT dstRect = { dx, dy, 0, 0 };
 
-			// ±ß½çĞ£Õı
+			// è¾¹ç•Œæ ¡æ­£
 			{
 				if (srcRect.right >= src->width)
 					srcRect.right = src->width - 1;
 				if (srcRect.bottom >= src->height)
 					srcRect.bottom = src->height - 1;
 
-				// ³¬³ö×ó±ß½ç
+				// è¶…å‡ºå·¦è¾¹ç•Œ
 				if (dstRect.left < 0)
 				{
 					srcRect.left += -dstRect.left;
 					dstRect.left = 0;
 				}
-				// ³¬³öÉÏ±ß½ç
+				// è¶…å‡ºä¸Šè¾¹ç•Œ
 				if (dstRect.top < 0)
 				{
 					srcRect.top += -dstRect.top;
@@ -2337,13 +2413,13 @@ namespace hz {
 				int visibleW = srcRect.right - srcRect.left + 1;
 				int visibleH = srcRect.bottom - srcRect.top + 1;
 
-				// ³¬³öÓÒ±ß½ç
+				// è¶…å‡ºå³è¾¹ç•Œ
 				if (dstRect.left + visibleW > width)
 				{
 					visibleW = width - dstRect.left;
 					srcRect.right = srcRect.left + visibleW - 1;
 				}
-				// ³¬³öÏÂ±ß½ç
+				// è¶…å‡ºä¸‹è¾¹ç•Œ
 				if (dstRect.top + visibleH > height)
 				{
 					visibleH = height - dstRect.top;
@@ -2371,7 +2447,7 @@ namespace hz {
 		}
 
 		/*
-		  ct 0ÎªRGB, 1ÎªBGR
+		  ct 0ä¸ºRGB, 1ä¸ºBGR
 		*/
 #ifdef _WIN32
 		void copyToDc(HDC hdc, const glm::ivec2& pos = { 0, 0 }, int ct = 0)
@@ -2391,22 +2467,57 @@ namespace hz {
 			if (ct == 0)
 			{
 				//RGB
-				*(UINT*)(bmpInfo.bmiColors + 2) = 0xFF0000;	// red·ÖÁ¿
-				*(UINT*)(bmpInfo.bmiColors + 1) = 0x00FF00;	// green·ÖÁ¿
-				*(UINT*)(bmpInfo.bmiColors + 0) = 0x0000FF;	// blue·ÖÁ¿
+				*(UINT*)(bmpInfo.bmiColors + 2) = 0xFF0000;	// redåˆ†é‡
+				*(UINT*)(bmpInfo.bmiColors + 1) = 0x00FF00;	// greenåˆ†é‡
+				*(UINT*)(bmpInfo.bmiColors + 0) = 0x0000FF;	// blueåˆ†é‡
 			}
 			else
 			{
 				//BGR
-				*(UINT*)(bmpInfo.bmiColors + 0) = 0xFF0000;	// red·ÖÁ¿
-				*(UINT*)(bmpInfo.bmiColors + 1) = 0x00FF00;	// green·ÖÁ¿
-				*(UINT*)(bmpInfo.bmiColors + 2) = 0x0000FF;	// blue·ÖÁ¿
+				*(UINT*)(bmpInfo.bmiColors + 0) = 0xFF0000;	// redåˆ†é‡
+				*(UINT*)(bmpInfo.bmiColors + 1) = 0x00FF00;	// greenåˆ†é‡
+				*(UINT*)(bmpInfo.bmiColors + 2) = 0x0000FF;	// blueåˆ†é‡
 			}
 			::SetDIBitsToDevice(hdc,
 				pos.x, pos.y, width, height,
 				0, 0, 0, height,
 				_data.data(), &bmpInfo, DIB_RGB_COLORS);
 
+		}
+		void copyToDcS(HDC hdc, glm::ivec2 hdcsize = { 0, 0 }, const glm::ivec2& pos = { 0, 0 })
+		{
+			if (_data.empty() || !(width > 0 && height > 0))
+			{
+				return;
+			}
+			int ct = 0;
+			memset(&bmpInfo, 0, sizeof(bmpInfo.bmiHeader));
+			bmpInfo.bmiHeader.biSize = sizeof(bmpInfo.bmiHeader);
+			bmpInfo.bmiHeader.biWidth = width;
+			bmpInfo.bmiHeader.biHeight = -height;
+			bmpInfo.bmiHeader.biPlanes = 1;
+			bmpInfo.bmiHeader.biBitCount = 32;
+			bmpInfo.bmiHeader.biCompression = BI_BITFIELDS;
+
+			if (ct == 0)
+			{
+				//RGB
+				*(UINT*)(bmpInfo.bmiColors + 2) = 0xFF0000;	// redåˆ†é‡
+				*(UINT*)(bmpInfo.bmiColors + 1) = 0x00FF00;	// greenåˆ†é‡
+				*(UINT*)(bmpInfo.bmiColors + 0) = 0x0000FF;	// blueåˆ†é‡
+			}
+			else
+			{
+				//BGR
+				*(UINT*)(bmpInfo.bmiColors + 0) = 0xFF0000;	// redåˆ†é‡
+				*(UINT*)(bmpInfo.bmiColors + 1) = 0x00FF00;	// greenåˆ†é‡
+				*(UINT*)(bmpInfo.bmiColors + 2) = 0x0000FF;	// blueåˆ†é‡
+			}
+			if (hdcsize.x < 1 || hdcsize.y < 1)
+			{
+				hdcsize = { width, height };
+			}
+			StretchDIBits(hdc, pos.x, pos.y, hdcsize.x, hdcsize.y, 0, 0, width, height, _data.data(), &bmpInfo, DIB_RGB_COLORS, SRCCOPY);
 		}
 #endif
 
@@ -2417,21 +2528,21 @@ namespace hz {
 			int srcH = height;
 			int bitCount = 32;
 			int nearest = 1;
-			//ÏÈ²»Ö§³ÖĞ¡ÓÚ16Î»µÄÎ»Í¼
+			//å…ˆä¸æ”¯æŒå°äº16ä½çš„ä½å›¾
 			if (bitCount < 16)
 			{
 				return 0;//exit(-1);
 			}
 			int lineSize = bitCount * srcW / 8;
-			//Æ«ÒÆÁ¿£¬windowsÏµÍ³ÒªÇóÃ¿¸öÉ¨ÃèĞĞ°´ËÄ×Ö½Ú¶ÔÆë
+			//åç§»é‡ï¼Œwindowsç³»ç»Ÿè¦æ±‚æ¯ä¸ªæ‰«æè¡ŒæŒ‰å››å­—èŠ‚å¯¹é½
 			//   int alignunsigned chars = ((bmiHeader.biWidth * bitCount + 31) & ~31) / 8L
 			//   - bmiHeader.biWidth * bitCount / 8L;
-			//Ô­Í¼Ïñ»º´æ
+			//åŸå›¾åƒç¼“å­˜
 			int srcBufSize = lineSize * srcH;
 			int i, j;
 
 
-			//Ä¿±êÍ¼Ïñ»º´æ
+			//ç›®æ ‡å›¾åƒç¼“å­˜
 			int desBufSize = ((desW * bitCount + 31) / 32) * 4 * desH;
 			int desLineSize = ((desW * bitCount + 31) / 32) * 4;
 			Image* ret = create_null(desW, desH);
@@ -2440,12 +2551,12 @@ namespace hz {
 			memset(desBuf, 0, desBufSize);
 			double rateH = (double)srcH / desH;
 			double rateW = (double)srcW / desW;
-			//×îÁÙ½ü²åÖµËã·¨
+			//æœ€ä¸´è¿‘æ’å€¼ç®—æ³•
 			if (mode == nearest)
 			{
 				for (i = 0; i < desH; i++)
 				{
-					//Ñ¡È¡×îÁÚ½üµÄµã
+					//é€‰å–æœ€é‚»è¿‘çš„ç‚¹
 					int tSrcH = (int)(rateH * i + 0.5);
 					for (j = 0; j < desW; j++)
 					{
@@ -2456,7 +2567,7 @@ namespace hz {
 					}
 				}
 			}
-			//Ë«ÏßĞÍÄÚ²åÖµËã·¨
+			//åŒçº¿å‹å†…æ’å€¼ç®—æ³•
 			else
 			{
 				for (i = 0; i < desH; i++)
@@ -2492,22 +2603,22 @@ namespace hz {
 	//  [4/6/2018 huazai]
 #if 0
 	/*
-	Í¼¼¯×°Ïä
+	å›¾é›†è£…ç®±
 	*/
 	class AtlasBox :public Res
 	{
 	private:
-		//x¿ÕÎ»Æ«ÒÆ,yÃ¿ĞĞ¸ß¶È
+		//xç©ºä½åç§»,yæ¯è¡Œé«˜åº¦
 		std::vector<glm::ivec2>  _line;
-		//µ±Ç°¸ß¶È
+		//å½“å‰é«˜åº¦
 		int						 _height = 0;
-		//Îó²î·¶Î§
+		//è¯¯å·®èŒƒå›´
 		int						 _range = 2;
 		Image					 _image;
 		glm::ivec2				 _maxsize = { 2048,2048 };
 
 	public:
-		//°ÑÒ»¸ö¾ØĞÎ×°Ïä·µ»ØÎ»ÖÃ
+		//æŠŠä¸€ä¸ªçŸ©å½¢è£…ç®±è¿”å›ä½ç½®
 		glm::ivec4 push(Image* img, const glm::ivec4& rs)
 		{
 			glm::ivec4 ret = { -1,-1,rs.z,rs.w };
@@ -2524,7 +2635,7 @@ namespace hz {
 			}
 			return ret;
 		}
-		//²éÕÒºÏÊÊµÄÎ»ÖÃ
+		//æŸ¥æ‰¾åˆé€‚çš„ä½ç½®
 		glm::ivec2 findPos(const glm::ivec2& size)
 		{
 			glm::ivec2 ret = { 0,-1 };
@@ -2568,7 +2679,7 @@ namespace hz {
 			}
 			return ret;
 		}
-		//ÅĞ¶ÏÊÇ·ñÏäÂú
+		//åˆ¤æ–­æ˜¯å¦ç®±æ»¡
 		bool isFull(int r, int h)
 		{
 			size_t inc = 0;
@@ -2585,14 +2696,14 @@ namespace hz {
 			}
 			return (!(inc > 0) || ((_maxsize.y - _height) < h));
 		}
-		//Çå¿ÕÏä×Ó
+		//æ¸…ç©ºç®±å­
 		void clear()
 		{
 			_line.clear();
 			_image.clearColor(0);
 			_height = 0;
 		}
-		//»ñÈ¡äÖÈ¾Í¼Ïñ
+		//è·å–æ¸²æŸ“å›¾åƒ
 		Image* getImage()
 		{
 			return &_image;
@@ -2620,23 +2731,23 @@ namespace hz {
 
 	};
 	/*
-	Í¼¼¯
+	å›¾é›†
 	*/
 	typedef struct AtlasInfo
 	{
-		//ËùÊôµÄÍ¼Ïñ
+		//æ‰€å±çš„å›¾åƒ
 		Image* image = 0;
 		glm::ivec4	 rect;
-		//Ê¹ÓÃ¼ÆÊı
+		//ä½¿ç”¨è®¡æ•°
 		size_t		 use = 0;
-		AtlasInfo(Image* img = 0, const glm::ivec4 & rs = { 0,0,0,0 }, size_t u = 0) :image(img), rect(rs), use(u)
+		AtlasInfo(Image* img = 0, const glm::ivec4& rs = { 0,0,0,0 }, size_t u = 0) :image(img), rect(rs), use(u)
 		{}
 	}AtlasInfo;
 	class AtlasCache :public Res
 	{
 	private:
 		std::map<std::string, AtlasInfo> _fc;
-		//Í¼ÏñÊı¾İ£¬¼ÇÂ¼µ±Ç°ĞÂ×ø±ê
+		//å›¾åƒæ•°æ®ï¼Œè®°å½•å½“å‰æ–°åæ ‡
 		std::vector<AtlasBox*> _box;
 		size_t incempty = 0;
 		std::set<std::wstring> _fn;
@@ -2662,7 +2773,7 @@ namespace hz {
 			auto pos = _box[incempty]->findPos({ img->width,img->height });
 			if (_box[incempty]->isFull(img->width, img->height) || pos.y < 0)
 			{
-				//ÏäÂúÔö¼ÓÒ»¸öÏä×Ó
+				//ç®±æ»¡å¢åŠ ä¸€ä¸ªç®±å­
 				_box.push_back(AtlasBox::create());
 				incempty++;
 			}
