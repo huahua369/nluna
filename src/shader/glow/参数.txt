@@ -1,0 +1,16 @@
+  int fiterMode;		// 水平0过滤，垂直1，混合两个纹理设置2，执行顺序0、1、2
+  int glowMode;		// 1滤色混合（屏幕）+去掉中间，0正片叠底删除多余像素，外发光=1，内发光=0
+  float glowFactor;		// 强度在fitermode为1时用
+  vec2 horizontalDir;		// = VEC2((float)1.0 / fbo_width, 0);
+  vec2 verticalDir;		// = VEC2(0, (float)1.0 / fbo_height);
+
+使用glow1.frag
+渲染流程
+1. 把三角形渲染到fbo[0]，把渲染结果复制到ptex纹理
+
+2. fiterMode=0渲染fbo[0]的纹理srcSampler矩形（大小同fbo），到fbo[1]
+
+3. fiterMode=1渲染fbo[1]的纹理srcSampler矩形，到fbo[0]
+
+4. fiterMode=2设置srcSampler=ptex，tempSampler=fbo[0]的纹理，
+    渲染到主窗口或fbo[1]或别的fbo即成，glBlendFunc(GL_ONE, GL_ONE);
