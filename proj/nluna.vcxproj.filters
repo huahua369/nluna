@@ -24,6 +24,9 @@
     <ClInclude Include="..\src\tools\tools.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\tools\utils_bin.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\test.cpp">

@@ -128,6 +128,7 @@
     <ClInclude Include="..\src\tools\font.h" />
     <ClInclude Include="..\src\tools\image_packer.h" />
     <ClInclude Include="..\src\tools\tools.h" />
+    <ClInclude Include="..\src\tools\utils_bin.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\test.cpp" />
