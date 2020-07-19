@@ -583,7 +583,7 @@ namespace hz {
 
 		void set(time_t t, bool isms = true)
 		{
-			int tms[] = { sizeof(struct tm),sizeof(struct tm_0) };
+			int tms[] = { sizeof(struct tm),sizeof(tm_0) };
 			_t = t;
 			_str = getFormat(t, "%Y-%m-%d %H:%M:%S", isms, (struct tm*) & _p);
 			if (!isms)
@@ -1262,16 +1262,7 @@ namespace hz {
 				y--;
 			}
 			int iWeek = (d + 2 * m + 3 * (m + 1) / 5 + y + y / 4 - y / 100 + y / 400) % 7;
-			switch (iWeek)
-			{
-			case 0:  "星期一";
-			case 1:  "星期二";
-			case 2:  "星期三";
-			case 3:  "星期四";
-			case 4:  "星期五";
-			case 5:  "星期六";
-			case 6:  "星期日";
-			}
+			const char* ss[] = { "星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日" };
 			return iWeek;
 		}
 	private:
@@ -1361,7 +1352,7 @@ namespace hz {
 	}
 	*/
 
-	class Timer
+	class Timer_t
 	{
 	public:
 		std::time_t getTimeStamp()
@@ -1371,7 +1362,7 @@ namespace hz {
 			return tp.time_since_epoch().count();
 		}
 	public:
-		Timer() : m_begin(std::chrono::high_resolution_clock::now()) {}
+		Timer_t() : m_begin(std::chrono::high_resolution_clock::now()) {}
 		void reset() { m_begin = std::chrono::high_resolution_clock::now(); }
 #if 0
 		//默认输出毫秒
@@ -1517,7 +1508,7 @@ namespace hz {
 		}
 
 	private:
-		hz::Timer t;
+		Timer_t t;
 		std::string str = "time";
 	};
 #define PTIMER hz::PTimer _ptimer_s(__FUNCDNAME__,__LINE__)

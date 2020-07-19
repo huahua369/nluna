@@ -13,27 +13,48 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="cpp">
+      <UniqueIdentifier>{80285859-5054-47fe-bd9e-f9753490302b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\tools\font.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\tools\image_packer.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="..\src\tools\tools.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\tools\utils_bin.h">
-      <Filter>头文件</Filter>
+    <ClInclude Include="..\src\tools\font\font.h">
+      <Filter>cpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\tools\net\curl_cx.h">
+      <Filter>cpp</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\tools\view\utils_info.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\tools\view\file.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\tools\font\font.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\tools\view\image.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\tools\view\mapView.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\tools\base\sem.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\test.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\tools\font.cpp">
-      <Filter>源文件</Filter>
+    <ClCompile Include="..\src\tools\base\promise_cx.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\tools\net\curl_cx.cpp">
+      <Filter>cpp</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

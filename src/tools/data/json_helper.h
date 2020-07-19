@@ -28,8 +28,12 @@
 #include <codecvt>
 #include <string>
 #include <regex>
+#include <queue>
 
-//#include "hlUtil.h"
+#include <base/camera.hpp>
+#include <base/hlUtil.h>
+#include <base/hl_time.h>
+
 //#include "hl_time.h"
 
 #ifndef NO_JSONTOOL
@@ -41,6 +45,8 @@ using njson = nlohmann::json;
 #define NJSON_H
 #endif
 #endif
+#include <view/utils_info.h>
+
 
 namespace hz
 {
@@ -368,15 +374,15 @@ namespace hz
 	}
 	inline bool is_range(const glm::ivec2& v, int64_t n, bool is = true)
 	{
-		return is ? n >= v.x && n <= v.y : n > v.x&& n < v.y;
+		return is ? n >= v.x && n <= v.y : n > v.x && n < v.y;
 	}
 	inline bool is_range(const glm::ivec3& v, int64_t n, bool is = true)
 	{
-		return is ? n >= v.x && n <= v.y : n > v.x&& n < v.y;
+		return is ? n >= v.x && n <= v.y : n > v.x && n < v.y;
 	}
 	inline bool is_range(const glm::ivec4& v, int64_t n, bool is = true)
 	{
-		return is ? n >= v.x && n <= v.y : n > v.x&& n < v.y;
+		return is ? n >= v.x && n <= v.y : n > v.x && n < v.y;
 	}
 
 #endif
@@ -594,6 +600,27 @@ namespace hz
 		}
 		return ret;
 	}
+	static std::string getStr(const njson& v, const std::string& key)
+	{
+		std::string ret;
+		if (v.is_null())
+		{
+			//ret = "";
+		}
+		else if (v.is_string())
+		{
+			ret = v.get<std::string>();
+		}
+		else if (v.is_object() && key != "" && v.find(key) != v.end())
+		{
+			ret = v[key].get<std::string>();
+		}
+		else
+		{
+			ret = hstring::trim(v.dump(), "\"");
+		}
+		return ret;
+	}
 	template<class T>
 	static std::vector<T> toVector(const njson& n)
 	{
@@ -614,7 +641,7 @@ namespace hz
 			res = std::regex_replace(res, r2, format);
 			res = std::regex_replace(res, r, format);
 		}
-		catch (const std::exception & e) {
+		catch (const std::exception& e) {
 			return res;
 		}
 		return res;
@@ -1065,9 +1092,7 @@ namespace hz
 			{
 				ret = hstring::trim(v.dump(), "\"");
 			}
-			if (!isutf8)
-				return AtoA(ret);
-			return ret;// AtoUTF8(ret);
+			return isutf8 ? ret : u8_gbk(ret);
 		}
 		static unsigned int getColor(const njson& v, unsigned int d = 0)
 		{
@@ -1138,21 +1163,18 @@ namespace hz
 		/*
 		 * 枚举对象或数组
 		 */
-		static void map_oa(const njson& data, std::function<void(njson k, njson v)> func)
+		static void map_oa(const njson& data, std::function<void(const std::string& k, njson v)> func)
 		{
-			if (data.is_array() || data.is_string())
+			if (func && (data.is_array() || data.is_string() || data.is_object()))
 			{
-				for (auto it : data)
+				for (auto& [k, v] : data.items())
 				{
-					func({}, it);
+					func(k, v);
 				}
-			}
-			else if (data.is_object())
-			{
-				for (auto it = data.begin(); it != data.end(); ++it)
-				{
-					func(it.key(), it.value());
-				}
+				//for (auto it = data.begin(); it != data.end(); ++it)
+				//{
+				//	func(it.key(), it.value());
+				//}
 			}
 		}
 
@@ -1170,16 +1192,19 @@ namespace hz
 			}
 			return ret;
 		}
+
+
 		static std::string get_keys(const njson& data, std::string s = "`")
 		{
 			std::string lstr;
-			jsont::map_oa(data, [=, &lstr](njson k, njson v) {
+			for (auto& [k, v] : data.items())
+			{
 				if (lstr.size())
 				{
 					lstr += ",";
 				}
 				lstr += s + jsont::getStr(k) + s;
-				});
+			}
 			return lstr;
 		}
 		static std::string get_values(const njson& data, std::string s = "'", std::vector<std::string> rang = { "(",")" })
@@ -1261,7 +1286,7 @@ namespace hz
 			{
 				str = n.dump();
 			}
-			str = AtoA(str);
+			str = u8_gbk(str);
 			printf("%s\n", str.c_str());
 		}
 #endif
@@ -1493,14 +1518,14 @@ namespace hz
 					const d = m[1].split('-').map((mt: any) = > (mt.length < 2 ? `0${mt
 			}` : mt));
 					let rd = [`${curretYear
-		}-${ m[0] }-${ d[0] }`];
+		} - ${ m[0] } - ${ d[0] }`];
 					if (d.length > 1) {
 						rd = utils.getDateRang([`${curretYear
-					}-${ m[0] }-${ d[0] }`, `${curretYear
-	}-${ m[0] }-${ d[1] }`], false);
+					} - ${ m[0] } - ${ d[0] }`, `${curretYear
+	} - ${ m[0] } - ${ d[1] }`], false);
 }
 rd.map((rt: any) = > { ret[rt] = 1; });
-	});
+});
 	}
 	let all = 0;
 	for (const ot of Object.keys(ret)) {
@@ -1520,6 +1545,7 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 		}
 #endif
 		// ---------------------------------------------------------------------------------------------------------------------------------------------------------
+#if 0
 		// convert UTF-8 string to wstring  
 		static std::wstring utf8_to_wstring(const std::string& str)
 		{
@@ -1529,7 +1555,7 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			{
 				ret = myconv.from_bytes(str);
 			}
-			catch (const std::exception & e)
+			catch (const std::exception& e)
 			{
 				ret = ansi_to_wstring(str);
 			}
@@ -1641,7 +1667,7 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			}
 			return wstr;
 		}
-		std::string u2a(const std::wstring& wstr)
+		static std::string u2a(const std::wstring& wstr)
 		{
 			std::string ret;
 			std::mbstate_t state = {};
@@ -1659,7 +1685,7 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			return ret;
 		}
 
-		std::wstring a2u(const std::string& str)
+		static std::wstring a2u(const std::string& str)
 		{
 			std::wstring ret;
 			std::mbstate_t state = {};
@@ -1685,7 +1711,7 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			if (hz::hstring::IsTextUTF8(src.c_str()))return src;
 			return wstring_to_utf8(ansi_to_wstring(src, ".932"), isbom);
 		}
-
+#endif
 #if 0
 
 		static std::string wstring_to_ansi0(const std::wstring& src)
@@ -1744,6 +1770,7 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 		}
 
 #endif
+#if 0
 		static std::wstring AtoW(const std::string& str)
 		{
 			if (hz::hstring::IsTextUTF8(str.c_str()))
@@ -1771,7 +1798,7 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			else
 				return hz::jsont::ansi_to_utf8(str);
 		}
-
+#endif
 		static char exchange(char c)
 		{
 			if (c <= 'Z' && c >= 'A')
@@ -2162,6 +2189,7 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 		~Wheres()
 		{
 		}
+		// SUBSTRING(row->'$.k',2, CHAR_LENGTH(row->'$.k')-2)
 		static std::string mjkey(std::string row, std::string k)
 		{
 			return "SUBSTRING(" + row + "-> '$." + k + "',2, CHAR_LENGTH(" + row + "->'$." + k + "')-2)";
@@ -2190,16 +2218,20 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			{
 				return;
 			}
-			jsont::map_oa(d, [&](njson k, njson v)
+			for (auto& [k, v] : d.items())
+			{
+				auto vstr = jsont::get_value(v);
+				if (vstr != "null")
 				{
-					auto vstr = jsont::get_value(v);
-					if (vstr != "null")
-					{
-						//std::string qs = r + "->'$." + jsont::getStr(k) + "' =" + vstr;
-						std::string qs = mjkey(r, jsont::getStr(k)) + " =" + vstr;
-						push(qs, is_and);
-					}
-				});
+					//std::string qs = r + "->'$." + jsont::getStr(k) + "' =" + vstr;
+					std::string qs = mjkey(r, jsont::getStr(k)) + " =" + vstr;
+					//if (v.is_number())
+					//{
+					//	qs = r + "->'$." + toStr(k) + "' =" + vstr;
+					//}
+					push(qs, is_and);
+				}
+			}
 		}
 		// r->k的值不能是数组、对象。
 		// k in [a]
@@ -2283,8 +2315,32 @@ rd.map((rt: any) = > { ret[rt] = 1; });
 			{
 				arr.push_back("=");
 			}
-			auto ls = "(`" + jsont::getStr(arr[0]) + "` " + jsont::getStr(arr[2]) + " " + jsont::get_value(arr[1], "'") + ")";
+			auto ls = toStr(arr[0]) + " " + toStr(arr[2]) + " " + jsont::get_value(arr[1], "'");
 			_where.push_back({ ls, is_and ? "AND" : "OR" });
+		}
+		// 传时间戳或日期
+		void push_range_date(std::string k, const std::string& d1, const std::string& d2)
+		{
+			// UNIX_TIMESTAMP(SUBSTRING(data->'$.create_time',2, CHAR_LENGTH(data->'$.create_time')-2))>=UNIX_TIMESTAMP('2020-04-08 17:10:00')
+			std::string o = "UNIX_TIMESTAMP(SUBSTRING(" + k + ",2, CHAR_LENGTH(" + k + ")-2))";
+			if (d1.size())
+			{
+				std::string dc1 = d1;
+				if (d1.find('-') < d1.size())
+				{
+					dc1 = "UNIX_TIMESTAMP('" + dc1 + "')";
+				}
+				_where.push_back({ o + ">=" + dc1, "AND" });
+			}
+			if (d2.size())
+			{
+				std::string dc2 = d2;
+				if (d2.find('-') < d2.size())
+				{
+					dc2 = "UNIX_TIMESTAMP('" + dc2 + "')";
+				}
+				_where.push_back({ o + "<=" + dc2, "AND" });
+			}
 		}
 		void push_in(std::string key, njson a, bool is_and = true)
 		{
@@ -2351,6 +2407,6 @@ auto s1= n.dump(2);//缩进2个空格
 */
 
 
-//#include "xml2json.h"
+#include "xml2json.h"
 
 #endif // __json_helper_h__

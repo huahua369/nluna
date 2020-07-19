@@ -6,8 +6,15 @@
 #include <algorithm>
 #include <codecvt>
 #include <string>
+#include <base/Singleton.h>
 #include "font/tags.h"
-
+#include <view/image.h>
+#include <view/image_packer.h>
+#include <data/json_helper.h>
+#include <view/draw_info.h>
+#include <view/mapView.h>
+#include <view/file.h>
+//#define 0_STD_STR_
 /*
  如果不需要位图字体则定义_FONT_NO_BITMAP
 
@@ -786,155 +793,14 @@ namespace hz
 
 			*codep = (*state != FONS_UTF8_ACCEPT) ?
 				(byte & 0x3fu) | (*codep << 6) :
-				(0xff >> type)& (byte);
+				(0xff >> type) & (byte);
 
 			*state = utf8d[256 + *state + type];
 			return *state;
 		}
 
 		/* FIR filter used by the default and light filters */
-		static void lcd_filter_fir(Fonts::Bitmap* bitmap, int  mode, int weights_type)
-		{
-			static const uint8_t  default_filter[5] = { 0x08, 0x4d, 0x56, 0x4d, 0x08 };
-			static const uint8_t  light_filter[5] = { 0x00, 0x55, 0x56, 0x55, 0x00 };
-
-			const uint8_t* weights = weights_type ? default_filter : light_filter;
-			uint32_t   width = (uint32_t)bitmap->width;
-			uint32_t   height = (uint32_t)bitmap->rows;
-
-
-			/* horizontal in-place FIR filter */
-			if (mode == 0 && width >= 4)
-			{
-				unsigned char* line = bitmap->buffer;
-
-
-				/* take care of bitmap flow */
-				if (bitmap->pitch < 0)
-					line -= bitmap->pitch * (int64_t)(bitmap->rows - 1);
-
-				/* `fir' and `pix' must be at least 32 bit wide, since the sum of */
-				/* the values in `weights' can exceed 0xFF                        */
-
-				for (; height > 0; height--, line += bitmap->pitch)
-				{
-					uint32_t  fir[4];        /* below, `pix' is used as the 5th element */
-					uint32_t  val1, xx;
-
-
-					val1 = line[0];
-					if (val1)
-					{
-						val1 = val1;
-					}
-					fir[0] = weights[2] * val1;
-					fir[1] = weights[3] * val1;
-					fir[2] = weights[4] * val1;
-					fir[3] = 0;
-
-					val1 = line[1];
-					fir[0] += weights[1] * val1;
-					fir[1] += weights[2] * val1;
-					fir[2] += weights[3] * val1;
-					fir[3] += weights[4] * val1;
-
-					for (xx = 2; xx < width; xx++)
-					{
-						uint32_t  val, pix;
-
-
-						val = line[xx];
-						pix = fir[0] + weights[0] * val;
-						fir[0] = fir[1] + weights[1] * val;
-						fir[1] = fir[2] + weights[2] * val;
-						fir[2] = fir[3] + weights[3] * val;
-						fir[3] = weights[4] * val;
-
-						pix >>= 8;
-						pix |= (uint32_t)-(int)(pix >> 8);
-						line[xx - 2] = (unsigned char)pix;
-					}
-
-					{
-						uint32_t  pix;
-
-
-						pix = fir[0] >> 8;
-						pix |= (uint32_t)-(int)(pix >> 8);
-						line[xx - 2] = (unsigned char)pix;
-
-						pix = fir[1] >> 8;
-						pix |= (uint32_t)-(int)(pix >> 8);
-						line[xx - 1] = (unsigned char)pix;
-					}
-				}
-			}
-
-			/* vertical in-place FIR filter */
-			else if (mode == 1 && height >= 4)
-			{
-				unsigned char* column = bitmap->buffer;
-				int    pitch = bitmap->pitch;
-
-
-				/* take care of bitmap flow */
-				if (bitmap->pitch < 0)
-					column -= (int64_t)bitmap->pitch * (int64_t)(bitmap->rows - 1);
-
-				for (; width > 0; width--, column++)
-				{
-					unsigned char* col = column;
-					uint32_t   fir[4];       /* below, `pix' is used as the 5th element */
-					uint32_t   val1, yy;
-
-
-					val1 = col[0];
-					fir[0] = weights[2] * val1;
-					fir[1] = weights[3] * val1;
-					fir[2] = weights[4] * val1;
-					fir[3] = 0;
-					col += pitch;
-
-					val1 = col[0];
-					fir[0] += weights[1] * val1;
-					fir[1] += weights[2] * val1;
-					fir[2] += weights[3] * val1;
-					fir[3] += weights[4] * val1;
-					col += pitch;
-
-					for (yy = 2; yy < height; yy++)
-					{
-						uint32_t  val, pix;
-
-
-						val = col[0];
-						pix = fir[0] + weights[0] * val;
-						fir[0] = fir[1] + weights[1] * val;
-						fir[1] = fir[2] + weights[2] * val;
-						fir[2] = fir[3] + weights[3] * val;
-						fir[3] = weights[4] * val;
-
-						pix >>= 8;
-						pix |= (uint32_t)-(int)(pix >> 8);
-						col[-2 * pitch] = (unsigned char)pix;
-						col += pitch;
-					}
-
-					{
-						uint32_t  pix;
-
-
-						pix = fir[0] >> 8;
-						pix |= (uint32_t)-(int)(pix >> 8);
-						col[-2 * pitch] = (unsigned char)pix;
-
-						pix = fir[1] >> 8;
-						pix |= (uint32_t)-(int)(pix >> 8);
-						col[-pitch] = (unsigned char)pix;
-					}
-				}
-			}
-		}
+		static void lcd_filter_fir(Fonts::Bitmap* bitmap, int  mode, int weights_type);
 
 		class Glyph
 		{
@@ -1093,15 +959,15 @@ namespace hz
 			struct font_impl {
 				stbtt_fontinfo font;
 				// EBLC	Embedded bitmap location data	嵌入式位图位置数据
-				int eblc;
-				uint32_t sbit_table_size;
-				int      sbit_table_type;
-				uint32_t sbit_num_strikes;
+				int eblc = 0;
+				uint32_t sbit_table_size = 0;
+				int      sbit_table_type = 0;
+				uint32_t sbit_num_strikes = 0;
 				// EBDT	Embedded bitmap data	嵌入式位图数据 either `CBDT', `EBDT', or `bdat' 
-				uint32_t ebdt_start;
-				uint32_t ebdt_size;
+				uint32_t ebdt_start = 0;
+				uint32_t ebdt_size = 0;
 				// EBSC	Embedded bitmap scaling data	嵌入式位图缩放数据
-				uint32_t ebsc;
+				uint32_t ebsc = 0;
 				std::map<std::string, sfnt_header> _tb;
 			};
 			typedef struct font_impl font_impl;
@@ -1785,15 +1651,15 @@ namespace hz
 					{
 #ifdef __json_helper_h__
 #ifdef _STD_STR_
-						n = isu8 ? jsont::wstring_to_utf8(to_wstr(name_, true)) : jsont::wstring_to_ansi(to_wstr(name_, true));
+						n = isu8 ? w_u8(to_wstr(name_, true)) : w_gbk(to_wstr(name_, true));
 #else
-						n = isu8 ? jsont::wstring_to_utf8(name_.to_wstr(true)) : jsont::wstring_to_ansi(name_.to_wstr(true));
+						n = isu8 ? w_u8(name_.to_wstr(true)) : w_gbk(name_.to_wstr(true));
 #endif
 #else
 #ifdef _STD_STR_
-						n = isu8 ? wstring_to_utf8(to_wstr(name_, true)) : wstring_to_ansi(to_wstr(name_, true));
+						n = isu8 ? w_u8(to_wstr(name_, true)) : w_gbk(to_wstr(name_, true));
 #else
-						n = isu8 ? wstring_to_utf8(name_.to_wstr(true)) : wstring_to_ansi(name_.to_wstr(true));
+						n = isu8 ? w_u8(name_.to_wstr(true)) : w_gbk(name_.to_wstr(true));
 #endif
 #endif // __json_helper_h__
 
@@ -1821,7 +1687,7 @@ namespace hz
 									auto it = *tw;
 									n.push_back(it);
 								}
-								n = jsont::ansi_to_utf8(n);
+								n = gbk_u8(n);
 							}
 							break;
 						default:
@@ -2521,7 +2387,7 @@ namespace hz
 					printf("tt_sbit_decoder_load_byte_aligned:"
 						" invalid bitmap dimensions\n"); return 0;
 				}
-				if (p + ((line_bits + 7) >> 3)* height > limit)
+				if (p + ((line_bits + 7) >> 3) * height > limit)
 				{
 					printf("tt_sbit_decoder_load_byte_aligned: broken bitmap\n");
 					return 0;
@@ -2650,7 +2516,7 @@ namespace hz
 							nbits -= w;
 						}
 
-						*pwrite++ |= ((rval >> nbits) & 0xFF)&
+						*pwrite++ |= ((rval >> nbits) & 0xFF) &
 							(~(0xFFU << w) << (8 - w - x_pos));
 						rval <<= 8;
 						w = line_bits - w;
@@ -2671,14 +2537,14 @@ namespace hz
 						{
 							if (p < limit)
 								rval |= *p++;
-							*pwrite |= ((rval >> nbits) & 0xFF)& (0xFF00U >> w);
+							*pwrite |= ((rval >> nbits) & 0xFF) & (0xFF00U >> w);
 							nbits += 8 - w;
 
 							rval <<= 8;
 						}
 						else
 						{
-							*pwrite |= ((rval >> nbits) & 0xFF)& (0xFF00U >> w);
+							*pwrite |= ((rval >> nbits) & 0xFF) & (0xFF00U >> w);
 							nbits -= w;
 						}
 					}
@@ -3002,118 +2868,7 @@ namespace hz
 				return load_bitmap(decoder, image_format, image_start, image_end, x_pos, y_pos);
 			}
 			// 初始化位图信息
-			int init_sbit()
-			{
-				font_impl_info* font_i = &font;
-				const stbtt_fontinfo* font = &font_i->font;
-				int i, count, stringOffset;
-				uint8_t* fc = font->data;
-				uint32_t offset = font->fontstart, table_size = 0, sbit_num_strikes = 0;
-				uint32_t ebdt_start = 0, ebdt_size = 0;
-				sfnt_header* ebdt_table = 0;
-				auto sbit_table = get_tag(font_i, TAG_CBLC);
-				sbit_table_type stt = sbit_table_type::TYPE_NONE;
-				do
-				{
-					if (sbit_table)
-					{
-						stt = sbit_table_type::TYPE_CBLC;
-						break;
-					}
-					sbit_table = get_tag(font_i, TAG_EBLC);
-					if (sbit_table)
-					{
-						stt = sbit_table_type::TYPE_EBLC;
-						break;
-					}
-					sbit_table = get_tag(font_i, TAG_bloc);
-					if (sbit_table)
-					{
-						stt = sbit_table_type::TYPE_EBLC;
-						break;
-					}
-					sbit_table = get_tag(font_i, TAG_sbix);
-					if (sbit_table)
-					{
-						stt = sbit_table_type::TYPE_SBIX;
-						break;
-					}
-					else
-					{
-						// error
-						return 0;
-					}
-				} while (0);
-				table_size = sbit_table->logicalLength;
-				switch (stt)
-				{
-				case sbit_table_type::TYPE_EBLC:
-				case sbit_table_type::TYPE_CBLC:
-				{
-					uint8_t* p = fc + sbit_table->offset;
-					uint32_t   count;
-					int majorVersion = stb_font::ttUSHORT(p + 0);
-					int minorVersion = stb_font::ttUSHORT(p + 2);
-					uint32_t num_strikes = stb_font::ttULONG(p + 4);
-					if (num_strikes >= 0x10000UL)
-					{
-						return 0;
-					}
-
-					/*
-					 *  Count the number of strikes available in the table.  We are a bit
-					 *  paranoid there and don't trust the data.
-					 */
-					count = num_strikes;
-					if (8 + 48UL * count > table_size)
-						count = (uint32_t)((table_size - 8) / 48);
-					sbit_num_strikes = count;
-				}
-				break;
-				case sbit_table_type::TYPE_SBIX:
-				{
-					//TODO		解析SBIX
-				}
-				break;
-				default:
-					break;
-				}
-				do
-				{
-					ebdt_table = get_tag(font_i, TAG_CBDT);
-					if (ebdt_table) break;
-					ebdt_table = get_tag(font_i, TAG_EBDT);
-					if (ebdt_table) break;
-					ebdt_table = get_tag(font_i, TAG_bdat);
-					if (!ebdt_table) return 0;
-				} while (0);
-
-				auto ebsc_table = get_tag(font_i, TAG_EBSC);
-				tt_info* ttp = (tt_info*)font->userdata;
-				uint8_t* b = fc + sbit_table->offset;
-				count = stb_font::ttULONG(b + 4);
-				if (!count)
-				{
-					return 0;
-				}
-
-				// 位图表eblc
-				//std::vector<BitmapSizeTable> bsts;
-				//std::vector<std::vector<IndexSubTableArray>> index_sub_table;
-				njson ns = get_bitmap_size_table(b, count, _bsts, _index_sub_table, _msidx_table);
-#ifndef nnDEBUG
-				printf("<%s>包含位图大小\n", _aname.c_str());
-				for (auto& it : ns)
-					printf("%s\n", it.dump().c_str());
-#endif // !nnDEBUG
-				// 位图数据表ebdt
-				b = fc + ebdt_table->offset;
-				glm::ivec2 version = { stb_font::ttUSHORT(b + 0), stb_font::ttUSHORT(b + 2) };
-				_sbit_table = sbit_table;
-				_ebdt_table = ebdt_table;
-				_ebsc_table = ebsc_table;
-				return ns.size();
-			}
+			int init_sbit();
 			int get_sidx(int height)
 			{
 				auto it = _msidx_table.find(height);
@@ -3268,47 +3023,7 @@ namespace hz
 			Bitmap* bitmap		输出位图信息
 			返回1成功
 			*/
-			int get_glyph_image(int gidx, double height, glm::ivec4* ot, Bitmap* bitmap, std::vector<char>* out, int lcd_type = 0)
-			{
-				int ret = 0;
-				if (gidx > 0)
-				{
-#ifndef _FONT_NO_BITMAP
-					if (first_bitmap)
-					{
-						// 解析位图
-						ret = get_glyph_bitmap(gidx, height, ot, bitmap, out);
-					}
-#endif
-					if (!ret)
-					{
-						// 解析轮廓并光栅化
-						double advance = height;
-						glm::vec2 lcds[] = { {1,1},{3,1},{1,3} };
-						double scale = get_scale_height(height);
-						auto fbb = font_dev::get_boundin_box(&font);
-						font_dev::get_glyph_bitmap(&font, gidx, scale, ot, out, &advance, lcds[lcd_type]);
-						if (bitmap)
-						{
-							auto hh = hhea;
-							auto he = hhea.ascender + hhea.descender + hhea.lineGap;
-							auto hef = hhea.ascender - hhea.descender + hhea.lineGap;
-
-							double hed = scale * he;
-							double hedf = scale * hef;
-							double lg = scale * hhea.lineGap;
-							bitmap->buffer = (unsigned char*)out->data();
-							bitmap->width = bitmap->pitch = ot->z;
-							bitmap->rows = ot->w;
-							bitmap->advance = advance;
-							bitmap->pixel_mode = PX_GRAY;	//255灰度图
-							init_bitmap_bitdepth(bitmap, 8);
-							ret = 1;
-						}
-					}
-				}
-				return ret;
-			}
+			int get_glyph_image(int gidx, double height, glm::ivec4* ot, Bitmap* bitmap, std::vector<char>* out, int lcd_type);
 			/*
 			获取量
 			*/
@@ -3432,6 +3147,53 @@ namespace hz
 		};
 		// !tt_info
 
+		// fd_info
+		class fd_info
+		{
+		private:
+			MapView* _fp = nullptr;
+			char* _data = nullptr;
+			int64_t _size = 0;
+		public:
+			fd_info()
+			{
+			}
+			fd_info(MapView* p)
+			{
+				init(p);
+			}
+
+			~fd_info()
+			{
+			}
+			void free_mv()
+			{
+				if (_fp)
+				{
+					MapView::destroy(_fp);
+				}
+			}
+			void init(MapView* p)
+			{
+				_fp = p;
+				if (_fp)
+				{
+					_data = (char*)_fp->mapview();
+					_size = _fp->getFileSize();
+				}
+			}
+			char* data()
+			{
+				return _data;
+			}
+			int64_t size()
+			{
+				return _size;
+			}
+		private:
+
+		};
+
 	public:
 		// todo 样式
 		//----------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -3486,6 +3248,8 @@ namespace hz
 			text_align _text_align = text_align::null;
 			vertical_align _vertical_align = vertical_align::null;
 			std::vector<glm::ivec3> colors;
+			// lcd模式{1,1},{3,1},{1,3}
+			int lcd_type = 0;
 		private:
 			//tt_info* font = nullptr;
 			std::vector<tt_info*> font_family;
@@ -3774,10 +3538,40 @@ namespace hz
 
 		};
 
+		class image_text_info
+		{
+		public:
+			Image* dst = nullptr;
+			Fonts::tt_info* font = nullptr;
+			double font_size = 0;
+			unsigned int color = -1;
+			glm::ivec2 pos;
+			unsigned char blur_size = 0;
+			glm::ivec2 blur_pos;
+			unsigned int color_blur = -1;
+			double font_dpi = 96.0;
+			bool first_bitmap = false;
+			int lcd_type = 0;
+			std::vector<tt_info*>* font_family = nullptr;
+		public:
+			image_text_info()
+			{
+			}
+
+			~image_text_info()
+			{
+			}
+
+		private:
+
+		};
+
+
 	private:
 		// TODO		数据区
 		std::set<std::string> dv;
 		std::vector<std::vector<char>*> fn_data;
+		std::vector<fd_info> fd_data;
 		std::vector<tt_info*> _fonts;
 		// 根据字体名查找
 		std::unordered_map<std::string, std::vector<tt_info*>> _tbs;
@@ -3797,6 +3591,10 @@ namespace hz
 			for (auto it : fn_data)
 			{
 				delete it;
+			}
+			for (auto it : fd_data)
+			{
+				it.free_mv();
 			}
 			for (auto it : _fonts)
 			{
@@ -4000,124 +3798,13 @@ namespace hz
 			return (idx < 0 || idx > _fonts.size()) ? nullptr : _fonts[idx];
 		}
 		// 文件名，是否复制数据
-		int add_font_file(const std::string& fn)
-		{
-			int ret = 0;
-			std::vector<char>* nd = new std::vector<char>();
-			auto& data = *nd;
-#ifdef __FILE__h__
-			hz::File::read_binary_file(fn, data);
-#else
-			read_binary_file(fn, data);
-#endif // __FILE__h__
-			if (data.size())
-			{
-				fn_data.push_back(nd);
-				nd->swap(data);
-				ret = add_font_mem(nd->data(), nd->size(), false);
-			}
-			return ret;
-		}
-		int add_font_mem(const char* data, size_t len, bool iscp)
-		{
-			int ret = 0;
-			std::vector<stb_font::font_impl*> fp;
-			stb_font ft;
-			int nums = ft.get_numbers(data);
-			int hr = 0;
-			njson ftn;
-			for (size_t i = 0; i < nums; i++)
-			{
-				auto font = tt_info::new_info();
-				data = font->init(data, len, iscp && i == 0);
-				stb_font::font_impl* fi = &font->font;
-				hr = ft.loadFont(fi, data, i, font);
-				if (hr)
-				{
-					int ascent = 0, descent = 0, lineGap = 0;
-					ft.getFontVMetrics(fi, &ascent, &descent, &lineGap);
-					auto fh = ascent - descent;
-					njson fot;
-					fot["ascender"] = (float)ascent / (float)fh;
-					fot["descender"] = (float)descent / (float)fh;
-					fot["lineh"] = (float)(fh + lineGap) / (float)fh;
-					fot["_ascent"] = ascent;
-					fot["_descent"] = descent;
-					fot["_lineGap"] = lineGap;
-					auto name = ft.get_font_name(fi);
-					ftn.push_back(fot);
-					fp.push_back(fi);
-					font->fh = fh;
-					font->ascender = (float)ascent / (float)fh;
-					font->descender = (float)descent / (float)fh;
-					font->lineh = (float)(fh + lineGap) / (float)fh;
-					font->_name = font->get_info_str(def_language_id);
-					font->_aname = jsont::utf8_to_ansi(font->_name);
-					font->init_post_table();
-#ifndef _FONT_NO_BITMAP
-					font->init_sbit();
-#endif // !_FONT_NO_BITMAP
-					LOCK_W(_lk);
-					_tbs[font->_name].push_back(font);
-					_fonts.push_back(font);
+		int add_font_file(const std::string& fn);
+		int add_font_mem(const char* data, size_t len, bool iscp);
 
-					//font->print_info();
-				}
-				else
-				{
-					tt_info::free_info(font);
-				}
-			}
-			return fp.size();
-		}
+		njson get_font_info(int language_id = 2052);
 
-		njson get_font_info(int language_id = 2052)
-		{
-			LOCK_R(_lk);
-			njson ret;;
-			for (auto& [k, v] : _tbs)
-			{
-				for (auto it : v)
-				{
-					auto n = it->get_info_str(language_id, 1);
-					auto ns = it->get_info_str(1033, 2);
-					if (ns.empty())
-					{
-						ns = it->get_info_str(language_id, 2);
-					}
-					ret[n]["is_fixed"] = it->isFixedPitch;
-					//ret[n]["post_fixed"] = it->postFixedPitch;
-					//ret[n]["char_fixed"] = it->charFixedPitch;
-					ret[n]["style"].push_back(ns);
-				}
-			}
-			return ret;
-		}
-
-		tt_info* get_font(const std::string& name, const std::string& st = "Regular")
-		{
-			LOCK_R(_lk);
-			tt_info* ret = nullptr;
-			auto it = _tbs.find(name);
-			if (it != _tbs.end() && it->second.size())
-			{
-				ret = it->second.size() ? it->second[0] : nullptr;
-				for (auto& ft : it->second)
-				{
-					auto fst = ft->get_info_str(2052, 2);
-					if (fst == st)
-					{
-						ret = ft;
-					}
-				}
-			}
-			return ret;
-		}
-		static sfnt_header* get_tag(font_impl_info* font_i, std::string tag)
-		{
-			auto it = font_i->_tb.find(tag);
-			return it != font_i->_tb.end() ? &it->second : nullptr;
-		}
+		tt_info* get_font(const std::string& name, const std::string& st = "Regular");
+		static sfnt_header* get_tag(font_impl_info* font_i, std::string tag);
 
 		void set_defontcss(tt_info* f1, tt_info* f2)
 		{
@@ -4132,31 +3819,7 @@ namespace hz
 		}
 	public:
 
-		bool is_ttc(const char* data, std::vector<uint32_t>* outv)
-		{
-			uint32_t num_fonts = 0;
-			uint32_t offset = 0;
-			bool ret = false;
-			ttc_info* tip = (ttc_info*)data;
-
-			if (memcmp(data, "ttcf", 4) != 0)
-				return ret;
-			num_fonts = swapInt32(tip->count);
-			//tip->version = swapInt32(tip->version);
-			if (tip->count)
-			{
-				for (size_t i = 0; i < num_fonts; i++)
-				{
-					offset = swapInt32(tip->offset[i]);
-					if (outv)
-					{
-						outv->push_back(offset);
-					}
-				}
-				ret = true;
-			}
-			return ret;
-		}
+		bool is_ttc(const char* data, std::vector<uint32_t>* outv);
 		//对应int32大小的成员 的转换 范例 
 		int32_t swapInt32(int32_t value)
 		{
@@ -4754,164 +4417,10 @@ namespace hz
 			double adv;
 			return font_dev::get_glyph_bitmap(&renderFont->font, g, height, ot, out, &adv);
 		}
-		Glyph* get_glyph_test(tt_info* font, unsigned int codepoint, short isize, short iblur, int bitmapOption = FONS_GLYPH_BITMAP_REQUIRED)
-		{
-			int i, g, advance, lsb, x0, y0, x1, y1, gw, gh, gx = 0, gy = 0, x, y;
-			float scale;
-			Glyph* glyph = NULL;
-			unsigned int h;
-			float size = isize; // 10.0f;
-			int pad, added;
-			unsigned char* bdst;
-			unsigned char* dst;
-			if (!font && _fonts.size())
-			{
-				font = _fonts[0];
-			}
-			else
-			{
-				//return glyph;
-			}
-
-			tt_info* renderFont = font;
-			if (isize < 2) return NULL;
-			if (iblur > 20) iblur = 20;
-			pad = iblur + 2;
-
-			// Reset allocator.
-			//stash->nscratch = 0;
-
-			// Find code point and size.
-			// 查找是否有用过
-			auto tg = font->find_glyph(codepoint);
-			for (; tg;)
-			{
-				if (tg->codepoint == codepoint && tg->size == isize && tg->blur == iblur) {
-					glyph = tg;
-					if (bitmapOption == FONS_GLYPH_BITMAP_OPTIONAL || (glyph->x0 >= 0 && glyph->y0 >= 0)) {
-						return glyph;
-					}
-					// At this point, glyph exists but the bitmap data is not yet created.
-					break;
-				}
-				tg = tg->next;
-			}
-			// Create a new glyph or rasterize bitmap data for a cached glyph.
-			g = font->get_glyph_index(codepoint, &renderFont, nullptr);
-
-			scale = font_dev::getPixelHeightScale(&renderFont->font, size);
-			font_dev::buildGlyphBitmap(&renderFont->font, g, scale, &advance, &lsb, &x0, &y0, &x1, &y1);
-			gw = x1 - x0 + pad * 2;
-			gh = y1 - y0 + pad * 2;
-
-			// Determines the spot to draw glyph in the atlas.
-			//if (bitmapOption == FONS_GLYPH_BITMAP_REQUIRED) {
-			//	// Find free spot for the rect in the atlas
-			//	added = atlasAddRect(stash->atlas, gw, gh, &gx, &gy);
-			//	if (added == 0 && stash->handleError != NULL) {
-			//		// Atlas is full, let the user to resize the atlas (or not), and try again.
-			//		stash->handleError(stash->errorUptr, FONS_ATLAS_FULL, 0);
-			//		added = atlasAddRect(stash->atlas, gw, gh, &gx, &gy);
-			//	}
-			//	if (added == 0) return NULL;
-			//}
-			//else {
-			//	// Negative coordinate indicates there is no bitmap data created.
-			//	gx = -1;
-			//	gy = -1;
-			//}
-
-			// Init glyph.
-			if (glyph == NULL) {
-				glyph = font->alloc_glyph();
-				glyph->codepoint = codepoint;
-				glyph->size = isize;
-				glyph->blur = iblur;
-				glyph->next = 0;
-
-				// Insert char to hash lookup.
-				font->inser_glyph(glyph);
-				//glyph->next = font->lut[h];
-				//font->lut[h] = font->nglyphs - 1;
-			}
-			glyph->index = g;
-			glyph->x0 = (short)gx;
-			glyph->y0 = (short)gy;
-			glyph->x1 = (short)(glyph->x0 + gw);
-			glyph->y1 = (short)(glyph->y0 + gh);
-			glyph->xadv = (short)(scale * advance * 10.0f);
-			glyph->xoff = (short)(x0 - pad);
-			glyph->yoff = (short)(y0 - pad);
-
-			if (bitmapOption == FONS_GLYPH_BITMAP_OPTIONAL) {
-				return glyph;
-			}
-			// Rasterize
-			//dst = &stash->texData[(glyph->x0 + pad) + (glyph->y0 + pad) * stash->params.width];
-			int gwh[] = { gw - pad * 2, gh - pad * 2 };
-			int params_width = gwh[0];
-			int params_height = gwh[1];
-			dst = glyph->resize_bitmap(params_width, params_height);
-			font_dev::renderGlyphBitmap(&renderFont->font, dst, gwh[0], gwh[1], params_width, scale, scale, g);
-			{
-				int w, h, i, j, c = 'a';
-				auto bitmap = stbtt_GetCodepointBitmap(&renderFont->font.font, 0, stbtt_ScaleForPixelHeight(&renderFont->font.font, 20), c, &w, &h, 0, 0);
-				//print_test(bitmap, w, h);
-			}
-			//print_test(dst, params_width, params_height);
-			// Make sure there is one pixel empty border.
-			auto mdst = &dst[glyph->x0 + glyph->y0 * params_width];
-			for (y = 0; y < gh; y++) {
-				mdst[y * params_width] = 0;
-				mdst[gw - 1 + y * params_width] = 0;
-			}
-			for (x = 0; x < gw; x++) {
-				mdst[x] = 0;
-				mdst[x + (gh - 1) * params_width] = 0;
-			}
-			// Debug code to color the glyph background
-		/*	unsigned char* fdst = &stash->texData[glyph->x0 + glyph->y0 * params_width];
-			for (y = 0; y < gh; y++) {
-				for (x = 0; x < gw; x++) {
-					int a = (int)fdst[x+y*params_width] + 20;
-					if (a > 255) a = 255;
-					fdst[x+y*params_width] = a;
-				}
-			}*/
-
-			// Blur
-			if (iblur > 0) {
-				//stash->nscratch = 0;
-				bdst = &dst[glyph->x0 + glyph->y0 * params_width];
-				Blur(bdst, gw, gh, params_width, iblur, 2);
-			}
-			//print_test(dst, params_width, params_height);
-
-			int dirtyRect[4] = {};
-			dirtyRect[0] = mini(dirtyRect[0], glyph->x0);
-			dirtyRect[1] = mini(dirtyRect[1], glyph->y0);
-			dirtyRect[2] = maxi(dirtyRect[2], glyph->x1);
-			dirtyRect[3] = maxi(dirtyRect[3], glyph->y1);
-
-			return glyph;
-		}
+		Glyph* get_glyph_test(tt_info* font, unsigned int codepoint, short isize, short iblur, int bitmapOption = FONS_GLYPH_BITMAP_REQUIRED);
 
 
-		static void print_test(const void* d, int w, int h)
-		{
-			unsigned char* bitmap = (unsigned char*)d;
-			printf("\n");
-			for (int j = 0; j < h; ++j)
-			{
-				printf("\t");
-				for (int i = 0; i < w; ++i)
-				{
-					printf("%c ", " .:ioVM@"[bitmap[j * w + i] >> 5]);
-				}
-				printf("\n");
-			}
-			printf("\n");
-		}
+		static void print_test(const void* d, int w, int h);
 
 		static int mini(int a, int b)
 		{
@@ -4949,6 +4458,7 @@ namespace hz
 			return str;
 		}
 	private:
+		// TODO:push_cache_bitmap
 		Image* push_cache_bitmap(Bitmap* bitmap, glm::ivec2* pos, int linegap = 0, unsigned int col = -1)
 		{
 			int width = bitmap->width + linegap, height = bitmap->rows + linegap;
@@ -4965,55 +4475,8 @@ namespace hz
 			return ret;
 		}
 	public:
-		void save_cache(std::string fdn)
-		{
-			int i = 0;
-			_packer.maps([=, &i](Image* img) {
-				std::string fn = fdn + std::to_string(i);
-#ifdef __FILE__h__
-				img->saveImage(fn + ".png");
-#else
-				auto d = img->png_data();
-				save_binary_file(fn + ".png", d.data(), d.size());
-#endif
-				});
-		}
-		glm::vec3 make_outline_y(css_text* ct, size_t n)
-		{
-			glm::ivec3 ret = { 0,0,0 };
-			std::vector<glm::ivec3> os;
-			css_text* mt = 0;
-			for (size_t i = 0; i < n; i++)
-			{
-				auto it = &ct[i];
-				bool ism = false;
-				auto& ft = it->get_fonts();
-				double lthis = 1.0;
-				for (auto font : ft)
-				{
-					if (font)
-					{
-						auto itr = font->get_rbl_height(it->get_fheight(), &ret, &ism);
-						os.push_back(itr);
-						lthis = std::max(lthis, floor(itr.y / 24.0));
-						if (ism)
-						{
-							mt = it;
-						}
-					}
-				}
-				it->line_thickness = lthis;
-			}
-			for (size_t i = 0; i < n; i++)
-			{
-				auto it = &ct[i];
-				it->row_height = ret.x;
-				it->row_y = ret.y;
-				it->row_base_y = ret.z;
-				it->_row = mt;
-			}
-			return ret;
-		}
+		void save_cache(std::string fdn);
+		glm::vec3 make_outline_y(css_text* ct, size_t n);
 	public:
 		/*
 			查询是否有缓存，没有则生成
@@ -5026,87 +4489,7 @@ namespace hz
 				unsigned char blur_size;
 				};
 		*/
-		std::vector<ft_item*> make_cache(tt_info* font, ft_key_s* key, double fns, std::vector<tt_info*>* fallbacks)
-		{
-			std::vector<ft_item*> ret;
-			ft_key_s k2;
-			k2.u = key->u;
-			k2.v.blur_size = 0;
-			ret.resize(1);
-			if (!font && fallbacks)
-			{
-				font = fallbacks->at(0);
-			}
-			ret[0] = font->find_item(&k2);
-			bool isblur = false;
-			if (key->v.blur_size)
-			{
-				ret.push_back(font->find_item(key));
-			}
-			if (!ret[0] || (ret.size() > 1 && !ret[1]))
-			{
-				tt_info* rfont = nullptr;
-				Bitmap bitmap[1] = {}, blur[1] = {};
-				std::vector<char> bitbuf[2];
-				glm::ivec4 rc;
-				std::vector<ft_item>  ps;
-				auto kt = key->v;
-				double base_line = 0;
-				int gidx = font->get_glyph_index(kt.unicode_codepoint, &rfont, fallbacks);
-				if (rfont && gidx)
-				{
-					auto bit = rfont->get_glyph_image(gidx, fns, &rc, bitmap, &bitbuf[0]);
-					glm::ivec2 pos;
-					if (font != rfont)
-					{
-						base_line = rfont->get_base_line(fns);
-					}
-					if (!ret[0])
-					{
-						ps.resize(1);
-						auto fit = &ps[0];
-						auto frc = rc;
-						auto bimg = push_cache_bitmap(bitmap, &pos, 0, -1);
-						frc.x = pos.x;
-						frc.y = pos.y;
-						fit->set_it(kt.unicode_codepoint, bimg, frc, { rc.x, rc.y }, bitmap->advance, 0, base_line);
-						fit->renderfont = rfont;
-					}
-					if (kt.blur_size > 0)
-					{
-						ft_item tt;
-						ps.push_back(tt);
-						auto fit = &ps[ps.size() - 1];
-						Fonts::get_blur(blur, bitmap, kt.blur_size, 1, &bitbuf[1]);
-						auto buimg = push_cache_bitmap(blur, &pos, 0, -1);
-						auto frc = glm::ivec4(pos.x, pos.y, blur->width, blur->rows);
-						fit->set_it(kt.unicode_codepoint, buimg, frc, { rc.x, rc.y }, bitmap->advance, kt.blur_size, base_line);
-						fit->renderfont = rfont;
-					}
-					if (ps.size())
-					{
-						std::vector<ft_item*> outit;
-						font->push_cache(key, ps.data(), ps.size(), &outit);//, bit == 2
-						if (!ret[0] && outit.size() > 1)
-						{
-							ret[0] = outit[0];
-							ret[1] = outit[1];
-						}
-						else
-						{
-							int idx = 0;
-							if (kt.blur_size > 0)idx = 1;
-							ret[idx] = outit[0];
-						}
-					}
-				}
-				else
-				{
-					ret.clear();
-				}
-			}
-			return ret;
-		}
+		std::vector<ft_item*> make_cache(tt_info* font, ft_key_s* key, double fns, std::vector<tt_info*>* fallbacks, int lcd_type);
 		static int get_kern_advance(tt_info* font, int g1, int g2)
 		{
 			return font ? font_dev::getGlyphKernAdvance(&font->font, g1, g2) : 0;
@@ -5178,10 +4561,12 @@ namespace hz
 			return ret;
 		}
 		// todo		渲染到image
+		void build_text(image_text_info* info, const std::string& str, size_t first_idx, size_t count);
+		/*
 		void build_text(Image* dst, tt_info* font, const std::string& str, size_t count, size_t first_idx, double font_size, unsigned int color = -1
 			, glm::ivec2 pos = { 0,0 }, unsigned char blur_size = 0, glm::ivec2 blur_pos = { 0,0 }, unsigned int color_blur = -1
-			, double dpi = 96, bool first_bitmap = true);
-		// todo		生成到draw_font_info
+			, double dpi = 96, bool first_bitmap = true, int lcd_type = 0);*/
+			// todo		生成到draw_font_info
 		glm::ivec2 build_info(css_text* csst, const std::string& str, size_t count, size_t first_idx, glm::ivec2 pos, draw_font_info* out);
 		void draw_image2(Image* dst, draw_image_info* info);
 		glm::ivec2 build_to_image(css_text* csst, const std::string& str, size_t count, size_t first_idx, glm::ivec2 pos, Image* dst);

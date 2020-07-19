@@ -23,17 +23,21 @@
 #include <unistd.h>  
 #include <dirent.h>
 #include <sys/param.h>
-
+#include <sys/epoll.h>
+#include <sys/inotify.h>
 #endif
 #include <sys/types.h>  
 #include <sys/stat.h>  
 #include <errno.h>  
 
-#include "Singleton.h"
+//#include "Singleton.h"
+#include "rw.h"
+
 #include "mapView.h"
-#include "FileMap.hpp"
+//#include "FileMap.hpp"
+#include <base/Event.h>
 #include "mem.h"
-#include "hlUtil.h"
+#include <base/hlUtil.h>
 #ifndef LOBYTE
 #define LOBYTE(w)           ((unsigned char)(((size_t)(w)) & 0xff))
 #define GetRValue(rgb)      (LOBYTE(rgb))
@@ -60,12 +64,21 @@
 #endif
 #endif
 
+
+#ifdef _WIN32
+#define fseeki64 _fseeki64
+#define ftelli64 _ftelli64
+#else			
+#define fseeki64 fseeko64
+#define ftelli64 ftello64
+#endif // _WIN32
+
 extern void* a_mgr;
 /*
 
  */
 namespace hz {
-	class File :public Singleton<File>
+	class File //:public Singleton<File>
 	{
 	private:
 		std::set<std::string> dv;
@@ -81,49 +94,7 @@ namespace hz {
 		{
 			dv.insert(dir);
 		}
-		static std::string getAP()
-		{
-			static std::string ret;
-			static std::once_flag flag;
-			std::call_once(flag, [=]() {
-#ifdef _WIN32
-#ifdef __EXEFILE__
-				char szAppPath[1024] = { 0 };
-				GetModuleFileNameA(GetModuleHandleA(""), (char*)szAppPath, 1024);
-				(strrchr((char*)szAppPath, '\\'))[1] = 0;
-				ret = szAppPath;
-#else
-				//可以获得DLL自身的路径
-				char dllpath[MAX_PATH];
-				::memset(dllpath, 0, sizeof(dllpath));
-				::GetModuleFileNameA(ModuleFromAddress(ModuleFromAddress), dllpath, MAX_PATH);
-				ret = getDic(dllpath);
-#endif // __EXEFILE__
-#else
-				// linux获取本进程目录
-				size_t len = PATH_MAX;
-				char processdir[PATH_MAX];
-				char processname[1024];
-				char* path_end;
-				std::vector<std::string> vs;
-				if (readlink("/proc/self/exe", processdir, len) <= 0)
-					return ret;
-				path_end = strrchr(processdir, '/');
-				if (path_end == NULL)
-					return ret;
-				++path_end;
-				strcpy(processname, path_end);
-				*path_end = '\0';
-				size_t l = (size_t)(path_end - processdir);
-				vs.push_back(processdir);
-				vs.push_back(processname);
-				ret = processdir;
-				//ret = getenv("HOME");
-				//ret += "/";
-#endif
-				});
-			return ret;
-		}
+		static std::string getAP();
 		static std::string getAP(std::string name, std::string pat = "")
 		{
 			std::string rap = getAP();
@@ -137,18 +108,7 @@ namespace hz {
 		}
 #ifdef _WIN32
 		// 一个通过内存地址取得模块句柄的帮助函数
-		static HMODULE WINAPI ModuleFromAddress(PVOID pv)
-		{
-			MEMORY_BASIC_INFORMATION mbi;
-			if (::VirtualQuery(pv, &mbi, sizeof(mbi)) != 0)
-			{
-				return (HMODULE)mbi.AllocationBase;
-			}
-			else
-			{
-				return NULL;
-			}
-		}
+		static HMODULE WINAPI ModuleFromAddress(PVOID pv);
 #endif
 		// 获取路径，去掉尾部n个文件夹
 		static std::string getDic(const std::string& dic, int last = 1)
@@ -332,6 +292,7 @@ namespace hz {
 			pathfname = 0x04,
 			pathext = 0x08,
 			path_all = pathdrive | pathdir,
+			path_noext = pathdrive | pathdir | pathfname,
 		};
 		static std::string getPath(const char* path_buffer, unsigned int ty = pathext)
 		{
@@ -379,11 +340,11 @@ namespace hz {
 			return (access(fn, 0) != -1);
 		}
 		//验证
-		static std::string getFn(std::string fnc, bool isutf8 = false)
+		std::string getFn(std::string fnc, bool isutf8 = false)
 		{
 			std::string tem = fnc;
 #ifndef __ANDROID__
-			auto sp = s();
+			auto sp = this;// s();
 			if (0 != access(fnc.c_str(), 0))
 			{
 				std::set<std::string> fv;
@@ -416,7 +377,7 @@ namespace hz {
 		{
 			char* file_name = (char*)filename.c_str();
 #ifndef nnDEBUG
-			printf("check_make_path: %s\n", file_name);
+			//printf("check_make_path: %s\n", file_name);
 #endif // DEBUG
 			char* t = file_name;
 			char chr = '/';
@@ -426,11 +387,19 @@ namespace hz {
 				chr = *ch;
 			}
 
-			for (; t;)
+			for (; t && *t; t++)
 			{
-				t = strchr(++t, chr);
-				if (t)
+				//t = strchr(++t, chr);
+				for (; !(*t == '/' || *t == '\\') && *t; t++);
+				if (*t)
+				{
+					chr = *t;
 					*t = 0;
+				}
+				else
+				{
+					break;
+				}
 				if (access(file_name, 0) != -1)
 				{
 					if (t)
@@ -466,6 +435,15 @@ namespace hz {
 			}
 			return ret == 0;
 		}
+
+		static int64_t file_size(FILE* fp)
+		{
+			int64_t size = 0;
+			fseeki64(fp, 0L, SEEK_END);
+			size = ftelli64(fp);
+			fseeki64(fp, 0L, SEEK_SET);
+			return size;
+		}
 		static bool read_binary_file(std::string filename, std::vector<char>& result, bool ismv = false)
 		{
 			int64_t size = 0;
@@ -476,6 +454,9 @@ namespace hz {
 #if (defined(VK_USE_PLATFORM_IOS_MVK) || defined(VK_USE_PLATFORM_MACOS_MVK))
 			filename = [[[NSBundle mainBundle]resourcePath] stringByAppendingPathComponent:@(filename)] .UTF8String;
 #endif
+#if 0
+
+
 			filename = s()->getFn(filename);
 #ifdef _WIN32
 			if (filename.find("/"))
@@ -483,6 +464,7 @@ namespace hz {
 				filename = hstring::replace(filename, "/", "\\");
 			}
 #endif
+#endif // 0
 			const char* fn = filename.c_str();
 			FILE* fp = ismv ? 0 : fopen(filename.c_str(), "rb");
 			if (!fp)
@@ -507,7 +489,7 @@ namespace hz {
 #else
 #ifdef MAPVIEW
 				MapView mv;
-				if (mv.openfile(fn))			//打开文件					
+				if (mv.openfile(fn, true))			//打开文件					
 				{
 					size = mv.getFileSize();
 					char* buf = (char*)mv.mapview();	//获取映射内容
@@ -523,15 +505,9 @@ namespace hz {
 				return false;
 #endif
 			}
-#ifdef _WIN32
-			_fseeki64(fp, 0L, SEEK_END);
-			size = _ftelli64(fp);
-			_fseeki64(fp, 0L, SEEK_SET);
-#else			
-			fseeko64(fp, 0L, SEEK_END);
-			size = ftello64(fp);
-			fseeko64(fp, 0L, SEEK_SET);
-#endif // _WIN32
+			fseeki64(fp, 0L, SEEK_END);
+			size = ftelli64(fp);
+			fseeki64(fp, 0L, SEEK_SET);
 			result.resize(size);
 			buff = &result[0];
 			retval = fread(buff, size, 1, fp);
@@ -554,6 +530,10 @@ namespace hz {
 #ifdef _WIN32
 			if (filename[1] != ':')
 				filename = getAP(filename);
+			if (filename.find('/') != std::string::npos) {
+				filename = hstring::replace(filename, "//", "\\");
+				filename = hstring::replace(filename, "/", "\\");
+			}
 #endif // _WIN32
 			check_make_path(getPath(filename.c_str(), pathdrive | pathdir));
 			const char* fn = filename.c_str();
@@ -563,7 +543,7 @@ namespace hz {
 			{
 #ifdef MAPVIEW 
 				MapView mv;
-				if (mv.openfile(fn) || mv.createfile(fn))			//打开文件					
+				if (mv.openfile(fn, false) || mv.createfile(fn))			//打开文件					
 				{
 					mv.creatmap(size);
 					char* buf = (char*)mv.mapview();	//获取映射内容
@@ -577,22 +557,17 @@ namespace hz {
 #endif
 				return false;// "fail to open file: " + filename;
 			}
-#ifdef _WIN32
 			if (is_plus)
-				_fseeki64(fp, pos, SEEK_SET);
-#else			
-			if (is_plus)
-				fseeko64(fp, pos, SEEK_SET);
-#endif // _WIN32
+				fseeki64(fp, pos, SEEK_SET);
 			retval = fwrite(data, size, 1, fp);
 			assert(retval == 1);
 			fclose(fp);
 			return true;
 		}
-		static std::vector<char> read_binary_file(std::string filename, bool ismv = false)
+		static std::vector<char> read_binary_file(std::string filename)
 		{
 			std::vector<char> ret;
-			read_binary_file(filename, ret, ismv);
+			read_binary_file(filename, ret, false);
 			return ret;
 		}
 #ifndef NO_BF 
@@ -616,7 +591,8 @@ namespace hz {
 			return 0;
 		}
 #endif
-		static int BrowseForFolder(const std::string& strCurrentPath, std::function<void(const std::string&)> rfunc, const std::string& title = "")
+
+		static int browse_folder(const std::string& strCurrentPath, std::function<void(const std::string&)> rfunc, const std::string& title = "")
 		{
 #ifdef _WIN32
 			BROWSEINFO bi;
@@ -660,12 +636,18 @@ namespace hz {
 #endif
 			return 0;
 		}
+#define BrowseForFolder browse_folder
+
 #ifdef _WIN32
-		static int openFileName(const std::string& strCurrentPath, const char* filter, HWND hWnd, std::function<void(const std::vector<std::string>&)> rfunc)
+		static int browse_openfile(const std::string& title, const std::string& strCurrentPath, const char* filter, HWND hWnd
+			, std::function<void(const std::vector<std::string>&)> rfunc, int n = 10)
 		{
 			OPENFILENAME opfn;
-			CHAR strFilename[MAX_PATH * 100];//存放文件名  
-											 //初始化  
+			//CHAR strFilename[MAX_PATH * 100];//存放文件名  
+			std::vector<char> sfn;
+			sfn.resize(MAX_PATH * n);
+			CHAR* strFilename = sfn.data();
+			//初始化  
 			ZeroMemory(&opfn, sizeof(OPENFILENAME));
 			opfn.lStructSize = sizeof(OPENFILENAME);//结构体大小  
 			opfn.hwndOwner = hWnd;
@@ -677,10 +659,11 @@ namespace hz {
 			//文件名的字段必须先把第一个字符设为 \0  
 			opfn.lpstrFile = strFilename;
 			opfn.lpstrFile[0] = '\0';
-			opfn.nMaxFile = sizeof(strFilename);
+			opfn.nMaxFile = sfn.size();// sizeof(strFilename);
 			//设置标志位，检查目录或文件是否存在  
 			opfn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_EXPLORER | OFN_NOCHANGEDIR | OFN_ALLOWMULTISELECT;
 			opfn.lpstrInitialDir = strCurrentPath.c_str();
+			opfn.lpstrTitle = title.c_str();
 			// 显示对话框让用户选择文件  
 			if (GetOpenFileName(&opfn))
 			{
@@ -957,7 +940,7 @@ namespace hz {
 											ii++;
 										}
 									}
-									catch (const std::exception & e)
+									catch (const std::exception& e)
 									{
 										printf("router message: %s\n", e.what());
 									}
@@ -1095,84 +1078,35 @@ namespace hz {
 			return ret;
 		}
 	public:
-#ifdef _WIN32
-#ifdef _WATCH_H_
-		static int inotify(const std::vector<std::string>& pathname, uint32_t mask = 0)
-		{
-			CDirectoryWatch::createWatchFile(jsont::AtoW(pathname[0]));
-			return 0;
-		}
-#endif
-#else
-		static int inotify(const std::vector<std::string>& pathname, uint32_t mask = IN_ALL_EVENTS)
-		{
-#define EVENT_NUM 12  
-
-			char* event_str[EVENT_NUM] =
-			{
-				"IN_ACCESS",
-				"IN_MODIFY",
-				"IN_ATTRIB",
-				"IN_CLOSE_WRITE",
-				"IN_CLOSE_NOWRITE",
-				"IN_OPEN",
-				"IN_MOVED_FROM",
-				"IN_MOVED_TO",
-				"IN_CREATE",
-				"IN_DELETE",
-				"IN_DELETE_SELF",
-				"IN_MOVE_SELF"
-			};
-			int fd;
-			int wd;
-			int len;
-			int nread;
-			char buf[BUFSIZ];
-			struct inotify_event* event;
-
-			fd = inotify_init();
-			if (fd < 0)
-			{
-				fprintf(stderr, "inotify_init failed\n");
-				return -1;
-			}
-			for (auto it : pathname)
-			{
-				wd = inotify_add_watch(fd, it.c_str(), mask);
-				if (wd < 0)
-				{
-					fprintf(stderr, "inotify_add_watch %s failed\n", it.c_str());
-					//return -1;
-				}
-			}
-
-			buf[sizeof(buf) - 1] = 0;
-			while ((len = read(fd, buf, sizeof(buf) - 1)) > 0)
-			{
-				nread = 0;
-				while (len > 0)
-				{
-					event = (struct inotify_event*) & buf[nread];
-					for (int i = 0; i < EVENT_NUM; i++)
-					{
-						if ((event->mask >> i) & 1)
-						{
-							if (event->len > 0)
-								fprintf(stdout, "%s --- %s\n", event->name, event_str[i]);
-							else
-								fprintf(stdout, "%s --- %s\n", " ", event_str[i]);
-						}
-					}
-					nread = nread + sizeof(struct inotify_event) + event->len;
-					len = len - sizeof(struct inotify_event) - event->len;
-				}
-			}
-
-			return 0;
-		}
-
-#endif // _WIN32
 	private:
+	};
+
+	class inotify_d
+	{
+	public:
+		enum class ty
+		{
+			tALL,
+			tADDED,
+			tREMOVED,
+			tMODIFIED,
+			tRENAMED_OLD_NAME,
+			tRENAMED_NEW_NAME,
+		};
+	private:
+		std::function<int(const char* name, int nlen, uint32_t m)> _func = nullptr;
+	public:
+		inotify_d();
+
+		virtual ~inotify_d();
+		void init(bool nonblock);
+	public:
+		int  inotify(const std::vector<std::string>& pathname, ty mask = ty::tALL);
+		void set_func(std::function<int(const char* name, int nlen, uint32_t m)>func = nullptr);
+	private:
+		int64_t _fd = 0;
+		std::vector<int> _wds;
+		uint32_t _mask = 0;
 	};
 
 
@@ -1215,7 +1149,7 @@ namespace hz {
 						ds = njson::from_cbor(dsd.begin(), dsd.end());
 						//ds = njson::parse(dsd.data());
 					}
-					catch (njson::exception & e)
+					catch (njson::exception& e)
 					{
 						// output exception information  
 						njson errordata = { {"error","json error"},{"message",e.what()},{"exception_id",e.id} };

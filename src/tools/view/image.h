@@ -38,6 +38,7 @@ if (img1.datasize() == 0)
 #include <string.h>
 #include <thread>
 #include <mutex>
+#include <atomic>
 #include <set>
 #include <string>
 #include <vector>
@@ -56,6 +57,8 @@ if (img1.datasize() == 0)
 #include <unistd.h>  
 #endif
 
+#include <base/hlUtil.h>
+#include <data/json_helper.h>
 //#include "svpng.inc"
 #ifdef LIBPNG
 #include "libpng.h"
@@ -256,7 +259,7 @@ namespace hz
 		std::string savefilename;
 #ifndef M_RES
 		// 是否更新
-		std::atomic_int64_t _upt = 0;
+		std::atomic_int _upt = 0;
 #endif // !__RES__H__
 
 		LockS _locks, _lock_upt, _lk_gif;
@@ -272,7 +275,7 @@ namespace hz
 		std::vector<BufferImageCopy> bufferCopyRegions;
 
 
-		Timer _giftime;
+		Timer_t _giftime;
 		yHist _yh;
 		// 像素区域
 		glm::ivec4 _prc;
@@ -393,8 +396,9 @@ namespace hz
 		}
 
 
-#ifndef M_RES
-		static void destroy(Image* p)
+#if 0
+		ndef M_RES
+			static void destroy(Image* p)
 		{
 			if (p)
 			{
@@ -787,9 +791,9 @@ namespace hz
 		std::wstring AtoW(const std::string str)
 		{
 			if (hz::hstring::IsTextUTF8(str.c_str()))
-				return hz::jsont::utf8_to_wstring(str);
+				return u8_w(str);
 			else
-				return hz::jsont::ansi_to_wstring(str);
+				return gbk_w(str);
 		}
 	public:
 		void draw_line(const glm::ivec4& p, unsigned int color)
@@ -1042,63 +1046,7 @@ namespace hz
 						case E_GIF:
 						};*/
 		}
-		bool load3Dtexture(const std::string& filename)
-		{
-#ifdef _GLI_HEAD_
-			std::vector<char> td;
-			File::read_binary_file(filename, td);
-			if (td.empty())
-			{
-				return false;
-			}
-			gli::texture2d_array tex2DArray(gli::load(td.data(), td.size()));
-			if (!tex2DArray.empty())
-			{
-				resize(static_cast<uint32_t>(tex2DArray.extent().x), static_cast<uint32_t>(tex2DArray.extent().y));
-				layerCount = static_cast<uint32_t>(tex2DArray.layers());
-				mipLevels = static_cast<uint32_t>(tex2DArray.levels());
-				size_t imgsize = tex2DArray.size();
-				_arrayimg.resize(imgsize);
-				memcpy(&_arrayimg[0], tex2DArray.data(), static_cast<size_t>(tex2DArray.size()));
-				// Setup buffer copy regions for each layer including all of it's miplevels
-
-				size_t offset = 0;
-				bufferCopyRegions.clear();
-				clearArray();
-				char* tem = (char*)&_arrayimg[0];
-				std::string fn = File::getPath(filename.c_str(), File::pathdrive | File::pathdir | File::pathfname);
-				for (uint32_t layer = 0; layer < layerCount; layer++)
-				{
-					for (uint32_t level = 0; level < mipLevels; level++)
-					{
-						std::vector<unsigned int>* img = new std::vector<unsigned int>;
-						_array.push_back(img);
-						BufferImageCopy bufferCopyRegion = {};
-						bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-						bufferCopyRegion.imageSubresource.mipLevel = level;
-						bufferCopyRegion.imageSubresource.baseArrayLayer = layer;
-						bufferCopyRegion.imageSubresource.layerCount = 1;
-						bufferCopyRegion.imageExtent.width = static_cast<uint32_t>(tex2DArray[layer][level].extent().x);
-						bufferCopyRegion.imageExtent.height = static_cast<uint32_t>(tex2DArray[layer][level].extent().y);
-						bufferCopyRegion.imageExtent.depth = 1;
-						bufferCopyRegion.bufferOffset = offset;
-
-						bufferCopyRegions.push_back(bufferCopyRegion);
-						img->resize(bufferCopyRegion.imageExtent.width * bufferCopyRegion.imageExtent.height);
-						memcpy(img->data(), tem + offset, bufferCopyRegion.imageExtent.width * bufferCopyRegion.imageExtent.height * 4);
-						savefilename = fn + "/array_" + std::to_string(layer) + "_" + std::to_string(level) + ".png";
-
-						//stbi_write_png_to_func(png_write_func, this, bufferCopyRegion.imageExtent.width, bufferCopyRegion.imageExtent.height, 4, img->data(), 0);
-						// Increase offset into staging buffer for next level / face
-						offset += tex2DArray[layer][level].size();
-
-					}
-				}
-				return true;
-			}
-#endif
-			return false;
-		}
+		bool load3Dtexture(const std::string& filename);
 		void saveImageArray(const std::string& filename, int w, int h)
 		{
 			for (size_t i = 0; i < _array.size(); i++)
@@ -1325,7 +1273,7 @@ namespace hz
 				}
 			}
 		}
-		void copy_lcd_to_image(unsigned char* bit, int pitch, glm::ivec4 rct, bool rgb = false)
+		void copy_lcd_to_image(unsigned char* bit, int pitch, glm::ivec4 rct, unsigned int ac, bool rgb = false)
 		{
 			unsigned int* expanded_data = 0;
 
@@ -1337,6 +1285,7 @@ namespace hz
 			unsigned int* bdata = _data.data();
 			int r = rgb ? 0 : 2, b = rgb ? 2 : 0;
 			//if (pixel_mode == 5)				/*lcd灰度图*/
+
 			{
 				for (j = 0; j < h && (j + posy) < outsize.y; j++)
 				{
@@ -1357,12 +1306,17 @@ namespace hz
 						pc[r] = *pixel++; //r	
 						pc[1] = *pixel++; //g	
 						pc[b] = *pixel++; //b
+						//pc[3] = *pixel++; //b
 						int a = pc[0] + pc[1] + pc[1];
 						a = (a < 0) ? 0 : ((a > 255) ? 255 : ((int)a));
 						if (a > 0)
 						{
-							pc[3] = 255; //a
-							px_blend(&dc[i + posx], uc);
+							pc[3] = 255;
+							//px_blend(&dc[i + posx], uc);
+							auto nc = ac;
+							//px_blend(&nc, uc);
+							px_blend(&uc, ac);
+							dc[i + posx] = uc;
 							//auto pd = &dc[i + posx];
 							//*pd = alpha_blend(*pd, uc);
 							//dc[i + posx] = alpha_blend(dc[i + posx], uc);
@@ -1517,63 +1471,7 @@ namespace hz
 			quality为jpeg品质，1-100
 
 		*/
-		int saveImage(std::string fn, int comp = 4, int quality = 100)
-		{
-			if (_data.empty())
-				return -1;
-			LOCK_R(_locks);
-			std::string ext = File::getPath(fn.c_str(), File::pathext);
-			if (fn.find(":") == std::string::npos)
-			{
-				fn = File::getAP(fn);
-			}
-
-			if (ext == ".bmp")
-			{
-				if (comp == 4)
-					comp = 3;
-				getCompdata(comp);
-				void* d = temp_data.empty() ? (void*)&_data[0] : (void*)&temp_data[0];
-				return stbi_write_bmp(fn.c_str(), (int)width, (int)height, comp, d);
-			}
-			if (ext == ".tga")
-			{
-				return stbi_write_tga(fn.c_str(), (int)width, (int)height, requested_components, &_data[0]);
-			}
-			if (ext == ".jpg")
-			{
-				return stbi_write_jpg(fn.c_str(), (int)width, (int)height, requested_components, &_data[0], quality);
-			}
-			if (ext == ".hdr")
-			{
-				temp_data.resize(width * height * comp * sizeof(float));
-				float* t = (float*)&temp_data[0];
-				for (size_t y = 0; y < height; ++y)
-				{
-					for (size_t x = 0; x < width; ++x)
-					{
-						unsigned int c = _data[y * width + x];
-						unsigned int R = GetRValue(c), G = GetGValue(c), B = GetBValue(c), A = c >> 24;
-						*t++ = R / 255.0f;
-						*t++ = G / 255.0f;
-						*t++ = B / 255.0f;
-						if (comp == 4)
-							*t++ = A / 255.0f;
-					}
-				}
-				return stbi_write_hdr(fn.c_str(), (int)width, (int)height, comp, (float*)&temp_data[0]);
-			}
-			savefilename = fn;
-#ifdef LIBPNG
-			if (ext == ".png")
-			{
-				hz::ImageLibpng ipng;
-			}
-			//return to_rgba();
-#endif
-			return stbi_write_png_to_func(png_write_func, this, (int)width, (int)height, comp, &_data[0], 0);
-			//return stbi_write_png(fn.c_str(), (int)width, (int)height, requested_components, &_data[0], 0);
-		}
+		int saveImage(std::string fn, int comp = 4, int quality = 100);
 #endif
 		std::string png_data()
 		{
@@ -1606,14 +1504,7 @@ namespace hz
 				}
 			}
 		}
-		static void png_write_func(void* context, void* data, int size)
-		{
-			if (context)
-			{
-				Image* p = (Image*)context;
-				File::save_binary_file(p->savefilename, (char*)data, size);
-			}
-		}
+		static void png_write_func(void* context, void* data, int size);
 
 		static void png_write_buf_func(void* context, void* data, int size)
 		{
@@ -1853,88 +1744,7 @@ namespace hz
 		//                                                              //
 		// 从内存或文件加载图像数据解析									//
 		// ************************************************************ //
-		bool GetImageData(const char* filename, size_t len = 0)
-		{
-			LOCK_W(_locks);
-			std::vector<char> file_data;
-			std::string fn;
-			if (len > 0)
-			{
-				file_data.resize(len);
-				memcpy(&file_data[0], filename, len);
-			}
-			else
-			{
-				//hz::Timer t;
-				fn = File::read_binary_file(filename, file_data);
-				//int64_t s = t.elapsed();
-				//LOGW("load %s file time: %lld ms%d\n", filename, s, (int)file_data.size());
-				if (file_data.size() == 0 || fn.empty()) {
-					return false;
-				}
-				_filename = filename;
-			}
-			int img_type = istupian((char*)&file_data[0], file_data.size());
-			if (img_type == E_PNG)
-			{
-#ifdef LIBPNG
-				hz::ImageLibpng ipng;
-				ipng.load(&file_data);
-				if (ipng.getHeight() && ipng.getWidth())
-				{
-					components = 4;
-					resize(ipng.getWidth(), ipng.getHeight());
-					memcpy(&_data[0], ipng.data(), ipng.datasize());
-					return true;
-				}
-#endif
-			}
-			int tmp_width = 0, tmp_height = 0, tmp_z = 0, tmp_components = 0;
-			int* delays = 0;
-			unsigned char* image_data = 0;
-			bool ret = false;
-			if (img_type == E_GIF)
-			{
-				image_data = stbi_load_gif_from_memory(reinterpret_cast<unsigned char*>(&file_data[0]), static_cast<int>(file_data.size()),
-					&delays, &tmp_width, &tmp_height, &tmp_z, &tmp_components, requested_components);
-				_layers = tmp_z;
-				_delays.resize(_layers);
-				memcpy(_delays.data(), delays, sizeof(int) * _layers);
-				stbi_image_free(delays);
-				ret = tmp_z > 0;
-			}
-			else
-			{
-				image_data = stbi_load_from_memory(reinterpret_cast<unsigned char*>(&file_data[0]), static_cast<int>(file_data.size()), &tmp_width, &tmp_height, &tmp_components, requested_components);
-				if ((image_data == nullptr) ||
-					(tmp_width <= 0) ||
-					(tmp_height <= 0) ||
-					(tmp_components <= 0)) {
-					//std::cout << "Could not read image data!" << std::endl;
-					return false;
-				}
-			}
-
-			size_t size = (tmp_width) * (tmp_height) * (requested_components <= 0 ? tmp_components : requested_components);
-			if (tmp_z > 0)
-			{
-				size *= tmp_z;
-			}
-			//width = tmp_width;
-			//height = tmp_height;
-			components = tmp_components;
-			size_t bs = resize(tmp_width, tmp_height, tmp_z) * requested_components;
-			memcpy(&_data[0], image_data, size);
-
-			stbi_image_free(image_data);
-			mipLevels = layerCount = 1;
-			_levels_info.resize(mipLevels);
-			_levels_info[0].width = width;
-			_levels_info[0].height = height;
-			_levels_info[0]._size = size;
-			set_update();
-			return true;
-		}
+		bool GetImageData(const char* filename, size_t len = 0);
 
 		void ab32(unsigned int* pDstBmp, int dst_width, const unsigned int* pSrcBmp, int src_width, int blend_width, int blend_height, unsigned int col)
 		{
@@ -2000,10 +1810,10 @@ namespace hz
 		{
 			float s = 1.0f / 255.0f;
 			return glm::vec4(
-				((in >> COL32_R_SHIFT) & 0xFF)* s,
-				((in >> COL32_G_SHIFT) & 0xFF)* s,
-				((in >> COL32_B_SHIFT) & 0xFF)* s,
-				((in >> COL32_A_SHIFT) & 0xFF)* s);
+				((in >> COL32_R_SHIFT) & 0xFF) * s,
+				((in >> COL32_G_SHIFT) & 0xFF) * s,
+				((in >> COL32_B_SHIFT) & 0xFF) * s,
+				((in >> COL32_A_SHIFT) & 0xFF) * s);
 		}
 
 		unsigned int ColorConvertFloat4ToU32(const glm::vec4& in)
@@ -2365,22 +2175,26 @@ namespace hz
 			below_A = *(pDst + 3);
 			if (below_A == 0)
 			{
-				//below_A = 255;
-				//*pDstBmp = src;
+				*pDstBmp = src;
+				return;
 			}
 			unsigned int uc[] = { below_B - (below_B - above_B) * above_A / 255 ,
 				below_G - (below_G - above_G) * above_A / 255,
 				below_R - (below_R - above_R) * above_A / 255,
 			};
-			*pDst++ = below_B - (below_B - above_B) * above_A / 255;
-			*pDst++ = below_G - (below_G - above_G) * above_A / 255;
-			*pDst++ = below_R - (below_R - above_R) * above_A / 255;
+			unsigned char d[4];
+			d[0] = below_B - (below_B - above_B) * above_A / 255;
+			d[1] = below_G - (below_G - above_G) * above_A / 255;
+			d[2] = below_R - (below_R - above_R) * above_A / 255;
 			auto lsa = pDst;
 			if (below_A == 255)
-				*pDst++ = 255;
+				d[3] = 255;
 			else
-				*pDst++ = below_A - (below_A - above_A) * above_A / 255;
-
+				d[3] = below_A - (below_A - above_A) * above_A / 255;
+			*pDst++ = d[0];
+			*pDst++ = d[1];
+			*pDst++ = d[2];
+			*pDst++ = d[3];
 			return;
 		}
 		void DrawBmp(Image* src, int x, int y, int w, int h, int dx, int dy, unsigned int col = -1)

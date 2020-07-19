@@ -4,10 +4,12 @@
 #ifdef _WIN32
 #include <WinSock2.h>
 #include <windows.h>
+#include <conio.h>
 #endif
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <random>
 //#include <source_location>
 #include <algorithm>
 #include <vector>
@@ -684,6 +686,30 @@ namespace hz
 				*num = i;
 			return rt;
 		}
+		// 随机字符串生成
+
+		static std::string random_str(int64_t n)
+		{
+			if (n < 1)
+			{
+				return "";
+			}
+			static std::string ch = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+			std::string a;
+			//do {
+			//	a.push_back(ch[i % 62]);
+			//	i = (i / 62);
+			//} while (i > 0);
+			static std::mt19937 rng(std::random_device{}());
+			std::uniform_int_distribution<int> dist6(0, 61);
+			for (size_t i = 0; i < n; i++)
+			{
+				int sr = dist6(rng);
+				a.push_back(ch[sr]);
+			}
+			return a;
+		}
+
 	private:
 		static bool IsTextUTF8(char* str, uint64_t length)
 		{
@@ -820,7 +846,7 @@ namespace hz
 			if (iUTF8 > 0)return true;
 			return false;
 		}
-#ifdef _WIN32
+#ifdef _WIN32aaaa
 		static std::wstring AnsiToUnicode(const char* buf)
 		{
 			int len = ::MultiByteToWideChar(CP_ACP, 0, buf, -1, NULL, 0);
@@ -1248,6 +1274,7 @@ namespace hz
 			}
 			return st;
 		}
+#if 0
 		static std::wstring AtoW(const std::string& text)
 		{
 			return (hz::hstring::IsTextUTF8(text.c_str())) ?
@@ -1336,6 +1363,7 @@ namespace hz
 		{
 			return wstring_to_utf8(ansi_to_wstring(src));
 		}
+#endif
 #ifdef _WIN32
 #ifndef _Clipboard_
 #define _Clipboard_
@@ -1343,7 +1371,7 @@ namespace hz
 		static void setClipboard(const char* text, int len)
 		{
 			//打开剪切板
-			if (OpenClipboard(0) & len > 0)
+			if (OpenClipboard(0) && len > 0)
 			{
 				HGLOBAL hClip;
 				TCHAR* pBuf = nullptr;

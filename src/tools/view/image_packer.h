@@ -1,4 +1,4 @@
-#ifndef __image_packer_h__
+ï»¿#ifndef __image_packer_h__
 #define __image_packer_h__
 
 #include <list>
@@ -11,7 +11,7 @@
 #include <thread>  
 #include <queue>  
 #include <functional>
-
+#include <base/print_time.h>
 #ifndef LOCK_R
 #include <shared_mutex>
 typedef std::shared_mutex LockS;
@@ -208,7 +208,7 @@ namespace hz
 	class stb_packer
 	{
 	private:
-		stbrp_context _ctx;
+		stbrp_context _ctx = {};
 		std::vector<stbrp_node> _rpns;
 	public:
 		stb_packer()
@@ -222,7 +222,23 @@ namespace hz
 		{
 			_rpns.resize(width);
 			stbrp_init_target(&_ctx, width, height, _rpns.data(), _rpns.size());
-			setup_allow_out_of_mem(0);
+			stbrp_setup_allow_out_of_mem(&_ctx, 0);
+		}
+		int push_rects(stbrp_rect* rects, int num_rects)
+		{
+
+		}
+		int push_rect(glm::ivec2 rc, glm::ivec2* pos)
+		{
+			stbrp_rect rct = {};
+			rct.w = rc.x;
+			rct.h = rc.y;
+			int ret = stbrp_pack_rects(&_ctx, &rct, 1);
+			if (pos)
+			{
+				*pos = { rct.x,rct.y };
+			}
+			return ret;
 		}
 	public:
 		int pack_rects(stbrp_rect* rects, int num_rects)
@@ -234,12 +250,12 @@ namespace hz
 			stbrp_setup_allow_out_of_mem(&_ctx, allow_out_of_mem);
 		}
 		/*
-		¿ÉÒÔÑ¡Ôñ¿âÓ¦¸ÃÊ¹ÓÃÄÄ¸ö´ò°üÆô·¢Ê½·½·¨¡£²»Í¬
+		å¯ä»¥é€‰æ‹©åº“åº”è¯¥ä½¿ç”¨å“ªä¸ªæ‰“åŒ…å¯å‘å¼æ–¹æ³•ã€‚ä¸åŒ
 
-		Æô·¢Ê½·½·¨½«Îª²»Í¬µÄÊı¾İ¼¯Éú³É¸üºÃ/¸ü²îµÄ½á¹û¡£
+		å¯å‘å¼æ–¹æ³•å°†ä¸ºä¸åŒçš„æ•°æ®é›†ç”Ÿæˆæ›´å¥½/æ›´å·®çš„ç»“æœã€‚
 
-		Èç¹ûÔÙ´Îµ÷ÓÃinit£¬½«ÖØÖÃÎªÄ¬ÈÏÖµ¡£*/
-		void etup_heuristic(int heuristic = 1)
+		å¦‚æœå†æ¬¡è°ƒç”¨initï¼Œå°†é‡ç½®ä¸ºé»˜è®¤å€¼ã€‚*/
+		void setup_heuristic(int heuristic = 1)
 		{
 			stbrp_setup_heuristic(&_ctx, heuristic);
 		}
@@ -251,11 +267,11 @@ namespace hz
 
 #if 1
 	/*
-	Ïä×ÓÀàĞèÒªÓĞÁ½¸ö½á¹¹
+	ç®±å­ç±»éœ€è¦æœ‰ä¸¤ä¸ªç»“æ„
 
-	ÒÀÀµÏî glm
+	ä¾èµ–é¡¹ glm
 
-	//Àı×ÓÍ¼ÏñÀà
+	//ä¾‹å­å›¾åƒç±»
 	class Image
 	{
 	public:
@@ -268,24 +284,24 @@ namespace hz
 		};
 	};
 
-	// ÓÃ·¨
+	// ç”¨æ³•
 	ImagePacker<Image> _box;
-	//ÉèÖÃÄ¬ÈÏ¿é´óĞ¡
+	//è®¾ç½®é»˜è®¤å—å¤§å°
 	_box.set_defmax({ 1024,1024 });
 
-	//°ÑÒ»¸öÍ¼Ïñ¾ØĞÎ×°Ïä·µ»ØÎ»ÖÃ
-	Image* img = 0;//µ¥¸ö×Ö·ûÍ¼Ïñ
-	Image* oi = nullptr;//·µ»Ø×ÖÌåÏä×ÓµÄÍ¼Ïñ
+	//æŠŠä¸€ä¸ªå›¾åƒçŸ©å½¢è£…ç®±è¿”å›ä½ç½®
+	Image* img = 0;//å•ä¸ªå­—ç¬¦å›¾åƒ
+	Image* oi = nullptr;//è¿”å›å­—ä½“ç®±å­çš„å›¾åƒ
 	glm::ivec4 rs = _box.push(img, &oi);
 
-	//Çå¿ÕËùÓĞ
+	//æ¸…ç©ºæ‰€æœ‰
 	_box.clear();
 	*/
-	template<class _Ty = Image, class pr_copy_value = _Ty::copy_image, class pr_create = _Ty::create_size>
+
+	template<typename value_type = Image, typename pr_copy_value = typename value_type::copy_image, typename pr_create = typename value_type::create_size>
 	class ImagePacker :public Res
 	{
 	public:
-		using value_type =_Ty;
 		pr_copy_value value_copy;
 		pr_create value_create;
 		static const int minbn = 2;
@@ -316,7 +332,7 @@ namespace hz
 			{
 				return isfull;
 			}
-			// ²éÑ¯ÊÇ·ñÓĞ¿ÕÏĞ¿é¡¢·Ö¸î¿ÕÏĞ¿é
+			// æŸ¥è¯¢æ˜¯å¦æœ‰ç©ºé—²å—ã€åˆ†å‰²ç©ºé—²å—
 			box_node* find_split_put(glm::ivec2 s, glm::ivec2* ot)
 			{
 				box_node* ret = nullptr;
@@ -328,7 +344,7 @@ namespace hz
 				}
 				if (_size.y >= s.y && _size.x >= s.x)
 				{
-					// ±£´æÅ¼Êı¶ÔÆë
+					// ä¿å­˜å¶æ•°å¯¹é½
 					if (s.y % 2) s.y++;
 					auto trc = _size - s;
 					if (ot)
@@ -345,23 +361,23 @@ namespace hz
 						n.x = _pos.x + s.x;
 						n.y = _pos.y;
 						n.z = trc.x;
-						// ÅĞ¶ÏÊÇ·ñĞèÒªÏòÏÂ·Ö¸î
+						// åˆ¤æ–­æ˜¯å¦éœ€è¦å‘ä¸‹åˆ†å‰²
 						if (_pos.x == 0)
 						{
 							glm::ivec4 nexts = { 0, _pos.y + s.y, _size.x, trc.y };
-							// ÖØĞÂÉèÖÃ±¾¿é´óĞ¡
+							// é‡æ–°è®¾ç½®æœ¬å—å¤§å°
 							set_rect(nexts);
 							n.w = s.y;
 
 							if (n.z >= minbn)
 							{
-								//´´½¨ÓÒ±ß¿ÕÏĞ¿é
+								//åˆ›å»ºå³è¾¹ç©ºé—²å—
 								ret = create(n, _value);
 							}
 						}
 						else if (_size.y - s.y > minbn)
 						{
-							// ·Ö¸îĞ¡¿é
+							// åˆ†å‰²å°å—
 							glm::ivec4 nexts = n;
 							nexts.z = s.x;
 							nexts.w = _size.y - s.y;
@@ -370,7 +386,7 @@ namespace hz
 							n.w = s.y;
 							if (n.z >= minbn)
 							{
-								//´´½¨ÓÒ±ß¿ÕÏĞ¿é
+								//åˆ›å»ºå³è¾¹ç©ºé—²å—
 								ret = create(n, _value);
 							}
 						}
@@ -393,18 +409,21 @@ namespace hz
 		private:
 
 		};
-		//¿ÕÏĞ±í
+		//ç©ºé—²è¡¨
 		std::list<box_node*> _data_free;
 		std::set<value_type*> _box;
 		glm::ivec2 _defmax = { 1024, 1024 };
-		LockS _lock;
+
+		//ç”¨äºæŸ¥æ‰¾åˆé€‚çš„ä½ç½®
+		std::vector<box_node*> _tem;
+		//LockS _lock;
 	public:
 		ImagePacker()
 		{
 		}
 		~ImagePacker()
 		{
-			LOCK_W(_lock);
+			//LOCK_W(_lock);
 			for (auto it : _box)
 			{
 				value_type::destroy(it);
@@ -412,17 +431,21 @@ namespace hz
 		}
 		void maps(std::function<void(value_type*)> func)
 		{
-			LOCK_R(_lock);
+			//LOCK_R(_lock);
 			for (auto it : _box)
 			{
 				func(it);
 			}
 		}
+		value_type* get0()
+		{
+			return *_box.begin();
+		}
 	public:
 		/*
-		todo:°ÑÒ»¸öÍ¼Ïñ¾ØĞÎ×°Ïä·µ»ØÎ»ÖÃ
-		dst ÊÇÔ´Í¼ÏñÇøÓò£¬
-		ivec2 ·µ»Ø×ø±ê
+		todo:æŠŠä¸€ä¸ªå›¾åƒçŸ©å½¢è£…ç®±è¿”å›ä½ç½®
+		dst æ˜¯æºå›¾åƒåŒºåŸŸï¼Œ
+		ivec2 è¿”å›åæ ‡
 		*/
 		value_type* push(value_type* img, glm::ivec4* dst, glm::ivec2* pos)
 		{
@@ -458,7 +481,7 @@ namespace hz
 			}
 			return ret;
 		}
-		// todo°ÑÒ»¸ö¾ØĞÎ¿é×°Ïä·µ»ØÎ»ÖÃ
+		// todoæŠŠä¸€ä¸ªçŸ©å½¢å—è£…ç®±è¿”å›ä½ç½®
 		value_type* push_rect(glm::ivec2 rc, glm::ivec2* pos)
 		{
 			value_type* ret = nullptr;
@@ -479,26 +502,28 @@ namespace hz
 	private:
 		value_type* find_put(const glm::ivec2& s, glm::ivec2* out_pos, value_type* img = nullptr, glm::ivec4* rs = nullptr)
 		{
-			LOCK_W(_lock);
+			//LOCK_W(_lock);
 			std::vector<box_node*> addtem, full;
 			glm::ivec2 pos;
 			glm::ivec4 dst_rect = { 0,0,s.x,s.y };
 			value_type* ret = nullptr;
-			//²éÕÒºÏÊÊµÄÎ»ÖÃ
-			std::vector<box_node*> tem;
 			auto fs = s;
 
 			if (fs.y % 2) fs.y++;
-			for (auto it : _data_free)
+			_tem.clear();
+			//if (_tem.size()!= _data_free.size())
 			{
-				auto c = it->_size - s;
-				if (c.x >= 0 && c.y >= 0 && c.y <= minbn || it->_pos.x == 0)
+				for (auto it : _data_free)
 				{
-					tem.push_back(it);
+					auto c = it->_size - s;
+					if (c.x >= 0 && c.y >= 0 && c.y <= minbn || it->_pos.x == 0)
+					{
+						_tem.push_back(it);
+					}
 				}
 			}
-			std::sort(tem.begin(), tem.end(), [](box_node* bn1, box_node* bn2) { return bn1->_size < bn2->_size; });
-			for (auto it : tem)
+			std::sort(_tem.begin(), _tem.end(), [](box_node* bn1, box_node* bn2) { return bn1->_size < bn2->_size; });
+			for (auto it : _tem)
 			{
 				auto nbn = it->find_split_put(s, &pos);
 				if (pos.x >= 0 && (pos.y >= 0))
@@ -548,7 +573,7 @@ namespace hz
 	public:
 		void clear()
 		{
-			LOCK_W(_lock);
+			//LOCK_W(_lock);
 			for (auto it : _data_free)
 			{
 				box_node::destroy(it);
@@ -577,20 +602,20 @@ namespace hz
 	public:
 		void set_defmax(const glm::ivec2& dm)
 		{
-			LOCK_W(_lock);
+			//LOCK_W(_lock);
 			if (dm.x > 0 && dm.y > 0)
 				_defmax = dm;
 		}
 		glm::ivec2 get_defmax()
 		{
-			LOCK_R(_lock);
+			//LOCK_R(_lock);
 			return _defmax;
 		}
 
-		// Ôö¼Ó¿Õ°×Ïä×Ó
+		// å¢åŠ ç©ºç™½ç®±å­
 		void push_box()
 		{
-			LOCK_W(_lock);
+			//LOCK_W(_lock);
 			auto p = value_create(_defmax.x, _defmax.y);
 			if (p)
 			{
@@ -605,62 +630,70 @@ namespace hz
 	public:
 		static void test_packer()
 		{
-			hz::ImagePacker<hz::Image> packer;							//»º´æ
+			ImagePacker<Image> packer;							//ç¼“å­˜
 			packer.set_defmax({ 512, 512 });
-			std::set<hz::Image*> out;
-			hz::Image* img = hz::Image::create_null(16, 16);
+			std::vector<Image*> out;
+			Image* img = Image::create_null(16, 16);
 
 			static std::default_random_engine random(::time(0));
 			std::uniform_int_distribution<int> dis1(4, 16);
 			std::uniform_int_distribution<int> dis2(50, 255);
 
-			// Ïä×Ó
+			// ç®±å­
 #ifdef STB_RECT_PACK_VERSION
 			stb_packer pack;
 			pack.init_target(512, 512);
+			Image tespack;
+			tespack.resize(512, 512);
 #endif
 			std::vector<stbrp_rect> rcs;
 			rcs.resize(1000);
 			auto rss = rcs.size();
 			int i;
+			std::vector<glm::ivec3> rects;
 			for (i = 0; i < rss; i++)
 			{
 				int tw = dis1(random);
 				int th = dis1(random);
-				auto& rc = rcs[i];
-				rc.w = tw; rc.h = th;
 				glm::vec3 v3;
 				v3.x = dis2(random);
 				v3.y = dis2(random);
 				v3.z = dis2(random);
-				unsigned int col = hz::to_uint(v3);
-				rc.id = col;
-
-				hz::Image* ret = 0;
-				img->resize(tw, th);
-				img->clear_color(col);
-				packer.push(img, &ret);
-				out.insert(ret);
+				unsigned int col = to_uint(v3);
+				rects.push_back({ tw,th,col });
 			}
-#ifdef STB_RECT_PACK_VERSION
-			for (size_t i = 0; i < rss; i++)
 			{
-				pack.pack_rects(&rcs[i], 1);
+				print_time at("my pack");
+				for (auto& it : rects)
+				{
+					glm::ivec2 prs;
+					auto rt = packer.push_rect({ it.x,it.y }, &prs);
+					if (rt)
+					{
+						glm::ivec4 trc = { prs.x,prs.y,it.x,it.y };
+						rt->draw_rect(trc, 0, it.z);
+					}
+				}
 			}
-#endif
-			Image tespack;
-			tespack.resize(512, 512);
-			for (size_t i = 0; i < rss; i++)
 			{
-				auto& it = rcs[i];
-				glm::ivec4 trc = { it.x,it.y,it.w,it.h };
-				tespack.draw_rect(trc, 0, it.id);
+				print_time at("stb pack");
+				for (auto& it : rects)
+				{
+					glm::ivec2 prs;
+					int k = pack.push_rect({ it.x,it.y }, &prs);
+					if (k)
+					{
+						glm::ivec4 trc = { prs.x,prs.y,it.x,it.y };
+						tespack.draw_rect(trc, 0, it.z);
+					}
+				}
 			}
-			out.insert(&tespack);
+			out.push_back(packer.get0());
+			out.push_back(&tespack);
 			i = 0;
 			for (auto it : out)
 			{
-				std::string fn = "test_packer" + std::to_string(i++) + ".png";
+				std::string fn = "test_packer_debug" + std::to_string(i++) + ".png";
 				it->saveImage(fn);
 			}
 		}

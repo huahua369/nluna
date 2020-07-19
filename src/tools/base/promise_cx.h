@@ -7,6 +7,7 @@
 #include <functional>
 #include <vector>
 #include <queue>
+#include <palloc/palloc.h>
 #include "sem.h"
 
 namespace hz {

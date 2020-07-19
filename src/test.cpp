@@ -1,10 +1,14 @@
-#include <WinSock2.h>
+ï»¿#include <WinSock2.h>
 #include <windows.h>
 #include <stdlib.h>
 #define _STD_STR_
 
 #define STB_IMPLEMENTATION
-#include "tools/tools.h"
+
+#include <data/json_helper.h>
+#include <view/image.h>
+#include <view/image_packer.h>
+#include <font/font.h>
 
 static void print_json(const njson& n, int idxs)
 {
@@ -42,25 +46,25 @@ void load_font(hz::Fonts* fts)
 void test_font(int w = 512, int h = 512)
 {
 	hz::Fonts fts;
-	//hz::FontBox<hz::Image> packer;							//»º´æ
+	//hz::FontBox<hz::Image> packer;							//ç¼“å­˜
 	//packer.set_defmax({ w, h });
 	std::set<hz::Image*> out;
 	hz::Image* img = hz::Image::create_null(16, 16);
 	hz::Image* cav = hz::Image::create_null(512, 128);
 	load_font(&fts);
-	auto nsimsun = fts.get_font(u8"ĞÂËÎÌå");
+	auto nsimsun = fts.get_font(u8"æ–°å®‹ä½“");
 	auto rfont = nsimsun;
 
 	double dpi = 96;
 	double fns = 13.0 * dpi / 72.0;
-	std::string str = u8R"({ÓĞÎï»ì³É)";
+	std::string str = u8R"({æœ‰ç‰©æ··æˆ)";
 	glm::ivec4 ot; std::string bittem;
 	hz::Fonts::Bitmap bitmap[1] = {};
 	const char* t = str.c_str();
 	const char* t1 = t, * t2;
 	unsigned int wcp = 0;
 	t = hz::Fonts::get_u8_last(t, &wcp);
-	int gidx = nsimsun->get_glyph_index(wcp, &rfont,0);
+	int gidx = nsimsun->get_glyph_index(wcp, &rfont, 0);
 	//auto bit = rfont->get_glyph_image(gidx, fns, &ot, &bittem, bitmap, true);
 	return;
 }
@@ -68,15 +72,15 @@ int main()
 {
 #if 0
 	FontBox<Image> _box;
-	//ÉèÖÃÄ¬ÈÏ¿é´óĞ¡
+	//è®¾ç½®é»˜è®¤å—å¤§å°
 	_box.set_defmax({ 1024,1024 });
 
-	//°ÑÒ»¸öÍ¼Ïñ¾ØĞÎ×°Ïä·µ»ØÎ»ÖÃ
-	Image* img = 0;//µ¥¸ö×Ö·ûÍ¼Ïñ
-	Image* oi = nullptr;//·µ»Ø×ÖÌåÏä×ÓµÄÍ¼Ïñ
+	//æŠŠä¸€ä¸ªå›¾åƒçŸ©å½¢è£…ç®±è¿”å›ä½ç½®
+	Image* img = 0;//å•ä¸ªå­—ç¬¦å›¾åƒ
+	Image* oi = nullptr;//è¿”å›å­—ä½“ç®±å­çš„å›¾åƒ
 	glm::ivec4 rs = _box.push(img, &oi);
 
-	//Çå¿ÕËùÓĞ
+	//æ¸…ç©ºæ‰€æœ‰
 	_box.clear();
 #endif
 	system("pause");

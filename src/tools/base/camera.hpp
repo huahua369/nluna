@@ -1,4 +1,4 @@
-/*
+ï»¿/*
 * Basic camera class
 *
 * Copyright (C) 2016 by Sascha Willems - www.saschawillems.de
@@ -12,9 +12,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <string>
 #include <vector>
 #include <array>
-#if 1
 
 //#define GLM_FORCE_MESSAGES
 
@@ -24,6 +24,12 @@
 //#define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 //#define GLM_FORCE_LEFT_HANDED
+
+#if (__has_include(<glm/glm.hpp>))
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#else
 #include "glm/glm/glm.hpp"
 #include "glm/glm/gtc/matrix_transform.hpp"
 #include "glm/glm/gtc/type_ptr.hpp"
@@ -457,7 +463,7 @@ namespace hz
 					forward = glm::normalize(forward);
 
 					float moveSpeed = deltaTime * _movementSpeed;
-					//ÉÏÏÂ
+					//ä¸Šä¸‹
 					//position += glm::normalize(glm::cross(camFront, glm::vec3(1.0f, 0.0f, 0.0f))) * moveSpeed;
 					glm::vec3 tp = camFront * moveSpeed;
 					if (keys[KEY_W])
@@ -550,7 +556,7 @@ namespace hz
 		}
 		glm::vec3 getMouse(float x, float y)
 		{
-			float scale_h = tanf(fov) * znear;   //Í¶Ó°´°¿Ú¸ß¶ÈµÄÒ»°ë
+			float scale_h = tanf(fov) * znear;   //æŠ•å½±çª—å£é«˜åº¦çš„ä¸€åŠ
 			float scale_w = _aspect * scale_h;
 
 			glm::vec3 aim = { scale_w * (static_cast<float>(x) / static_cast<float>(_width) * 2.f - 1.f),
@@ -566,21 +572,21 @@ namespace hz
 			U = glm::cross(U, z_target);
 			glm::vec3 V = glm::cross(N, U);
 
-			/*ÒÔÏÂËÄĞĞÊÇ×ø±êÏµĞı×ª¾ØÕó£¬½«ÎïÌåÏÈ½øĞĞ×ø±êÏµÆ½ÒÆ£¬ÔÙ½øĞĞ×ø±êÏµĞı×ª*/
+			/*ä»¥ä¸‹å››è¡Œæ˜¯åæ ‡ç³»æ—‹è½¬çŸ©é˜µï¼Œå°†ç‰©ä½“å…ˆè¿›è¡Œåæ ‡ç³»å¹³ç§»ï¼Œå†è¿›è¡Œåæ ‡ç³»æ—‹è½¬*/
 			glm::mat4 data;
 			data[0][0] = U.x;  data[0][1] = U.y;  data[0][2] = U.z; data[0][3] = 0.0f;
 			data[1][0] = V.x;  data[1][1] = V.y;  data[1][2] = V.z; data[1][3] = 0.0f;
 			data[2][0] = N.x;  data[2][1] = N.y;  data[2][2] = N.z; data[2][3] = 0.0f;
 			data[3][0] = 0.0f; data[3][1] = 0.0f; data[3][2] = 0.0f; data[3][3] = 1.0f;
 
-			glm::mat4 trans = glm::translate(glm::mat4(), glm::vec3(-eye.x, -eye.y, -eye.z));	//×ø±êÏµÆ½ÒÆ¾ØÕó
+			glm::mat4 trans = glm::translate(glm::mat4(), glm::vec3(-eye.x, -eye.y, -eye.z));	//åæ ‡ç³»å¹³ç§»çŸ©é˜µ
 
-			glm::mat4 transTranspose = glm::translate(glm::mat4(), glm::vec3(eye.x, eye.y, eye.z));//×ø±êÏµÆ½ÒÆ¾ØÕóµÄÄæ
-			glm::mat4 vi = glm::transpose(matrices._view);;//Éú³É×ø±êÏµĞı×ª¾ØÕóµÄÄæ
+			glm::mat4 transTranspose = glm::translate(glm::mat4(), glm::vec3(eye.x, eye.y, eye.z));//åæ ‡ç³»å¹³ç§»çŸ©é˜µçš„é€†
+			glm::mat4 vi = glm::transpose(matrices._view);;//ç”Ÿæˆåæ ‡ç³»æ—‹è½¬çŸ©é˜µçš„é€†
 
-			ViewTranspose = transTranspose * vi; //¹Û²ì¾ØÕóµÄÄæ view-1 = (view)-1 = (trans*(*this))-1 = (*this)-1*(trans)-1
+			ViewTranspose = transTranspose * vi; //è§‚å¯ŸçŸ©é˜µçš„é€† view-1 = (view)-1 = (trans*(*this))-1 = (*this)-1*(trans)-1
 
-			return matrices._view * trans;//¹Û²ì¾ØÕó
+			return matrices._view * trans;//è§‚å¯ŸçŸ©é˜µ
 		}
 		bool TestRayOBBIntersection(
 			glm::vec3 ray_origin,        // Ray origin, in world space  
@@ -702,20 +708,20 @@ namespace hz
 
 		}
 		/*
-		»ùÓÚslabµÄÅö×²¼ì²â£ºÔÚ2D¿Õ¼äÖĞslab¿ÉÒÔÀí½âÎªÆ½ĞĞÓÚ×ø±êÖáµÄÁ½ÌõÖ±Ïß¼äµÄÇøÓò£¬3D¿Õ¼äÖĞÎªÆ½ĞĞÓÚxyÆ½Ãæ£¨»òÕßyzÃæ£¬xzÃæ£©µÄÁ½¸öÆ½ÃæÖ®¼äµÄÇøÓò¡£
+		åŸºäºslabçš„ç¢°æ’æ£€æµ‹ï¼šåœ¨2Dç©ºé—´ä¸­slabå¯ä»¥ç†è§£ä¸ºå¹³è¡Œäºåæ ‡è½´çš„ä¸¤æ¡ç›´çº¿é—´çš„åŒºåŸŸï¼Œ3Dç©ºé—´ä¸­ä¸ºå¹³è¡Œäºxyå¹³é¢ï¼ˆæˆ–è€…yzé¢ï¼Œxzé¢ï¼‰çš„ä¸¤ä¸ªå¹³é¢ä¹‹é—´çš„åŒºåŸŸã€‚
 
-ÏÈÍÆµ¼2D¿Õ¼äÖĞµÄÇé¿ö£¬Èç¹ûÒ»ÌõÉäÏßÓëÓĞ³¤·½ĞÎ¹¹³ÉµÄAABBÇøÓòÏà½»£¬Ôò¸ÃÉäÏßÔÚx-slabºÍy-slabÖ®¼äµÄÏß¶ÎÓĞÏà½»£¬ÈçÏÂÍ¼ËùÊ¾£º
-3D¿Õ¼äÖĞÉäÏßÓëAABB°üÎ§ºĞµÄÅö×²¼ì²â
+å…ˆæ¨å¯¼2Dç©ºé—´ä¸­çš„æƒ…å†µï¼Œå¦‚æœä¸€æ¡å°„çº¿ä¸æœ‰é•¿æ–¹å½¢æ„æˆçš„AABBåŒºåŸŸç›¸äº¤ï¼Œåˆ™è¯¥å°„çº¿åœ¨x-slabå’Œy-slabä¹‹é—´çš„çº¿æ®µæœ‰ç›¸äº¤ï¼Œå¦‚ä¸‹å›¾æ‰€ç¤ºï¼š
+3Dç©ºé—´ä¸­å°„çº¿ä¸AABBåŒ…å›´ç›’çš„ç¢°æ’æ£€æµ‹
 
-	  ½ø¶ø¿ÉÒÔÍÆµ¼³ö3D¿Õ¼äÖĞµÄÇé¿ö£¬3D¿Õ¼äÖĞÅĞ¶ÏÉäÏßÊÇ·ñÓë³¤·½Ìå¹¹³ÉµÄAABB°üÎ§ºĞÏà½»µÄ·½·¨ÊÇ£¬ÅĞ¶Ï¸ÃÉäÏßÔÚx-slab,y-slab,z-slabÖ®¼äµÄ²¿·ÖÊÇ·ñÓĞ¹«¹²ÇøÓò¡£
-	 ÉäÏßµÄ·½³Ì¿ÉÒÔ±íÊ¾£ºp0+t*D,ÆäÖĞp0ÎªÉäÏßµÄÔ­µã,DÎªÉäÏßµÄ·½Ïò£¬¼ÙÉèÉäÏßÔÚx-slabÖ®¼äµÄ²¿·Öt·Ö±ğÎªt1ºÍt2,y-slabÖ®¼äµÄ²¿·ÖÎªt3ºÍt4,z-slabÖ®¼äµÄ²¿·ÖÎªt5ºÍt6£¬Ê£ÏÂµÄÎÊÌâ¾ÍÊÇÅĞ¶Ï£¨t1,t2£©,(t3,t4),(t5, t6)ÔÚÊıÖáÉÏÊÇ·ñÓĞ¹«¹²²¿·Ö£¬¼´°ÑÈıÎ¬ÎÊÌâ½µ½âÎªÒ»Î¬ÎÊÌâÈ¥¿¼ÂÇ£¬¹Ø¼üÎÊÌâÊÇÈçºÎÇóµÃ²ÎÊıt.
-	 ÎÒÃÇÖªµÀ£¬Æ½ÃæµÄ·½³ÌÎª X*n = d£¬ÆäÖĞXÎªÆ½ÃæÉÏµÄµã£¬nÎª·¨ÏòÁ¿,dÎªÔ­µãµ½Æ½ÃæµÄÓĞÏò¾àÀë£¬ÉäÏßºÍÆ½ÃæÏà½»£¬¼´ÓĞ¹«¹²µã£¬ÁíÉÏÊöÁ½Ê½ÏàµÈµÃ³ö(p0 + t *D)*n = d£¬µÃ³öt = (d - n*p0)/n * D.ÒòÎªslabÆ½Ãæ·½³ÌÖĞµÄ·¨ÏòÁ¿ÓĞÁ½¸ö·ÖÁ¿ÎªÁã£¬ËùÒÔÉÏÃæµÄ¹«Ê½¿ÉÒÔ½øĞĞ¼ò»¯£º
-¼ÙÉèp0(px,py,pz),D(Dx,Dy,Dz)
-Ôòx-slabÖ®¼äÏß¶ÎµÄtÖµÎª£º£¨d-px£©/Dx
-y-slab¡¢z-slabÒÔ´ËÀàÍÆ¡£
-	Ê£ÏÂµÄÎÊÌâ¾ÍÊÇÇóÈı¶ÔtÖµÖ®¼äÊÇ·ñÓĞ¹«¹²²¿·Ö,·½·¨ÎªÈç¹ûmax(t1, t3, t5)´óÓÚmin(t2, t4, t6)£¬ÔòÃ»ÓĞ¹«¹²²¿·Ö£¬¼´ÉäÏßÓëAABB°üÎ§ºĞ²»Ïà½»£¬·ñÔòÏà½»¡£
+	  è¿›è€Œå¯ä»¥æ¨å¯¼å‡º3Dç©ºé—´ä¸­çš„æƒ…å†µï¼Œ3Dç©ºé—´ä¸­åˆ¤æ–­å°„çº¿æ˜¯å¦ä¸é•¿æ–¹ä½“æ„æˆçš„AABBåŒ…å›´ç›’ç›¸äº¤çš„æ–¹æ³•æ˜¯ï¼Œåˆ¤æ–­è¯¥å°„çº¿åœ¨x-slab,y-slab,z-slabä¹‹é—´çš„éƒ¨åˆ†æ˜¯å¦æœ‰å…¬å…±åŒºåŸŸã€‚
+	 å°„çº¿çš„æ–¹ç¨‹å¯ä»¥è¡¨ç¤ºï¼šp0+t*D,å…¶ä¸­p0ä¸ºå°„çº¿çš„åŸç‚¹,Dä¸ºå°„çº¿çš„æ–¹å‘ï¼Œå‡è®¾å°„çº¿åœ¨x-slabä¹‹é—´çš„éƒ¨åˆ†tåˆ†åˆ«ä¸ºt1å’Œt2,y-slabä¹‹é—´çš„éƒ¨åˆ†ä¸ºt3å’Œt4,z-slabä¹‹é—´çš„éƒ¨åˆ†ä¸ºt5å’Œt6ï¼Œå‰©ä¸‹çš„é—®é¢˜å°±æ˜¯åˆ¤æ–­ï¼ˆt1,t2ï¼‰,(t3,t4),(t5, t6)åœ¨æ•°è½´ä¸Šæ˜¯å¦æœ‰å…¬å…±éƒ¨åˆ†ï¼Œå³æŠŠä¸‰ç»´é—®é¢˜é™è§£ä¸ºä¸€ç»´é—®é¢˜å»è€ƒè™‘ï¼Œå…³é”®é—®é¢˜æ˜¯å¦‚ä½•æ±‚å¾—å‚æ•°t.
+	 æˆ‘ä»¬çŸ¥é“ï¼Œå¹³é¢çš„æ–¹ç¨‹ä¸º X*n = dï¼Œå…¶ä¸­Xä¸ºå¹³é¢ä¸Šçš„ç‚¹ï¼Œnä¸ºæ³•å‘é‡,dä¸ºåŸç‚¹åˆ°å¹³é¢çš„æœ‰å‘è·ç¦»ï¼Œå°„çº¿å’Œå¹³é¢ç›¸äº¤ï¼Œå³æœ‰å…¬å…±ç‚¹ï¼Œå¦ä¸Šè¿°ä¸¤å¼ç›¸ç­‰å¾—å‡º(p0 + t *D)*n = dï¼Œå¾—å‡ºt = (d - n*p0)/n * D.å› ä¸ºslabå¹³é¢æ–¹ç¨‹ä¸­çš„æ³•å‘é‡æœ‰ä¸¤ä¸ªåˆ†é‡ä¸ºé›¶ï¼Œæ‰€ä»¥ä¸Šé¢çš„å…¬å¼å¯ä»¥è¿›è¡Œç®€åŒ–ï¼š
+å‡è®¾p0(px,py,pz),D(Dx,Dy,Dz)
+åˆ™x-slabä¹‹é—´çº¿æ®µçš„tå€¼ä¸ºï¼šï¼ˆd-pxï¼‰/Dx
+y-slabã€z-slabä»¥æ­¤ç±»æ¨ã€‚
+	å‰©ä¸‹çš„é—®é¢˜å°±æ˜¯æ±‚ä¸‰å¯¹tå€¼ä¹‹é—´æ˜¯å¦æœ‰å…¬å…±éƒ¨åˆ†,æ–¹æ³•ä¸ºå¦‚æœmax(t1, t3, t5)å¤§äºmin(t2, t4, t6)ï¼Œåˆ™æ²¡æœ‰å…¬å…±éƒ¨åˆ†ï¼Œå³å°„çº¿ä¸AABBåŒ…å›´ç›’ä¸ç›¸äº¤ï¼Œå¦åˆ™ç›¸äº¤ã€‚
 
-  ´úÂëÈçÏÂ£º
+  ä»£ç å¦‚ä¸‹ï¼š
 //box struct
 struct Box
 {
@@ -747,7 +753,7 @@ glm::vec2 intersectBox(const Ray& ray, const Box& cube)
  return glm::vec2(tNear, tFar);
 }
 
-Èç¹û·µ»ØÖµtNear > tFarÔò²»Ïà½»£¬·ñÔòÉäÏßÓëAABB°üÎ§ºĞÏà½»¡£
+å¦‚æœè¿”å›å€¼tNear > tFaråˆ™ä¸ç›¸äº¤ï¼Œå¦åˆ™å°„çº¿ä¸AABBåŒ…å›´ç›’ç›¸äº¤ã€‚
 		*/
 	};
 #endif

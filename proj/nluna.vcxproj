@@ -69,7 +69,12 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>..\src\tools\;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>..\src\tools\;$(IncludePath)</IncludePath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -125,14 +130,20 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\tools\font.h" />
-    <ClInclude Include="..\src\tools\image_packer.h" />
+    <ClInclude Include="..\src\tools\font\font.h" />
+    <ClInclude Include="..\src\tools\net\curl_cx.h" />
     <ClInclude Include="..\src\tools\tools.h" />
-    <ClInclude Include="..\src\tools\utils_bin.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\test.cpp" />
-    <ClCompile Include="..\src\tools\font.cpp" />
+    <ClCompile Include="..\src\tools\base\promise_cx.cpp" />
+    <ClCompile Include="..\src\tools\base\sem.cpp" />
+    <ClCompile Include="..\src\tools\font\font.cpp" />
+    <ClCompile Include="..\src\tools\net\curl_cx.cpp" />
+    <ClCompile Include="..\src\tools\view\file.cpp" />
+    <ClCompile Include="..\src\tools\view\image.cpp" />
+    <ClCompile Include="..\src\tools\view\mapView.cpp" />
+    <ClCompile Include="..\src\tools\view\utils_info.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
