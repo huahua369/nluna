@@ -1,0 +1,35 @@
+#version 450
+// compute高斯模糊，2pass
+layout (local_size_x = 16, local_size_y = 16) in;
+
+layout (binding = 0, rgba8) uniform readonly image2D inputImage;
+layout (binding = 1, rgba8) uniform image2D outputImage;
+
+const int NW = 5;
+// layout(binding=2) uniform u_UniformBuffer  
+
+layout(push_constant) uniform uPushConstant 
+{
+	vec2  dir;			// H=x, V=y
+	float blurScale;
+	float blurStrength;	
+	float weight[NW];    // {0.227027, 0.1945946, 0.1216216,0.054054,0.016216}
+}upc;
+																																				
+void main ()																																													
+{																																																	
+	ivec2 tc;																																													
+	vec2 dir=upc.dir;	
+	vec2 st=upc.dir*upc.blurScale;																																														
+	tc = ivec2(gl_GlobalInvocationID.xy);
+	//vec2 tex_offset = 1.0 / textureSize(samplerColor, 0) * upc.blurScale; // gets size of single texel
+	vec4 color = imageLoad(inputImage, tc) * upc.weight[0]; // current fragment's contribution
+	vec4  result=color;
+	for(int i = 1; i < NW; ++i,dir+=st)
+	{
+		result += imageLoad(inputImage,  ivec2(tc +dir)) * upc.weight[i] * upc.blurStrength;
+		result += imageLoad(inputImage, ivec2(tc - dir)) * upc.weight[i] * upc.blurStrength;
+	}
+	//result=vec4(0,upc.weight[0],0.0,1);
+	imageStore(outputImage, tc, result);
+}				

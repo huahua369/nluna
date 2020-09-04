@@ -1,0 +1,44 @@
+#version 450
+// compute高斯模糊，2pass
+layout (local_size_x = 16, local_size_y = 16) in;
+
+layout (binding = 0, rgba8) uniform readonly image2D inputImage;
+layout (binding = 1, rgba8) uniform image2D outputImage;
+
+//layout(set=0, binding=1) uniform u_UniformBuffer  
+layout(push_constant) uniform uPushConstant 
+{
+	vec2  dir;			// 水平过滤 { 1.0 , 0 }，垂直过滤 { 0, 1.0 }，
+	float coloc_factor;	// 颜色强度，水平过滤时glowFactor=1.0，垂直过滤时设置4.5之类
+	float wt_normalize;	// (1.0/(1.0+2.0*(0.93 + 0.8 + 0.7 + 0.6 + 0.5 + 0.4 + 0.3 + 0.2 + 0.1)))
+	float gauss[9];		// { 0.93, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1 };	
+}upc;
+																																				
+void main ()																																													
+{																																																	
+	ivec2 tc;																																														
+	int i;																																													
+	vec2 dir;																																													
+	vec2 step5;																																													
+	vec4 color;																																														
+	vec4 color1;																																													
+	vec4 c1;																																													
+	vec4 c2;																																															
+	tc = ivec2(gl_GlobalInvocationID.xy);																																											
+	color1 = imageLoad(inputImage, tc);
+	color = color1 * upc.wt_normalize;	
+	step5 = upc.dir;																																									
+	dir = step5;																																													
+	for (i = 0 ; i < 9; i++, dir = (dir + step5)) 																																													
+	{					
+		c1 = imageLoad(inputImage, ivec2(tc + dir));
+		c2 = imageLoad(inputImage, ivec2(tc - dir));
+		//c1.rgb*=c1.a; c2.rgb*=c1.a;
+		color = ((color + (c1 *(upc.gauss[i] * upc.wt_normalize))) 																																													
+		+ (c2 * (upc.gauss[i] * upc.wt_normalize)));	
+	};				
+	// 垂直过滤设置glowFactor
+	color *= upc.coloc_factor;
+	//color.rgb*=color.a;
+	imageStore(outputImage, tc, color);
+}				
