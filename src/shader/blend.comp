@@ -1,0 +1,37 @@
+#version 450
+layout (local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0, rgba8) uniform readonly image2D srcSampler;
+layout(binding = 1, rgba8) uniform readonly image2D tempSampler;
+layout (binding = 2, rgba8) uniform image2D outputImage;
+
+//layout(set=1, binding=2) uniform u_UniformBuffer  
+layout(push_constant) uniform uPushConstant 
+{
+	vec4  glow_color;
+	float outerGlow;	
+	float innerGlow;
+}upc;
+// 外发光、内发光 设置二选一，为1.0，另一个设置0.0																											
+void main ()																																													
+{ 
+	vec4 color;																																													
+	vec4 s;																																												
+	vec4 sc;	
+	ivec2 uv;
+	uv = ivec2(gl_GlobalInvocationID.xy);
+	s = imageLoad(tempSampler, uv);																																													
+	color = s;																																													
+	sc = imageLoad(srcSampler, uv);																																							
+	color = ((1.0 - ((1.0 - s) * (1.0 - sc))) - sc) * upc.outerGlow + (color * sc) * upc.innerGlow;
+	// 外发光
+    //  c = 1-(1-c)*(1-sc);     //滤色混合（屏幕）
+    //  c-=sc;                  //去掉中间
+    // 内发光
+    //  c*=sc;                  //正片叠底,删除多余像素	
+	color.rgb=upc.glow_color.rgb*upc.glow_color.a;
+	color.rgb*=color.a;
+	sc.rgb*=sc.a;
+	color+=sc;
+	imageStore(outputImage, ivec2(gl_GlobalInvocationID.xy), color);																																												
+}				
