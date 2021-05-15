@@ -140,6 +140,7 @@
     <ClCompile Include="..\src\tools\base\sem.cpp" />
     <ClCompile Include="..\src\tools\font\font.cpp" />
     <ClCompile Include="..\src\tools\net\curl_cx.cpp" />
+    <ClCompile Include="..\src\tools\uvcx\smq.cpp" />
     <ClCompile Include="..\src\tools\view\file.cpp" />
     <ClCompile Include="..\src\tools\view\image.cpp" />
     <ClCompile Include="..\src\tools\view\mapView.cpp" />

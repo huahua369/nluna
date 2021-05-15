@@ -56,5 +56,8 @@
     <ClCompile Include="..\src\tools\net\curl_cx.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\tools\uvcx\smq.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
