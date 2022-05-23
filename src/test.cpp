@@ -21,7 +21,7 @@ static void print_json(const njson& n, int idxs)
 	{
 		str = n.dump();
 	}
-	//str = u8toA(str);
+	//str = u8toA(str);  
 	printf("%s\n", str.c_str());
 }
 void load_font(hz::Fonts* fts)
@@ -46,7 +46,7 @@ void load_font(hz::Fonts* fts)
 void test_font(int w = 512, int h = 512)
 {
 	hz::Fonts fts;
-	//hz::FontBox<hz::Image> packer;							//缓存
+	//hz::FontBox<hz::Image> packer; //缓存
 	//packer.set_defmax({ w, h });
 	std::set<hz::Image*> out;
 	hz::Image* img = hz::Image::create_null(16, 16);

@@ -22,7 +22,7 @@
 #else
 #define VK_CHECK_RESULT(f) { VkResult res = (f); if (res != VK_SUCCESS)	{ std::cout << "Fatal : VkResult is \"" << hz::tools::errorString(res) << "\" in " << __FILE__ << " at line " << __LINE__ << std::endl; assert(res == VK_SUCCESS);}}
 #endif
-//
+//																		
 namespace hz
 {
 	namespace initializers
@@ -746,7 +746,7 @@ namespace hz
 				break;
 
 			case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
-				// Image is a transfer source
+				// Image is a transfer source 
 				// Make sure any reads from the image have been finished
 				imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 				break;
@@ -843,7 +843,7 @@ namespace hz
 		{
 #if defined(_WIN32)
 			MessageBoxA(NULL, message.c_str(), caption.c_str(), MB_OK | MB_ICONERROR);
-#elif defined(__ANDROID__)
+#elif defined(__ANDROID__)	
 			LOGE("Fatal error: %s", message.c_str());
 #else
 			std::cerr << message << "\n";

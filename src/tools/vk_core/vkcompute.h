@@ -1,6 +1,6 @@
-ï»¿/*
-	ä¸»è¦å®ç°ï¼šdvk_compute
-	å‚è€ƒå®ç”¨æ ·ä¾‹void comp_test()
+/*
+	Ö÷ÒªÊµÏÖ£ºdvk_compute
+	²Î¿¼ÊµÓÃÑùÀıvoid comp_test()
 */
 #define _IN_VKC_CX
 
@@ -26,7 +26,7 @@ public:
 	//void setStorageBuffer(const std::string& name, void* buffer);
 };
 #ifdef _IN_VKC_CX
-// todo compute ç€è‰²å™¨
+// todo compute ×ÅÉ«Æ÷
 class dvk_compute
 {
 public:
@@ -132,15 +132,15 @@ public:
 			// MLOGE("Uniform %s size not match, dst=%ud src=%ud", name.c_str(), it->second.dataSize, size);
 			return;
 		}
-		// æ‹·è´æ•°æ®è‡³ringbuffer
+		// ¿½±´Êı¾İÖÁringbuffer
 		//uint8_t* ringCPUData = (uint8_t*)(ringBuffer->GetMappedPointer());
 		//uint64_t ringOffset = ringBuffer->AllocateMemory(it->second.dataSize);
 		//uint64_t bufferSize = it->second.dataSize;
 
-		// æ‹·è´æ•°æ®
+		// ¿½±´Êı¾İ
 		//memcpy(ringCPUData + ringOffset, dataPtr, bufferSize);
 
-		// è®°å½•Offset
+		// ¼ÇÂ¼Offset
 		//dynamicOffsets[it->second.dynamicIndex] = ringOffset;
 	}
 	void SetTexture(const std::string& name, dvk_texture* texture)
@@ -233,12 +233,12 @@ private:
 	}
 	void Prepare()
 	{
-		// åˆ›å»ºdescriptorSet
+		// ´´½¨descriptorSet
 		//descriptorSet = _shader->new_dvkset();
 #if 1
 		auto& bufferParams = _shader->_srinfo.bufferParams;
 		auto& imageParams = _shader->_srinfo.imageParams;
-		// ä»Shaderè·å–Bufferä¿¡æ¯
+		// ´ÓShader»ñÈ¡BufferĞÅÏ¢
 #if 0
 		for (auto it = bufferParams.begin(); it != bufferParams.end(); ++it)
 		{
@@ -266,7 +266,7 @@ private:
 			}
 		}
 #endif
-		// è®¾ç½®Offsetçš„ç´¢å¼•,DynamicOffsetçš„é¡ºåºè·Ÿsetå’Œbindingé¡ºåºç›¸å…³
+		// ÉèÖÃOffsetµÄË÷Òı,DynamicOffsetµÄË³Ğò¸úsetºÍbindingË³ĞòÏà¹Ø
 		dynamicOffsetCount = 0;
 		//std::vector<DVKDescriptorSetLayoutInfo>& setLayouts = _shader->setLayoutsInfo.setLayouts;
 		auto& setlayouts = _shader->_srinfo.bindings;
@@ -305,7 +305,7 @@ private:
 #endif
 		dynamicOffsets.resize(dynamicOffsetCount);
 
-		// ä»Shaderä¸­è·å–Textureä¿¡æ¯ï¼ŒåŒ…å«attachmentä¿¡æ¯
+		// ´ÓShaderÖĞ»ñÈ¡TextureĞÅÏ¢£¬°üº¬attachmentĞÅÏ¢
 		for (auto it = imageParams.begin(); it != imageParams.end(); ++it)
 		{
 			simulateTexture texture = {};
@@ -380,7 +380,7 @@ public:
 	void barrier_mem_compute(bool src_write);
 	void barrier_buffer(VkBuffer bufs, uint32_t size, int src_familyidx, int dst_familyidx, uint32_t srcStageMask, uint32_t dstStageMask, bool access_r2w);
 
-	// srcStageMaskå’ŒdstStageMaskç­‰äº0çš„æ—¶å€™access_r2w =trueæ—¶  srcStageMask=VK_ACCESS_SHADER_READ_BITå’ŒsrcStageMask=VK_ACCESS_SHADER_WRITE_BIT
+	// srcStageMaskºÍdstStageMaskµÈÓÚ0µÄÊ±ºòaccess_r2w =trueÊ±  srcStageMask=VK_ACCESS_SHADER_READ_BITºÍsrcStageMask=VK_ACCESS_SHADER_WRITE_BIT
 	void barrier_image(dvk_texture* img, int src_familyidx, int dst_familyidx
 		, ImageLayoutBarrier oldLayout, ImageLayoutBarrier newLayout
 		, bool access_r2w, uint32_t srcStageMask = 0, uint32_t dstStageMask = 0);
@@ -418,7 +418,7 @@ public:
 	void bind_ibo16(VkBuffer buffer, VkDeviceSize offset);
 	void bind_ibo32(VkBuffer buffer, VkDeviceSize offset);
 	void bind_vbos(uint32_t firstBinding, uint32_t bindingCount, const VkBuffer* pBuffers, const VkDeviceSize* pOffsets);
-	// ç»‘å®šå•ä¸ªvbo
+	// °ó¶¨µ¥¸övbo
 	void bind_vbo(VkBuffer pBuffer, VkDeviceSize offset, uint32_t firstBinding = 0);
 
 	// draw
@@ -562,8 +562,8 @@ void dvk_cmd::barrier_mem_compute(bool src_write)
 	barrier.memoryBarrierCount = 1;
 	barrier.pMemoryBarriers = &memoryBarrier;
 	vkCmdPipelineBarrier(cmdb,
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // srcStageMask
-		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // dstStageMask
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // srcStageMask            
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, // dstStageMask  
 		0,
 		barrier.memoryBarrierCount, barrier.pMemoryBarriers,
 		barrier.bufferMemoryBarrierCount, barrier.pBufferMemoryBarriers,
@@ -967,7 +967,7 @@ ut_compute* shader_hp::new_compute(dvk_device* dev_, const std::vector<std::stri
 }
 void comp_test()
 {
-	// æ··åˆ
+	// »ìºÏ
 	auto blend_comp = sh->new_compute(dev, { "blend.comp" });
 	auto texfn = opentexfn();
 	if (texfn.empty())
@@ -997,7 +997,7 @@ void comp_test()
 		return;
 	}
 	dvk_texture* compute_targets[6] = {};
-	// åˆ›å»º3ä¸ªè¾“å‡ºimage
+	// ´´½¨3¸öÊä³öimage
 	uint32_t format = 0;// 91;// VK_FORMAT_R16G16B16A16_UNORM;
 	for (size_t i = 0; i < 5; i++)
 	{
@@ -1006,13 +1006,13 @@ void comp_test()
 	auto st = dvk_texture::new_storage2d(dev, tex0->width, tex0->height, true);
 	auto gc1_ubo1 = dvk_buffer::new_ubo(dev, false, 32 * 1024 * 1024 - 2);
 	auto gc1_ubo = dvk_buffer::new_ubo(dev, false, 32 * 1024 * 1024);
-	// åˆ›å»ºcomputeç€è‰²å™¨å®ç°é«˜æ–¯æ¨¡ç³Š
+	// ´´½¨compute×ÅÉ«Æ÷ÊµÏÖ¸ßË¹Ä£ºı
 	ut_compute* gauss_comp = sh->new_compute(dev, { "gauss_blur.comp" });
 	ut_compute* gauss_comp1 = sh->new_compute(dev, { "gauss_blur1.comp" });
-	auto set1 = gauss_comp->new_set();			// pass 1 ç”¨
-	auto set2 = gauss_comp->new_set();			// pass 2 ç”¨
-	auto set_g1 = gauss_comp1->new_set();		// pass 1 ç”¨
-	auto set_g2 = gauss_comp1->new_set();		// pass 2 ç”¨
+	auto set1 = gauss_comp->new_set();			// pass 1 ÓÃ
+	auto set2 = gauss_comp->new_set();			// pass 2 ÓÃ
+	auto set_g1 = gauss_comp1->new_set();		// pass 1 ÓÃ
+	auto set_g2 = gauss_comp1->new_set();		// pass 2 ÓÃ
 	auto set_blend = blend_comp->new_set();
 	set1->write_image("inputImage", tex0);
 	set1->write_image("outputImage", compute_targets[0]);
@@ -1027,8 +1027,8 @@ void comp_test()
 	set_blend->write_image("outputImage", compute_targets[2]);
 
 	struct gauss_info {
-		glm::vec2  dir;			// æ°´å¹³è¿‡æ»¤ { 1.0 / 256.0, 0 }ï¼Œå‚ç›´è¿‡æ»¤ { 0, 1.0 / 256.0 }ï¼Œ
-		float glowFactor = 1.0;	// é¢œè‰²å¼ºåº¦ï¼Œæ°´å¹³è¿‡æ»¤æ—¶glowFactor=1.0ï¼Œå‚ç›´è¿‡æ»¤æ—¶è®¾ç½®4.5ä¹‹ç±»
+		glm::vec2  dir;			// Ë®Æ½¹ıÂË { 1.0 / 256.0, 0 }£¬´¹Ö±¹ıÂË { 0, 1.0 / 256.0 }£¬
+		float glowFactor = 1.0;	// ÑÕÉ«Ç¿¶È£¬Ë®Æ½¹ıÂËÊ±glowFactor=1.0£¬´¹Ö±¹ıÂËÊ±ÉèÖÃ4.5Ö®Àà
 		float wt_normalize = (1.0 / (1.0 + 2.0 * (0.93 + 0.8 + 0.7 + 0.6 + 0.5 + 0.4 + 0.3 + 0.2 + 0.1)));
 		float gauss[9] = { 0.93, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1 };
 	}upc_gauss;
@@ -1055,7 +1055,7 @@ void comp_test()
 		upc_gauss.dir = { 1.0 , 0 };
 		gauss_comp->set_push_constant(cmd1, &upc_gauss, sizeof(gauss_info), 0);
 		cmd1->dispatch(gs.x, gs.y, gs.z);
-		// åŒæ­¥
+		// Í¬²½
 		cmd1->barrier_image(compute_targets[0], 1, 1, hz::ImageLayoutBarrier::ComputeGeneralRW, hz::ImageLayoutBarrier::ComputeGeneralRW, false);
 		gauss_comp->bind(cmd1, set2);
 		//upc.dir = { 0, 1.0 / tex0->_height };
@@ -1063,7 +1063,7 @@ void comp_test()
 		upc_gauss.glowFactor = 1.2;
 		gauss_comp->set_push_constant(cmd1, &upc_gauss, sizeof(gauss_info), 0);
 		cmd1->dispatch(gs.x, gs.y, gs.z);
-		// cmd1->barrier_mem_compute(true);//æ— å…³ç³»ä¸ç”¨åŒæ­¥
+		// cmd1->barrier_mem_compute(true);//ÎŞ¹ØÏµ²»ÓÃÍ¬²½
 		upc_gauss1.dir = { 1.0,0 };
 		gauss_comp1->bind(cmd1, set_g1);
 		gauss_comp1->set_push_constant(cmd1, &upc_gauss1, sizeof(gauss_info1), 0);
@@ -1077,7 +1077,7 @@ void comp_test()
 
 		//cmd1->barrier_image(compute_targets[4], 1, 1, ImageLayoutBarrier::ComputeGeneralRW, ImageLayoutBarrier::ComputeGeneralRW, false);
 		//cmd1->blit_image(st, compute_targets[4]);
-		//// æ··åˆæˆå…‰è¾‰
+		//// »ìºÏ³É¹â»Ô
 		//blend_comp->bind(cmd1, set_blend);
 		//blend_comp->set_push_constant(cmd1, &upc_blend, sizeof(blend_info), 0);
 		//cmd1->dispatch(gs.x, gs.y, gs.z);
