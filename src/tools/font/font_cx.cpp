@@ -1,5 +1,8 @@
 ﻿
+//#include "pch.h"
+
 #include <data/json_helper.h>
+
 #include "font_c.h"
 #include "font_cx.h"
 #include "view/mapView.h"
@@ -77,7 +80,7 @@ namespace hz
 		char* data_to_end = data_to + outsize;
 		char* data_to_next = 0;
 		typedef std::codecvt<wchar_t, char, mbstate_t> convert_facet;
-		mbstate_t out_state = {0};
+		mbstate_t out_state = { 0 };
 		auto result = std::use_facet<convert_facet>(sys_locale).out(
 			out_state, data_from, data_from_end, data_from_next,
 			data_to, data_to_end, data_to_next);
@@ -155,8 +158,8 @@ namespace hz
 
 	void Fonts::lcd_filter_fir(Bitmap* bitmap, int mode, int weights_type)
 	{
-		static const uint8_t  default_filter[5] = {0x08, 0x4d, 0x56, 0x4d, 0x08};
-		static const uint8_t  light_filter[5] = {0x00, 0x55, 0x56, 0x55, 0x00};
+		static const uint8_t  default_filter[5] = { 0x08, 0x4d, 0x56, 0x4d, 0x08 };
+		static const uint8_t  light_filter[5] = { 0x00, 0x55, 0x56, 0x55, 0x00 };
 
 		const uint8_t* weights = weights_type ? default_filter : light_filter;
 		uint32_t   width = (uint32_t)bitmap->width;
@@ -363,7 +366,7 @@ namespace hz
 		}
 
 		int buildGlyphBitmap(font_impl* font, int glyph, float size, float scale,
-							 int* advance, int* lsb, int* x0, int* y0, int* x1, int* y1)
+			int* advance, int* lsb, int* x0, int* y0, int* x1, int* y1)
 		{
 			FT_Error ftError;
 			FT_GlyphSlot ftGlyph;
@@ -387,7 +390,7 @@ namespace hz
 		}
 
 		void renderGlyphBitmap(font_impl* font, unsigned char* output, int outWidth, int outHeight, int outStride,
-							   float scaleX, float scaleY, int glyph)
+			float scaleX, float scaleY, int glyph)
 		{
 			FT_GlyphSlot ftGlyph = font->font->glyph;
 			int ftGlyphOffset = 0;
@@ -626,14 +629,14 @@ namespace hz
 			int ret = 0;
 			uint8_t* data = info->data;
 			uint32_t index_map = info->index_map;
-			wchar_t wt[] = {(wchar_t)codepoint, 0};
+			wchar_t wt[] = { (wchar_t)codepoint, 0 };
 			uint16_t format = ttUSHORT(data + index_map + 0);
 			// 0*, 2, 4*, 6*, 8, 10, 12*, 13*, 14
 			if (format == 2) {
 				//STBTT_assert(0); // @TODO: high-byte mapping for japanese/chinese/korean
 				if (codepoint > 127)
 				{
-					char st[4] = {0};
+					char st[4] = { 0 };
 					auto astr = w2a(wt, 1, st, 4);
 					char* t = (char*)&codepoint;
 					t[0] = st[1]; t[1] = st[0];
@@ -670,7 +673,7 @@ namespace hz
 		}
 
 		static int buildGlyphBitmap(font_impl* font, int glyph, float scale,
-									int* advance, int* lsb, int* x0, int* y0, int* x1, int* y1)
+			int* advance, int* lsb, int* x0, int* y0, int* x1, int* y1)
 		{
 			stbtt_GetGlyphHMetrics(&font->font, glyph, advance, lsb);
 			stbtt_GetGlyphBitmapBox(&font->font, glyph, scale, scale, x0, y0, x1, y1);
@@ -678,7 +681,7 @@ namespace hz
 		}
 
 		static void renderGlyphBitmap(font_impl* font, unsigned char* output, int outWidth, int outHeight, int outStride,
-									  float scaleX, float scaleY, int glyph)
+			float scaleX, float scaleY, int glyph)
 		{
 			stbtt_MakeGlyphBitmap(&font->font, output, outWidth, outHeight, outStride, scaleX, scaleY, glyph);
 		}
@@ -756,7 +759,7 @@ namespace hz
 			stbtt_GetCodepointHMetrics(&font->font, ch, &advance, &lsb);
 			return glm::ivec2(advance, lsb);
 		}
-		static char* get_glyph_bitmap(font_impl* font, int gidx, double scale, glm::ivec4* ot, std::vector<char>* out, double* advance, glm::vec2 lcd = {1, 1})
+		static char* get_glyph_bitmap(font_impl* font, int gidx, double scale, glm::ivec4* ot, std::vector<char>* out, double* advance, glm::vec2 lcd = { 1, 1 })
 		{
 			//int i, j, baseline, ch = 0;
 			//int baseline;
@@ -801,13 +804,13 @@ namespace hz
 			char* pxs = out->data();
 			memset(pxs, 0, out->size());
 			stbtt_MakeGlyphBitmapSubpixel(&font->font,
-										  (unsigned char*)pxs,
-										  x1 - x0,
-										  y1 - y0,
-										  x1 - x0, // screen width ( stride )
-										  scale * lcd.x, scale * lcd.y,
-										  shift_x, shift_y, // shift x, shift y
-										  gidx);
+				(unsigned char*)pxs,
+				x1 - x0,
+				y1 - y0,
+				x1 - x0, // screen width ( stride )
+				scale * lcd.x, scale * lcd.y,
+				shift_x, shift_y, // shift x, shift y
+				gidx);
 
 			return pxs;
 		}
@@ -1400,7 +1403,7 @@ namespace hz
 			y_pos < 0 || (unsigned int)(y_pos + height) > bit_height)
 		{
 			printf("tt_sbit_decoder_load_byte_aligned:"
-				   " invalid bitmap dimensions\n"); return 0;
+				" invalid bitmap dimensions\n"); return 0;
 		}
 		if (p + ((line_bits + 7) >> 3) * height > limit)
 		{
@@ -1480,7 +1483,7 @@ namespace hz
 			y_pos < 0 || (unsigned int)(y_pos + height) > bit_height)
 		{
 			printf("tt_sbit_decoder_load_bit_aligned:"
-				   " invalid bitmap dimensions\n");
+				" invalid bitmap dimensions\n");
 			return 0;
 		}
 
@@ -1604,7 +1607,7 @@ namespace hz
 				if (get_index(decoder, gidx, x_pos, y_pos))
 				{
 					// 灰度图转RGBA
-					img.copy_to_image((unsigned char*)bitmap->buffer, bitmap->pitch, {x + metrics->horiBearingX, y + metrics->horiAdvance - metrics->horiBearingY, bitmap->width, bitmap->rows}, 0xff0080ff, 1, 0);
+					img.copy_to_image((unsigned char*)bitmap->buffer, bitmap->pitch, { x + metrics->horiBearingX, y + metrics->horiAdvance - metrics->horiBearingY, bitmap->width, bitmap->rows }, 0xff0080ff, 1, 0);
 				}
 			}
 			x += bitmap->width + 2 + metrics->horiBearingX;
@@ -1658,7 +1661,7 @@ namespace hz
 	}
 	Fonts::Fonts()
 	{
-		_packer.set_defmax({1024, 1024});
+		_packer.set_defmax({ 1024, 1024 });
 	}
 
 	Fonts::~Fonts()
@@ -1681,7 +1684,7 @@ namespace hz
 	{
 		std::string ret;
 #ifdef _WIN32
-		char szAppPath[1024] = {0};
+		char szAppPath[1024] = { 0 };
 		GetModuleFileNameA(GetModuleHandleA(""), (char*)szAppPath, 1024);
 		(strrchr((char*)szAppPath, '\\'))[1] = 0;
 		ret = szAppPath;
@@ -2262,8 +2265,8 @@ namespace hz
 	}
 	// 获取BitmapSizeTable
 	njson get_bitmap_size_table(uint8_t* blc, unsigned int count,
-								std::vector<BitmapSizeTable>& bsts,
-								std::vector<std::vector<IndexSubTableArray>>& index_sub_table, std::unordered_map<uint8_t, uint32_t>& ms)
+		std::vector<BitmapSizeTable>& bsts,
+		std::vector<std::vector<IndexSubTableArray>>& index_sub_table, std::unordered_map<uint8_t, uint32_t>& ms)
 	{
 		auto b = blc + 8;
 		bsts.resize(count);
@@ -2297,7 +2300,7 @@ namespace hz
 			it.flags.raw.value = *b;
 			b += 1;
 			get_index_sub_table(blc + it.indexSubTableArrayOffset, it.numberOfIndexSubTables, index_sub_table[i]);
-			n["ppem"] = {it.ppemX, it.ppemY};
+			n["ppem"] = { it.ppemX, it.ppemY };
 			ms[it.ppemY] = i;
 			n["id"] = i;
 			ns.push_back(n);
@@ -2367,16 +2370,23 @@ namespace hz
 			ret = add_font_mem(fd->data(), fd->size(), false);
 		}
 #else
-		MapView* mvfp;
-		{
-			//print_time pti("add_font_file");
-			mvfp = load_file(fn);
-		}
+		//MapView* mvfp;
+		//{
+		//	//print_time pti("add_font_file");
+		//	mvfp = load_file(fn);
+		//}
+		auto mv = new mfile_t();
+		auto md = mv->open_d(fn, true);
 #endif // 0
-		if (mvfp && mvfp->getFileSize())
+		if (!md)
+		{
+			delete mv;
+			return ret;
+		}
+		if (mv && mv->get_file_size())
 		{
 			//print_time pti("add_font_file afm");
-			auto& fdi = fd_data.emplace_back(fd_info{mvfp});
+			auto& fdi = fd_data.emplace_back(fd_info{ mv });
 			ret = add_font_mem(fdi.data(), fdi.size(), false);
 		}
 		return ret;
@@ -2414,7 +2424,7 @@ namespace hz
 				//fot["_lineGap"] = lineGap;
 				auto name = ft.get_font_name(fi);
 				//ftn.push_back(fot);
-				//fp.push_back(fi);
+				fp.push_back(fi);
 				font->fh = fh;
 				font->_index = i;
 				font->ascender = (float)ascent / (float)fh;
@@ -2449,11 +2459,12 @@ namespace hz
 						nsimsun_ascii(font->bitinfo);
 					}
 #endif // !_FONT_NO_BITMAP
-					LOCK_W(_lk);
+					//LOCK_W(_lk);
 					_tbs[font->_name].push_back(font);
 					_fonts.push_back(font);
 				}
-
+				if (on_add_cb)
+					on_add_cb(font->_name.c_str(), font, uptr);
 				//printf("%s\n", font->_aname.c_str());
 				//font->print_info();
 			}
@@ -2467,8 +2478,8 @@ namespace hz
 
 	njson Fonts::get_font_info(int language_id)
 	{
-		LOCK_R(_lk);
-		njson ret;;
+		//LOCK_R(_lk);
+		njson ret;
 		for (auto& [k, v] : _tbs)
 		{
 			for (auto it : v)
@@ -2490,8 +2501,9 @@ namespace hz
 
 	tt_info* Fonts::get_font(const std::string& name, const std::string& st)
 	{
-		LOCK_R(_lk);
+		//LOCK_R(_lk);
 		tt_info* ret = nullptr;
+		tt_info* ret1 = nullptr;
 		auto it = _tbs.find(name);
 		if (it != _tbs.end() && it->second.size())
 		{
@@ -2499,13 +2511,14 @@ namespace hz
 			for (auto& ft : it->second)
 			{
 				auto fst = ft->_style;
+				if (!ret1)ret1 = ft;
 				if (fst == st)
 				{
 					ret = ft;
 				}
 			}
 		}
-		return ret;
+		return ret ? ret : ret1;
 	}
 
 	sfnt_header* get_tag(font_impl_info* font_i, std::string tag)
@@ -2516,13 +2529,13 @@ namespace hz
 
 	void Fonts::set_defontcss(tt_info* f1, tt_info* f2)
 	{
-		LOCK_W(_lk);
+		//LOCK_W(_lk);
 		_decss.set_font2(f1, f2);
 	}
 
 	css_text* Fonts::create_css_text()
 	{
-		LOCK_R(_lk);
+		//LOCK_R(_lk);
 		css_text* p = css_text::create(&_decss);
 		return p;
 	}
@@ -2922,8 +2935,8 @@ namespace hz
 
 			for (i = 0; i < bitmap->rows; i++)
 				memcpy(buffer + (unsigned int)new_pitch * i,
-					   bitmap->buffer + (unsigned int)pitch * i,
-					   len);
+					bitmap->buffer + (unsigned int)pitch * i,
+					len);
 		}
 
 		//free(bitmap->buffer);
@@ -3246,7 +3259,7 @@ namespace hz
 		}
 		// Rasterize
 		//dst = &stash->texData[(glyph->x0 + pad) + (glyph->y0 + pad) * stash->params.width];
-		int gwh[] = {gw - pad * 2, gh - pad * 2};
+		int gwh[] = { gw - pad * 2, gh - pad * 2 };
 		int params_width = gwh[0];
 		int params_height = gwh[1];
 		dst = glyph->resize_bitmap(params_width, params_height);
@@ -3345,8 +3358,8 @@ namespace hz
 	Image* Fonts::push_cache_bitmap(Bitmap* bitmap, glm::ivec2* pos, int linegap, unsigned int col)
 	{
 		int width = bitmap->width + linegap, height = bitmap->rows + linegap;
-		glm::ivec4 rc4 = {0, 0, bitmap->width, bitmap->rows};
-		auto ret = _packer.push_rect({width, height}, pos);
+		glm::ivec4 rc4 = { 0, 0, bitmap->width, bitmap->rows };
+		auto ret = _packer.push_rect({ width, height }, pos);
 		if (ret)
 		{
 			rc4.x = pos->x;
@@ -3375,20 +3388,20 @@ namespace hz
 	{
 		int i = 0;
 		_packer.maps([=, &i](Image* img)
-		{
-			std::string fn = fdn + std::to_string(i);
+			{
+				std::string fn = fdn + std::to_string(i);
 #ifdef __FILE__h__
-			img->saveImage(fn + ".png");
+				img->saveImage(fn + ".png");
 #else
-			auto d = img->png_data();
-			save_binary_file(fn + ".png", d.data(), d.size());
+				auto d = img->png_data();
+				save_binary_file(fn + ".png", d.data(), d.size());
 #endif
-		});
+			});
 	}
 
 	glm::vec3 Fonts::make_outline_y(css_text* ct, size_t n)
 	{
-		glm::ivec3 ret = {0, 0, 0};
+		glm::ivec3 ret = { 0, 0, 0 };
 		std::vector<glm::ivec3> os;
 		css_text* mt = 0;
 		for (size_t i = 0; i < n; i++)
@@ -3482,7 +3495,7 @@ namespace hz
 					auto bimg = push_cache_bitmap(bitmap, &pos, 0, -1);
 					frc.x = pos.x;
 					frc.y = pos.y;
-					fit->set_it(kt.unicode_codepoint, bimg, frc, {rc.x, rc.y}, bitmap->advance, 0, base_line);
+					fit->set_it(kt.unicode_codepoint, bimg, frc, { rc.x, rc.y }, bitmap->advance, 0, base_line);
 					fit->renderfont = rfont;
 				}
 				if (kt.blur_size > 0)
@@ -3493,7 +3506,7 @@ namespace hz
 					Fonts::get_blur(blur, bitmap, kt.blur_size, 1, &bitbuf[1]);
 					auto buimg = push_cache_bitmap(blur, &pos, 0, -1);
 					auto frc = glm::ivec4(pos.x, pos.y, blur->width, blur->rows);
-					fit->set_it(kt.unicode_codepoint, buimg, frc, {rc.x, rc.y}, bitmap->advance, kt.blur_size, base_line);
+					fit->set_it(kt.unicode_codepoint, buimg, frc, { rc.x, rc.y }, bitmap->advance, kt.blur_size, base_line);
 					fit->renderfont = rfont;
 				}
 				if (ps.size())
@@ -3594,12 +3607,12 @@ namespace hz
 				if (info->blur_size > 0 && ftits.size() > 1)
 				{
 					auto bft = ftits[1];
-					glm::ivec2 dps = {kern + tpx + bft->_baseline.x + info->blur_pos.x - info->blur_size,
+					glm::ivec2 dps = { kern + tpx + bft->_baseline.x + info->blur_pos.x - info->blur_size,
 						py + dbl + bft->_baseline.y + info->blur_pos.y - info->blur_size
 					};
 					info->dst->draw_image2(bft->_image, bft->_rect, dps, info->color_blur);
 				}
-				glm::ivec2 dps = {kern + tpx + ftit->_baseline.x, py + dbl + ftit->_baseline.y};
+				glm::ivec2 dps = { kern + tpx + ftit->_baseline.x, py + dbl + ftit->_baseline.y };
 				info->dst->draw_image2(ftit->_image, ftit->_rect, dps, info->color);
 				adv = ftit->_advance;
 			}
@@ -3627,11 +3640,11 @@ namespace hz
 					// 灰度图转RGBA
 					if (info->blur_size > 0)
 					{
-						glm::ivec4 brc = {kern + tpx + rc.x + info->blur_pos.x - info->blur_size, py + dbl + rc.y + info->blur_pos.y - info->blur_size,
-							cpbit->width, cpbit->rows};
+						glm::ivec4 brc = { kern + tpx + rc.x + info->blur_pos.x - info->blur_size, py + dbl + rc.y + info->blur_pos.y - info->blur_size,
+							cpbit->width, cpbit->rows };
 						info->dst->copy_to_image(cpbit->buffer, cpbit->pitch, brc, info->color_blur, cpbit->pixel_mode, 0, true);
 					}
-					glm::ivec4 frc = {kern + tpx + rc.x, py + dbl + rc.y, bitmap->width, bitmap->rows};
+					glm::ivec4 frc = { kern + tpx + rc.x, py + dbl + rc.y, bitmap->width, bitmap->rows };
 					if (info->lcd_type)
 					{
 						lcd_filter_fir(bitmap, 0, 0);
@@ -3860,11 +3873,11 @@ namespace hz
 					auto bft = ftits[1];
 					if (bft)
 					{
-						glm::ivec2 dps = {tpx + bft->_baseline.x + csst->blur_pos.x - fk.blur_size,
-							py + dbl + bft->_baseline.y + csst->blur_pos.y - fk.blur_size};
+						glm::ivec2 dps = { tpx + bft->_baseline.x + csst->blur_pos.x - fk.blur_size,
+							py + dbl + bft->_baseline.y + csst->blur_pos.y - fk.blur_size };
 						draw_image_info dii;
 						dii.user_image = bft->_image;
-						dii.a = {dps.x + kern, dps.y, bft->_rect.z, bft->_rect.w};
+						dii.a = { dps.x + kern, dps.y, bft->_rect.z, bft->_rect.w };
 						dii.rect = bft->_rect;
 						dii.col = csst->color_blur;
 						dii.unser_data = unicode_codepoint;
@@ -3873,10 +3886,10 @@ namespace hz
 						vblurs.push_back(dii);
 					}
 				}
-				glm::ivec2 dps = {tpx + ftit->_baseline.x, py + dbl + ftit->_baseline.y};
+				glm::ivec2 dps = { tpx + ftit->_baseline.x, py + dbl + ftit->_baseline.y };
 				draw_image_info dii;
 				dii.user_image = ftit->_image;
-				dii.a = {dps.x + kern, dps.y, ftit->_rect.z, ftit->_rect.w};
+				dii.a = { dps.x + kern, dps.y, ftit->_rect.z, ftit->_rect.w };
 				dii.rect = ftit->_rect;
 				dii.col = csst->color;
 				dii.unser_data = unicode_codepoint;
@@ -3899,7 +3912,7 @@ namespace hz
 					adv = ((int64_t)spc.z);
 				}
 			}
-			vpos->push_back({adv, py});
+			vpos->push_back({ adv, py });
 			tpx += adv + spaces;
 		}
 		//njson posn, dif;
@@ -3963,7 +3976,7 @@ namespace hz
 		{
 			return;
 		}
-		glm::vec2 texsize = {info->user_image->width, info->user_image->height};
+		glm::vec2 texsize = { info->user_image->width, info->user_image->height };
 		auto rect = info->rect;
 		auto a = info->a;
 		auto sliced = info->sliced;
@@ -3976,7 +3989,7 @@ namespace hz
 		{
 			rect.w = a.w;
 		}
-		glm::ivec2 dpos = {a.x, a.y};
+		glm::ivec2 dpos = { a.x, a.y };
 		dst->draw_image2(info->user_image, rect, dpos, info->col);
 
 	}
@@ -4037,7 +4050,7 @@ namespace hz
 		{
 			auto cs = font->get_char_extent(codepoint, csst->get_font_size(), csst->get_font_dpi(), csst->get_font_family());
 			int c = t - str;
-			ret = {cs.x, cs.y, c};
+			ret = { cs.x, cs.y, c };
 		}
 		return ret;
 	}
@@ -4068,7 +4081,7 @@ namespace hz
 		ret._size.z = rh;
 		glm::ivec2 brc;
 		ret.mk_last_line(t);
-		ret._ycpos.push_back({0, ret._ystr.size()});
+		ret._ycpos.push_back({ 0, ret._ystr.size() });
 		auto ycposit = ret._ycpos.rbegin();
 		ret.pushy(rh, my, t, brc, rh);
 		for (; *t && i < count; i++)
@@ -4077,7 +4090,7 @@ namespace hz
 			{
 				t++;
 				brc.x = 0; ret.mk_last_line(t);
-				ret._ycpos.push_back({0, ret._ystr.size()});
+				ret._ycpos.push_back({ 0, ret._ystr.size() });
 				ycposit = ret._ycpos.rbegin();
 				ret.pushy(rh, my, t, brc, rh); my = 0;
 				continue;
@@ -4141,10 +4154,10 @@ namespace hz
 					glm::ivec2 pos;
 					int width = bitmap->width + linegap, height = bitmap->rows + linegap;
 					auto img = ctx->push_cache_bitmap(bitmap, &pos);
-					glm::ivec4 rc4 = {pos.x, pos.y, bitmap->width, bitmap->rows};
+					glm::ivec4 rc4 = { pos.x, pos.y, bitmap->width, bitmap->rows };
 					if (img)
 					{
-						rp = rfont->push_gcache(glyph_index, fns, img, rc4, {rc.x, rc.y});
+						rp = rfont->push_gcache(glyph_index, fns, img, rc4, { rc.x, rc.y });
 						if (rp)rp->advance = bitmap->advance;
 					}
 				}
@@ -4155,7 +4168,7 @@ namespace hz
 		return ret;
 	}
 	glm::ivec3 Fonts::mk_fontbitmap(tt_info* font, unsigned int glyph_index, unsigned int unicode_codepoint
-									, int fns, glm::ivec2 pos, unsigned int col, Image* outimg)
+		, int fns, glm::ivec2 pos, unsigned int col, Image* outimg)
 	{
 		int lcd_type = 0;
 		int linegap = 0;
@@ -4173,7 +4186,7 @@ namespace hz
 			if (bit && outimg)
 			{
 				int width = bitmap->width + linegap, height = bitmap->rows + linegap;
-				glm::ivec4 rc4 = {0, 0, bitmap->width, bitmap->rows};
+				glm::ivec4 rc4 = { 0, 0, bitmap->width, bitmap->rows };
 				auto ret = outimg;
 				if (ret)
 				{
@@ -4211,7 +4224,7 @@ namespace hz
 		mx += x;
 		if (!_last || _last->weight != x || _last->rtl != rtl)
 		{
-			_lastys->push_back({x, 0, rtl});
+			_lastys->push_back({ x, 0, rtl });
 			_last = _lastys->data() + _lastys->size() - 1;
 		}
 		_last->n++;
@@ -4235,9 +4248,9 @@ namespace hz
 		_size.x = std::max(mx, _size.x);
 		_size.y += height;// _size.z;
 		if (y < 0)return;
-		_ystr.push_back({0, 0, autobr, bt});
+		_ystr.push_back({ 0, 0, autobr, bt });
 		if (!_lasty || _lasty->weight != y) {
-			_y.push_back({y, 0});
+			_y.push_back({ y, 0 });
 			_lasty = &_y[_y.size() - 1];
 		}
 		mx = 0;
@@ -4272,6 +4285,8 @@ namespace hz
 		const char* ret1 = 0;
 		size_t outn = 0;
 		size_t ys = _ystr.size();
+		if (first > second)
+			std::swap(first, second);
 		if (first.y < ys)
 		{
 			auto& it = _ystr[first.y];
@@ -4303,8 +4318,10 @@ namespace hz
 			auto& it = _ystr[i];
 			outn += it.n;
 		}
-		if (rlen)*rlen = outn;
-		if (rsize)*rsize = ret1 - ret;
+		if (rlen)
+			*rlen = outn;
+		if (rsize && ret && ret1)
+			*rsize = ret1 - ret;
 		return ret;
 	}
 	size_t text_extent::get_substr(glm::uvec2 first, glm::uvec2 second, std::string& out, const char** pstr)
@@ -4313,8 +4330,10 @@ namespace hz
 		auto str = get_substr(first, second, &rlen, &rsize);
 		if (rsize > 0)
 		{
-			out.append(str, str + rsize);
-			*pstr = str;
+			if (str)
+				out.append(str, str + rsize);
+			if (pstr)
+				*pstr = str;
 		}
 		return rsize;
 	}
@@ -4351,7 +4370,7 @@ namespace hz
 	}
 	// 多光标
 	glm::ivec2 text_extent::get_cpos2(int idx) {
-		glm::ivec2 ret = {-1, -1};
+		glm::ivec2 ret = { -1, -1 };
 		do
 		{
 			if (idx < 0) { idx = 0; }
@@ -4371,10 +4390,24 @@ namespace hz
 	glm::ivec2 text_extent::cpos2te(glm::ivec2 cp)
 	{
 		cp -= 1;
-		if (cp.x < 0 || cp.y < 0 || cp.y >= _ycpos.size())
+		if (cp.x < 0)
 		{
-			assert(0);
-			return {-1, -1};
+			cp.x = 0;
+		}
+		if (cp.y > _ycpos.size())
+		{
+			cp.y = _ycpos.size();
+			cp.y--;
+			//assert(0);
+			//return { -1, -1 };
+		}
+		if (cp.y < 0)
+		{
+			cp.y = 0;
+		}
+		if (_ycpos.empty() || cp.y >= _ycpos.size())
+		{
+			return { 0, 0 };
 		}
 		auto ycp = _ycpos[cp.y];
 		int xx = cp.x;
@@ -4392,7 +4425,7 @@ namespace hz
 			}
 		}
 		//printf("\t%d,%d转换%d,%d\n", cp.x, cp.y, xx, yy);
-		return glm::ivec2{xx, yy};
+		return glm::ivec2{ xx, yy };
 	}
 	glm::ivec2 text_extent::get_cpos()
 	{
@@ -4401,7 +4434,7 @@ namespace hz
 
 	glm::ivec2 text_extent::te2cpos2(const glm::ivec2& cp)
 	{
-		glm::ivec2 ret = {1, 1};
+		glm::ivec2 ret = { 1, 1 };
 		if (_ystr.empty())
 		{
 			return ret;
@@ -4601,7 +4634,7 @@ namespace hz
 			}
 #if 1
 			// 本rtl块范围
-			glm::ivec2 r = {nv, 0};
+			glm::ivec2 r = { nv, 0 };
 			// 获取 ic前
 			for (int i = ic - 1; i >= 0; i--)
 			{
@@ -4644,16 +4677,20 @@ namespace hz
 				mtc += it.n;
 			}
 			tc = mtc;
+#ifdef DEBUG
 			printf("rtl: %d\t%d\n", r.x, r.y);
+#endif // DEBUG
 #endif
 			break;
 		}
 		if (tc < 1)
 		{
+#ifdef DEBUG
 			printf("X:\t%d\t%d\n", tc, px);
+#endif // DEBUG
 			tc = 0; px = 0;
 		}
-		return glm::ivec2{tc, px};
+		return glm::ivec2{ tc, px };
 	}
 	glm::ivec2 text_extent::get_idx(std::vector<item_t>& v, int pos, float inv, int* o)
 	{
@@ -4687,7 +4724,7 @@ namespace hz
 		{
 			rtl = rtl;
 		}
-		return glm::ivec2{tc, px};
+		return glm::ivec2{ tc, px };
 	}
 	glm::ivec3 get_idx2(std::vector<text_extent::item_t>& v, int idx)
 	{
@@ -4714,7 +4751,7 @@ namespace hz
 			tc += it.n;
 			c -= it.n;
 		}
-		return glm::ivec3{tc, px, last};
+		return glm::ivec3{ tc, px, last };
 	}
 	template<class T1>
 	bool it_cb(T1& it, glm::ivec4& ot, bool is)
@@ -4878,7 +4915,7 @@ namespace hz
 	// 获取坐标在文本的行列位置return{字符位置xy，光标坐标zw}当前行高height
 	glm::ivec4 text_extent::get_pos_idx(glm::ivec2 pos, bool* is_range_, glm::ivec2* cp)
 	{
-		glm::ivec4 ret = {-1, -1, -1, -1};
+		glm::ivec4 ret = { -1, -1, -1, -1 };
 		int height = 0;
 		bool ir = true;
 		glm::uvec2 py = get_idx(_y, pos.y, 0.0f, &height);	// 判断在哪行
@@ -4980,7 +5017,7 @@ namespace hz
 	// 返回光标坐标
 	glm::ivec4 text_extent::get_cursor_idx(glm::ivec2 idx)
 	{
-		glm::ivec4 ret = {-1, -1, -1, -1};
+		glm::ivec4 ret = { -1, -1, -1, -1 };
 		int height = 0;
 		bool ir = true;
 		glm::uvec3 py = {};
@@ -5061,7 +5098,7 @@ namespace hz
 				for (size_t k = 0; k < it.n; k++)
 				{
 					oty += it.weight;
-					av.push_back({lps, oty, it.rtl ? 1 : 0});
+					av.push_back({ lps, oty, it.rtl ? 1 : 0 });
 					lps = oty;
 				}
 			}
@@ -5081,7 +5118,7 @@ namespace hz
 		{
 			auto [x, z, rtl] = av[i];
 			if (x > z)std::swap(x, z);
-			ot.push_back({x, size.y, z - x, size.x});
+			ot.push_back({ x, size.y, z - x, size.x });
 		}
 		if (ot.size() > 3)
 		{
@@ -5109,7 +5146,7 @@ namespace hz
 			auto& vx = get_av(i);
 			glm::ivec3 ry = get_idx2(_y, y++);
 			int h = height > 0 ? height : ry.z;
-			vx_for(vx, x1, x2, {h, ry.y}, outvd);
+			vx_for(vx, x1, x2, { h, ry.y }, outvd);
 		}
 	}
 
@@ -5179,7 +5216,7 @@ namespace hz
 	{
 		LOCK_R(_lock);
 		std::string ret;
-		int ls[] = {language, 1033};
+		int ls[] = { language, 1033 };
 
 		for (int i = 0; i < 2 && ret.empty(); i++)
 		{
@@ -5192,6 +5229,32 @@ namespace hz
 					if (p[j]->name_id == idx)
 					{
 						ret = (p[j]->get_name());
+					}
+				}
+			}
+		}
+		return ret;
+	}
+	size_t tt_info::get_info_strv(int language, int idx, std::vector<uint16_t>& buf)
+	{
+		//LOCK_R(_lock);
+		size_t ret = 0;
+		int ls[] = { language, 1033 };
+
+		for (int i = 0; i < 2; i++)
+		{
+			auto it = _detail.find(ls[i]);
+			if (it != _detail.end())
+			{
+				auto& p = it->second;
+				for (size_t j = 0; j < p.size(); j++)
+				{
+					if (p[j]->name_id == idx)
+					{
+						auto pn = (p[j]->name_);
+						ret = pn.size();
+						buf.resize(ret);
+						memcpy(buf.data(), pn.data(), ret * 2);
 					}
 				}
 			}
@@ -5297,7 +5360,7 @@ namespace hz
 				}
 				out_bitmap->buffer = (unsigned char*)out->data();
 				Image tem[1] = {};
-				img->getBox({px, py, bc.y, bc.x}, tem);
+				img->getBox({ px, py, bc.y, bc.x }, tem);
 				auto td = tem->data();
 				auto ti = tem->dsize();
 				for (size_t i = 0; i < ti; i++)
@@ -5476,7 +5539,7 @@ namespace hz
 			ft_key_s key2;
 			key2.u = key->u;
 			//key2.v.blur_size = 0;
-			std::unordered_map<uint64_t, ft_item*>* ct[2] = {&_cache_table, &_cache_table1};
+			std::unordered_map<uint64_t, ft_item*>* ct[2] = { &_cache_table, &_cache_table1 };
 			do {
 				//	key2.v.is_bitmap = bits;
 				auto it1 = ct[0]->find(key2.u);
@@ -5525,7 +5588,7 @@ namespace hz
 			int x0 = 0, y0 = 0, x1 = 0, y1 = 0, advance, lsb;
 			font_dev::buildGlyphBitmap(rfont->_font, g, scale, &advance, &lsb, &x0, &y0, &x1, &y1);
 			double adv = scale * advance;
-			ret = {x1 - x0, y1 - y0, adv};
+			ret = { x1 - x0, y1 - y0, adv };
 			LOCK_W(_lock);
 			_char_lut[cs.u] = ret;
 		}
@@ -5552,6 +5615,34 @@ namespace hz
 					str = font_dev::get_glyph_index(it->_font, u8str, &g);
 					if (g > 0) {
 						*renderFont = it;
+						break;
+					}
+				}
+			}
+			// It is possible that we did not find a fallback glyph.
+			// In that case the glyph index 'g' is 0, and we'll proceed below and cache empty glyph.
+		}
+		else
+		{
+			*renderFont = this;
+		}
+		*oidx = g;
+		return str;
+	}
+	const char* tt_info::get_glyph_index_u8(const char* u8str, int* oidx, tt_info** renderFont, familys_t* fbs)
+	{
+		// Create a new glyph or rasterize bitmap data for a cached glyph.
+		int g = 0;
+		auto str = font_dev::get_glyph_index(_font, u8str, &g);
+		// Try to find the glyph in fallback fonts.
+		if (g < 1) {
+			if (fbs)
+			{
+				for (size_t i = 0; i < fbs->count; i++)
+				{
+					str = font_dev::get_glyph_index(fbs->familys[i]->_font, u8str, &g);
+					if (g > 0) {
+						*renderFont = fbs->familys[i];
 						break;
 					}
 				}
@@ -5789,7 +5880,7 @@ namespace hz
 #endif // !nnDEBUG
 		// 位图数据表ebdt
 		b = fc + ebdt_table->offset;
-		glm::ivec2 version = {stb_font::ttUSHORT(b + 0), stb_font::ttUSHORT(b + 2)};
+		glm::ivec2 version = { stb_font::ttUSHORT(b + 0), stb_font::ttUSHORT(b + 2) };
 		bitinfo->_sbit_table = sbit_table;
 		bitinfo->_ebdt_table = ebdt_table;
 		bitinfo->_ebsc_table = ebsc_table;
@@ -5835,7 +5926,7 @@ namespace hz
 			{
 				// 解析轮廓并光栅化
 				double advance = height;
-				glm::vec2 lcds[] = {{1, 1}, {3, 1}, {1, 3}, {4, 1, }};
+				glm::vec2 lcds[] = { {1, 1}, {3, 1}, {1, 3}, {4, 1, } };
 				font_dev::get_glyph_bitmap(_font, gidx, scale, ot, out, &advance, lcds[lcd_type]);
 				if (bitmap)
 				{
@@ -5929,7 +6020,7 @@ namespace hz
 		glm::ivec3 ret;
 		double scale = get_scale_height(height);
 		double f = hhea.ascender;
-		double ba = ceil(f * scale);
+		double ba = floor(f * scale);
 		f += abs(hhea.descender);
 		ret.z = ba;
 		ret.y = ceil(f * scale);	// 向上取整
@@ -5961,8 +6052,8 @@ namespace hz
 	{
 		float scale = get_scale_height(height);
 		double f = hhea.ascender;
-		return ceil(f * scale);
-		//return floor(f * scale); // 向下取整
+		//return ceil(f * scale);
+		return floor(f * scale); // 向下取整
 	}
 	int tt_info::get_xmax_extent(double height, int* line_gap)
 	{
@@ -6024,26 +6115,40 @@ namespace hz
 			name_a.assign(temp, length_);
 		}
 		ndata.assign(temp, length_);
+		auto ss = length_ / 2;
+
 		name_.assign((wchar_t*)name, length_ / 2);
 	}
 	std::string tt_info::info_one::get_name(bool isu8)
 	{
-		std::string n;
+		std::string n, gbkstr, u8str, wstr;
 		if (encoding_id)
 		{
-#ifdef __json_helper_h__
-#ifdef _STD_STR_
-			n = isu8 ? w_u8(to_wstr(name_, true)) : w_gbk(to_wstr(name_, true));
-#else
-			n = isu8 ? w_u8(name_.to_wstr(true)) : w_gbk(name_.to_wstr(true));
-#endif
-#else
-#ifdef _STD_STR_
-			n = isu8 ? w_u8(to_wstr(name_, true)) : w_gbk(to_wstr(name_, true));
-#else
-			n = isu8 ? w_u8(name_.to_wstr(true)) : w_gbk(name_.to_wstr(true));
-#endif
-#endif // __json_helper_h__
+			/*#ifdef __json_helper_h__
+			#ifdef _STD_STR_
+						n = isu8 ? w_u8(to_wstr(name_, true)) : w_gbk(to_wstr(name_, true));
+			#else
+						//n = isu8 ? w_u8(name_.to_wstr(true)) : w_gbk(name_.to_wstr(true));
+						n = isu8 ? u16_u8((uint16_t*)name_.c_str(),name_.size()) : u16_gbk((uint16_t*)name_.c_str(), name_.size());
+			#endif
+			#else
+			#ifdef _STD_STR_
+						n = isu8 ? w_u8(to_wstr(name_, true)) : w_gbk(to_wstr(name_, true));
+			#else
+						n = isu8 ? w_u8(name_.to_wstr(true)) : w_gbk(name_.to_wstr(true));
+			#endif
+			#endif // __json_helper_h__*/
+			//gbkstr = u16_gbk((uint16_t*)name_.c_str(), name_.size());
+			//u8str = u16_u8((uint16_t*)name_.c_str(), name_.size());
+			//auto sw = (to_wstr(name_.data(), name_.size(), true));
+			auto sws = ndata.size() * 0.5;
+			std::string nd(ndata.c_str(), ndata.size());
+			char* temp = (char*)nd.data();
+			for (int i = 0; i < sws; ++i)
+			{
+				temp = Fonts::tt_ushort(temp);
+			}
+			n = isu8 ? icu_16u8((uint16_t*)nd.c_str(), sws) : u16_gbk((uint16_t*)nd.c_str(), sws);
 
 			switch (platform_id)
 			{
@@ -6071,6 +6176,16 @@ namespace hz
 					}
 					n = gbk_u8(n);
 				}
+				//else if (encoding_id == 1)
+				//{
+				//	char* tc = (char*)ndata.data();
+				//	wchar_t* tw = (wchar_t*)ndata.data();
+				//	char buf[128] = {}, b[10] = {};
+				//	wchar_t bufw[128] = {};
+				//	memcpy(buf, tc, ndata.size() < 128 ? ndata.size() : 128);
+				//	memcpy(bufw, tw, ndata.size() < 128 ? ndata.size() : 128);
+				//	n = u16_u8((uint16_t*)name_.c_str(), name_.size());
+				//}
 				break;
 			default:
 				break;
@@ -6086,9 +6201,41 @@ namespace hz
 		std::string n = get_name(false);
 		printf("name：%s\tname_id：%d\tplatform_id：%d\tlanguage_id：%d\tencoding_id：%d\n", n.c_str(), name_id, platform_id, language_id, encoding_id);
 	}
-	std::wstring tt_info::info_one::to_wstr(std::wstring str, bool is_swap)
+	//std::wstring tt_info::info_one::to_wstr(std::wstring str, bool is_swap)
+	//{
+	//	std::wstring ret = str;
+	//	if (is_swap)
+	//	{
+	//		char* temp = (char*)ret.data();
+	//		for (int i = 0; i < ret.size(); ++i)
+	//		{
+	//			temp = Fonts::tt_ushort(temp);
+	//		}
+	//	}
+	//	return ret;
+	//}
+	std::wstring to_wstr(const wchar_t* str, int len, bool is_swap)
 	{
-		std::wstring ret = str;
+		std::wstring ret;
+		ret.reserve(len + 1);
+		for (int i = 0; i < len; i++, str++)
+			ret.push_back(*str);
+		if (is_swap)
+		{
+			char* temp = (char*)ret.data();
+			for (int i = 0; i < ret.size(); ++i)
+			{
+				temp = Fonts::tt_ushort(temp);
+			}
+		}
+		return ret;
+	}
+	std::wstring to_wstr(uint16_t* str, int len, bool is_swap)
+	{
+		std::wstring ret;
+		ret.reserve(len + 1);
+		for (int i = 0; i < len; i++, str++)
+			ret.push_back(*str);
 		if (is_swap)
 		{
 			char* temp = (char*)ret.data();
@@ -6129,6 +6276,7 @@ namespace hz
 
 			case STBTT_vcurve:
 			{
+				// 二次曲线
 				//mTess->insertVertex(current);
 				glm::vec2 contrl;
 				contrl.x = stbVer->cx;
@@ -6139,8 +6287,7 @@ namespace hz
 				current.x = stbVer->x;
 				current.y = stbVer->y;
 
-				fmt.push_back('C');
-				_path.push_back(contrl);
+				fmt.push_back('Q');
 				_path.push_back(contrl);
 				_path.push_back(current);
 				//insert the middle point
@@ -6149,6 +6296,22 @@ namespace hz
 			break;
 			case STBTT_vcubic:
 			{
+				// 三次曲线
+				glm::vec2 contrl, contrl1;
+				contrl.x = stbVer->cx;
+				contrl.y = stbVer->cy;
+				contrl1.x = stbVer->cx1;
+				contrl1.y = stbVer->cy1;
+
+				previous = current;
+
+				current.x = stbVer->x;
+				current.y = stbVer->y;
+
+				fmt.push_back('C');
+				_path.push_back(contrl);
+				_path.push_back(contrl1);
+				_path.push_back(current);
 
 			}break;
 			default:break;
@@ -6173,12 +6336,12 @@ namespace hz
 	//}
 	// 支持移动、直线、二次贝塞尔曲线，构成的路径。		（三次曲线未测试过）
 	unsigned char* get_glyph_bitmap_subpixel(stbtt_vertex* vertices, int num_verts, glm::vec2 scale, glm::vec2 shift, glm::vec2 xy_off
-											 , std::vector<unsigned char>* out, glm::ivec3 bpm_size, int invert)
+		, std::vector<unsigned char>* out, glm::ivec3 bpm_size, int invert)
 	{
 		stbtt__bitmap gbm;
 		if ((int)scale.x == 0 || (int)scale.y == 0)
 		{
-			scale.x = scale.y = std::max(scale.x, scale.y);
+			scale.x = scale.y = std::max(std::max(scale.x, scale.y), 1.0f);
 		}
 		// now we get the size
 		gbm.w = bpm_size.x;
@@ -6202,26 +6365,31 @@ namespace hz
 
 	void get_path_bitmap(stbtt_vertex* vertices, int num_verts, image_gray* bmp, glm::vec2 scale, glm::vec2 xy_off)
 	{
-		get_glyph_bitmap_subpixel(vertices, num_verts, scale, {0, 0}, xy_off, &bmp->_data, {bmp->width, bmp->height, 0});
+		get_glyph_bitmap_subpixel(vertices, num_verts, scale, { 0, 0 }, xy_off, &bmp->_data, { bmp->width, bmp->height, 0 });
 	}
 	void build_blur(image_gray* grayblur, float blur, unsigned int fill, int blurcount, Image* dst, glm::ivec2 pos, bool iscp)
 	{
 
 		std::vector<unsigned char> rbd;
 		unsigned char* bdata = grayblur->data();
-		glm::ivec2 rbs = {grayblur->width, grayblur->height};
+		glm::ivec2 rbs = { grayblur->width, grayblur->height };
 		if (iscp)
 		{
 			rbd.resize((int64_t)rbs.x * rbs.y);
 			auto cpd = rbd.data();
 			memcpy(cpd, bdata, rbd.size());
 			bdata = cpd;
+			grayblur->ud = cpd;
 		}
 		// 模糊
 		Fonts::Blur(bdata, rbs.x, rbs.y, rbs.x, blur, blurcount);
 		// 转成rgba
 		if (dst)
-			dst->copy_to_image(bdata, rbs.x, {pos.x, pos.y, rbs.x, rbs.y}, fill, 2);
+		{
+			glm::ivec4 src4 = { 0, 0, rbs.x, rbs.y };
+			dst->copy2(grayblur, pos, src4, fill);
+			//dst->copy_to_image(bdata, rbs.x, src4, fill, 2);
+		}
 	}
 
 
@@ -6397,9 +6565,9 @@ namespace hz
 				return;
 			}
 			// 支持的大小
-			obt->_chsize = {{12, 6}, {14, 7}, {16, 8}};
+			obt->_chsize = { {12, 6}, {14, 7}, {16, 8} };
 			// 范围
-			obt->_unicode_rang = {{0x21, 0x7e}, {0x21, 0x7e}, {0x21, 0x7e}};
+			obt->_unicode_rang = { {0x21, 0x7e}, {0x21, 0x7e}, {0x21, 0x7e} };
 		}
 	}
 }

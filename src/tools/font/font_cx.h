@@ -20,7 +20,7 @@
 /*
  如果不需要位图字体则定义_FONT_NO_BITMAP
 
- */
+*/
 
 #ifndef NJSON_H
 //#define JSON_NOEXCEPTION
@@ -406,6 +406,11 @@ namespace hz
 		std::string v;
 	};
 	struct bitmap_ttinfo;
+	class tt_info;
+	struct familys_t {
+		tt_info** familys = 0;
+		size_t count = 0;
+	};
 	// todo				 tt_info
 	class tt_info
 	{
@@ -429,15 +434,15 @@ namespace hz
 			int name_id = 0;
 			int length_ = 0;
 			info_one(int platform,
-					 int encoding,
-					 int language,
-					 int nameid,
-					 const char* name, int len);
+				int encoding,
+				int language,
+				int nameid,
+				const char* name, int len);
 
 			std::string get_name(bool isu8 = true);
 			void print();
 
-			static std::wstring to_wstr(std::wstring str, bool is_swap = false);
+			//static std::wstring to_wstr(std::wstring str, bool is_swap = false);
 		};
 
 	public:
@@ -514,13 +519,16 @@ namespace hz
 		}
 		const char* init(const char* d, size_t s, bool iscp);
 		void add_info(int platform,
-					  int encoding,
-					  int language,
-					  int nameid,
-					  const char* name, int length);
+			int encoding,
+			int language,
+			int nameid,
+			const char* name, int length);
 		std::vector<info_one*>* get_info(int language);
 		// 获取中文信息
 		std::string get_info_str(int language = 2052, int idx = 1);
+
+		size_t get_info_strv(int language, int idx, std::vector<uint16_t>& buf);
+
 		bool is_script(const char* s);
 		void print_info(int language = -1);
 
@@ -572,6 +580,7 @@ namespace hz
 		glm::ivec4 get_bounding_box(double scale, bool is_align0);
 
 		const char* get_glyph_index_u8(const char* u8str, int* oidx, tt_info** renderFont, std::vector<tt_info*>* fallbacks);
+		const char* get_glyph_index_u8(const char* u8str, int* oidx, tt_info** renderFont, familys_t* fallbacks);
 		//int get_glyph_index_u8(const char* u8str, tt_info** renderFont, std::vector<tt_info*>* fallbacks);
 		int get_glyph_index(unsigned int codepoint, tt_info** renderFont, std::vector<tt_info*>* fallbacks);
 	public:
@@ -1066,14 +1075,14 @@ namespace hz
 	class fd_info
 	{
 	private:
-		MapView* _fp = nullptr;
+		mfile_t* _fp = nullptr;
 		char* _data = nullptr;
 		int64_t _size = 0;
 	public:
 		fd_info()
 		{
 		}
-		fd_info(MapView* p)
+		fd_info(mfile_t* p)
 		{
 			init(p);
 		}
@@ -1085,16 +1094,16 @@ namespace hz
 		{
 			if (_fp)
 			{
-				MapView::destroy(_fp);
+				delete (_fp);
 			}
 		}
-		void init(MapView* p)
+		void init(mfile_t* p)
 		{
 			_fp = p;
 			if (_fp)
 			{
-				_data = (char*)_fp->mapview();
-				_size = _fp->getFileSize();
+				_data = (char*)_fp->data();
+				_size = _fp->size();
 			}
 		}
 		char* data()
@@ -1134,11 +1143,13 @@ namespace hz
 		css_text _decss;
 
 	public:
+		void* uptr = 0;
+		std::function<void(const char* name, tt_info*, void* uptr)> on_add_cb;
+	public:
+
 		Fonts();
 
 		~Fonts();
-	public:
-
 	public:
 		void set_langid(int langid);
 		tt_info* get_font(int idx);
@@ -1291,7 +1302,7 @@ namespace hz
 
 	public:
 		static glm::ivec3 mk_fontbitmap(tt_info* font, unsigned int glyph_index, unsigned int unicode_codepoint
-										, int fns, glm::ivec2 pos, unsigned int col, Image* outimg);
+			, int fns, glm::ivec2 pos, unsigned int col, Image* outimg);
 	private:
 
 
@@ -1321,9 +1332,9 @@ namespace hz
 		对于精度要求比较高的，可以循环取得曲线上的点，我们这边则直接取得中点（t=0.5）。最后将取得的点插入到轮廓线中。
 	*/
 	unsigned char* get_glyph_bitmap_subpixel(stbtt_vertex* vertices, int num_verts, glm::vec2 scale, glm::vec2 shift,
-											 glm::vec2 xy_off, std::vector<unsigned char>* out, glm::ivec3 bpm_size, int invert = 0);
+		glm::vec2 xy_off, std::vector<unsigned char>* out, glm::ivec3 bpm_size, int invert = 0);
 
-	void get_path_bitmap(stbtt_vertex* vertices, int num_verts, image_gray* bmp, glm::vec2 scale = {1, 1}, glm::vec2 xy_off = {0.0f, 0.0f});
+	void get_path_bitmap(stbtt_vertex* vertices, int num_verts, image_gray* bmp, glm::vec2 scale = { 1, 1 }, glm::vec2 xy_off = { 0.0f, 0.0f });
 	// 生成模糊
 
 	void build_blur(image_gray* grayblur, float blur, unsigned int fill, int blurcount, Image* dst, glm::ivec2 pos, bool iscp);
@@ -1332,6 +1343,8 @@ namespace hz
 	sfnt_header* get_tag(font_impl_info* font_i, std::string tag);
 
 	unsigned int fons_decutf8(unsigned int* state, unsigned int* codep, unsigned int byte);
+	std::wstring to_wstr(const wchar_t* str, int len, bool is_swap);
+	std::wstring to_wstr(uint16_t* str, int len, bool is_swap);
 }; //!hz
 #endif // !__font_h__
 
@@ -1356,13 +1369,13 @@ glm::ivec2 draw_text(Fonts::css_text* csst, glm::ivec2 pos, const std::string& s
 		//下划线
 		oly += tns;
 		auto col = csst->color;
-		draw_line({pos.x, pos.y + oly}, {out->awidth, pos.y + oly}, col, tns);
+		draw_line({ pos.x, pos.y + oly }, { out->awidth, pos.y + oly }, col, tns);
 	}
 	if (csst->text_decoration & hz::Fonts::css_text::overline)
 	{
 		//上划线
 		auto col = csst->color;
-		draw_line({pos.x, pos.y}, {out->awidth, pos.y}, col, tns);
+		draw_line({ pos.x, pos.y }, { out->awidth, pos.y }, col, tns);
 	}
 	for (auto& it : out->vitem)
 	{
@@ -1374,7 +1387,7 @@ glm::ivec2 draw_text(Fonts::css_text* csst, glm::ivec2 pos, const std::string& s
 		tns = csst->line_thickness1;
 		oly = bs + base_line * 0.68;
 		auto col = csst->color;
-		draw_line({pos.x, pos.y + oly}, {out->awidth, pos.y + oly}, col, tns);
+		draw_line({ pos.x, pos.y + oly }, { out->awidth, pos.y + oly }, col, tns);
 	}
 	return ret;
 }
