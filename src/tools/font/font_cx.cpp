@@ -1,5 +1,10 @@
 ﻿
-//#include "pch.h"
+/*
+
+
+2022-07-07: build_blur高斯模糊函数，get_path_bitmap路径光栅化函数
+
+*/
 
 #include <data/json_helper.h>
 
