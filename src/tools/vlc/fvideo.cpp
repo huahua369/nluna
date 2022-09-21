@@ -375,6 +375,7 @@ public:
 	int find_stream_info = 1;
 	int filter_nbthreads = 0;
 	bool ispushaudio = false;
+
 	/* current context */
 	bool is_full_screen = 0;
 	int64_t audio_callback_time = 0;
@@ -390,6 +391,9 @@ public:
 	int dummy;
 	std::vector<OptionDef> options;
 	std::vector<Uint8> abufv;
+	// 音频线程
+	std::thread audiopt;
+	VideoState* tis = 0;
 public:
 	play_ctx() {}
 	~play_ctx() {}
@@ -438,7 +442,7 @@ public:
 
 	void new_display();
 
-	void push_audio(void* opaque);
+	void push_audio_thread();
 };
 static const struct TextureFormatEntry {
 	enum AVPixelFormat format;
@@ -1451,6 +1455,9 @@ void play_ctx::stream_close(VideoState* is)
 	/* XXX: use a special url_shutdown call to abort parse cleanly */
 	is->abort_request = 1;
 	SDL_WaitThread(is->read_tid, NULL);
+	// 等待音频线程
+	if (ispushaudio)
+		audiopt.join();
 
 	/* close each stream */
 	if (is->audio_stream >= 0)
@@ -2721,33 +2728,32 @@ void play_ctx::sdl_audio_callback(void* opaque, Uint8* stream, int len)
 		sync_clock_to_slave(&is->extclk, &is->audclk);
 	}
 }
-int64_t kti = 0, dt = 0, dt1 = 0;
+//int64_t kti = 0, dt = 0, dt1 = 0;
 static void sdl_audio_callback1(void* opaque, Uint8* stream, int len)
 {
-	dt = av_gettime_relative() - kti;
+	//dt = av_gettime_relative() - kti;
 	auto p = (play_ctx*)((VideoState*)opaque)->userptr;
 	auto qas = SDL_GetQueuedAudioSize(p->audio_dev);
 	p->sdl_audio_callback(opaque, stream, len);
-	dt1 = av_gettime_relative() - p->audio_callback_time;
+	//dt1 = av_gettime_relative() - p->audio_callback_time;
 
-	kti = av_gettime_relative();
+	//kti = av_gettime_relative();
 }
-void play_ctx::push_audio(void* opaque)
+void play_ctx::push_audio_thread()
 {
-	auto is = (VideoState*)opaque; //audio_tgt
 	while (1)
 	{
+		auto is = tis;
 		if (is->abort_request)
 			break;
 		double n = abufv.size();
-		auto dt = (av_gettime_relative() - kti);
+		//auto dt = (av_gettime_relative() - kti);
 		auto qas = SDL_GetQueuedAudioSize(audio_dev);
-		sdl_audio_callback(opaque, abufv.data(), n);
+		sdl_audio_callback(is, abufv.data(), n);
 		SDL_QueueAudio(audio_dev, abufv.data(), n);
-		kti = av_gettime_relative();
-		auto nk = 1000000LL * is->audio_hw_buf_size / is->audio_tgt.bytes_per_sec;
+		//kti = av_gettime_relative();
+		//auto nk = 1000000LL * is->audio_hw_buf_size / is->audio_tgt.bytes_per_sec;
 		auto nk1 = 1000000LL * qas / is->audio_tgt.bytes_per_sec / 2;
-
 		av_usleep(nk1);
 	}
 
@@ -2783,9 +2789,7 @@ int play_ctx::audio_open(void* opaque, AVChannelLayout* wanted_channel_layout, i
 	wanted_spec.format = AUDIO_S16SYS;
 	wanted_spec.silence = 0;
 	wanted_spec.samples = FFMAX(SDL_AUDIO_MIN_BUFFER_SIZE, 2 << av_log2(wanted_spec.freq / SDL_AUDIO_MAX_CALLBACKS_PER_SEC));
-	//wanted_spec.callback = sdl_audio_callback1;
-	wanted_spec.callback = 0;
-	ispushaudio = !wanted_spec.callback;
+	wanted_spec.callback = ispushaudio ? 0 : sdl_audio_callback1;
 	wanted_spec.userdata = opaque;
 	while (!(audio_dev = SDL_OpenAudioDevice(NULL, 0, &wanted_spec, &spec, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE | SDL_AUDIO_ALLOW_CHANNELS_CHANGE))) {
 		av_log(NULL, AV_LOG_WARNING, "SDL_OpenAudio (%d channels, %d Hz): %s\n",
@@ -2980,12 +2984,14 @@ int play_ctx::stream_component_open(VideoState* is, int stream_index)
 		if ((ret = decoder_start(&is->auddec, audio_thread1, "audio_decoder", is)) < 0)
 			goto out;
 		SDL_PauseAudioDevice(audio_dev, 0);
+		tis = is;
 		if (ispushaudio)
 		{
+			assert(!audiopt.joinable());
 			std::thread at1([=]() {
-				push_audio(is);
+				push_audio_thread();
 				});
-			at1.detach();
+			audiopt.swap(at1);
 		}
 		break;
 	case AVMEDIA_TYPE_VIDEO:
@@ -4108,6 +4114,7 @@ int ff_play(int argc, char** argv, bool isdisplay, void(*dcb)(yuv_info_t*))
 	play_ctx* ctx = new play_ctx();
 	init_dynload();
 	init_options(ctx);
+	ctx->ispushaudio = true;
 	av_log_set_flags(AV_LOG_SKIP_REPEATED);
 	auto options = ctx->options.data();
 	parse_loglevel(argc, argv, options);
