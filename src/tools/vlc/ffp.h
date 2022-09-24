@@ -1,5 +1,3 @@
-
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -24,6 +22,7 @@ struct ctrl_data_t
 	bool mute = false;	// 静音
 	bool full_screen = false;//全屏
 	bool next_frame = false;//显示一帧
+	bool is_exit = false;	// 退出，需要重新ff_open
 };
 // dcb设置显示回调函数，ctrl_cb返回1修改
 void* ff_open(const char* url, void(*dcb)(yuv_info_t*));

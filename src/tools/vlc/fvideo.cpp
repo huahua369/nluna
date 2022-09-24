@@ -1508,6 +1508,7 @@ void play_ctx::stream_close(VideoState* is)
 
 void play_ctx::do_exit(VideoState* is)
 {
+	et = 0;
 	if (is) {
 		stream_close(is);
 	}
@@ -1515,15 +1516,18 @@ void play_ctx::do_exit(VideoState* is)
 		SDL_DestroyRenderer(renderer);
 	if (window)
 		SDL_DestroyWindow(window);
-	uninit_opts();
 #if CONFIG_AVFILTER
 	av_freep(&vfilters_list);
 #endif
-	avformat_network_deinit();
-	if (show_status)
-		printf("\n");
-	if (renderer && window)
-		SDL_Quit();
+	if (0)
+	{
+		uninit_opts();
+		avformat_network_deinit();
+		if (show_status)
+			printf("\n");
+		if (renderer && window)
+			SDL_Quit();
+	}
 	av_log(NULL, AV_LOG_QUIET, "%s", "");
 
 	//exit(0);
@@ -3727,6 +3731,12 @@ void play_ctx::upctrl(ctrl_data_t* p)
 	do
 	{
 		if (!p || !tis)break;
+		if (p->is_exit)
+		{
+			do_exit(cur_stream);
+			et = 0;
+			break;
+		}
 		if (p->full_screen)
 		{
 			toggle_full_screen(tis);
@@ -5730,13 +5740,21 @@ void play_ctx::new_display()
 void* ff_open(const char* url, void(*dcb)(yuv_info_t*))//, int (*ctrl_cb)(ctrl_data_t*))
 {
 	if (!url)return 0;
+	static std::once_flag flg;
+	std::call_once(flg, [=]() {
+		init_dynload();
+		/* register all codecs, demux and protocols */
+#if CONFIG_AVDEVICE
+		avdevice_register_all();
+#endif
+		avformat_network_init();
+		});
 
 	play_ctx* ctx = new play_ctx();
 	ctx->input_filename = url;
 	SDL_sem* sem = SDL_CreateSemaphore(0);
 	auto cb = [=]() {
 		VideoState* is;
-		init_dynload();
 		init_options(ctx);
 		ctx->ispushaudio = true;
 		//ctx->infinite_buffer = 0;
@@ -5745,11 +5763,6 @@ void* ff_open(const char* url, void(*dcb)(yuv_info_t*))//, int (*ctrl_cb)(ctrl_d
 		auto options = ctx->options.data();
 		//parse_loglevel(argc, argv, options);
 
-		/* register all codecs, demux and protocols */
-#if CONFIG_AVDEVICE
-		avdevice_register_all();
-#endif
-		avformat_network_init();
 
 		signal(SIGINT, sigterm_handler); /* Interrupt (ANSI).    */
 		signal(SIGTERM, sigterm_handler); /* Termination (ANSI).  */
