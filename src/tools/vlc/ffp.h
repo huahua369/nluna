@@ -26,7 +26,8 @@ struct ctrl_data_t
 	bool next_frame = false;//显示一帧
 };
 // dcb设置显示回调函数，ctrl_cb返回1修改
-void* ff_open(const char* url, void(*dcb)(yuv_info_t*), int (*ctrl_cb)(ctrl_data_t*));
+void* ff_open(const char* url, void(*dcb)(yuv_info_t*));
+void ff_set(void* p, ctrl_data_t* c);
 
 int ff_play(int argc, char** argv, bool isdisplay, void(*dcb)(yuv_info_t*));
 void vlc_play(const char* fn, bool* isplay);

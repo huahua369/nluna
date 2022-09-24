@@ -32,6 +32,11 @@
 #include <data/json_helper.h>
 #include <view/mapView.h>
 #include <vk_core/view_info.h>
+#ifdef __has_include
+#if (__has_include(<base/print_time.h>))
+#include <base/print_time.h>
+#endif
+#endif
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -396,12 +401,14 @@ public:
 	std::vector<Uint8> abufv;
 	// 音频线程
 	std::thread audiopt;
+	std::atomic_int16_t is_ctrl;
+	ctrl_data_t* pc = 0;
 	VideoState* tis = 0;
 	// 事件
-	int et = 0;
-	int (*ctrl_cb)(ctrl_data_t*) = 0;
+	int et = 1;
+
 public:
-	play_ctx() {}
+	play_ctx() { is_ctrl = 0; }
 	~play_ctx() {}
 	int opt_add_vfilter(void* optctx, const char* opt, const char* arg);
 	int decoder_decode_frame(Decoder* d, AVFrame* frame, AVSubtitle* sub);
@@ -3625,17 +3632,12 @@ void play_ctx::refresh_wait_event(VideoState* is)
 	double remaining_time = 0.0;
 
 	while (et) {
-		if (ctrl_cb)
+		if (pc && is_ctrl > 0)
 		{
-			ctrl_data_t c = {};
-			c.ctx = this;
-			if (ctrl_cb(&c))
-			{
-				upctrl(&c);
-			}
+			upctrl(pc); is_ctrl = 0; pc = 0;
 		}
 		if (!cursor_hidden && av_gettime_relative() - cursor_last_shown > CURSOR_HIDE_DELAY) {
-			SDL_ShowCursor(0);
+			//SDL_ShowCursor(0);
 			cursor_hidden = 1;
 		}
 		if (remaining_time > 0.0)
@@ -3734,7 +3736,7 @@ void play_ctx::upctrl(ctrl_data_t* p)
 			toggle_pause(cur_stream);
 		if (p->mute)
 			toggle_mute(cur_stream);
-		if (p->volume != 0)
+		if (p->volume >= 0)
 			set_volume(cur_stream, p->volume);
 		if (p->volume_inc != 0)
 			update_volume(cur_stream, p->volume_inc > 0 ? 1 : -1, SDL_VOLUME_STEP);
@@ -5725,12 +5727,13 @@ void play_ctx::new_display()
 		}
 	}
 }
-
-void* ff_open(const char* url, void(*dcb)(yuv_info_t*), int (*ctrl_cb)(ctrl_data_t*))
+void* ff_open(const char* url, void(*dcb)(yuv_info_t*))//, int (*ctrl_cb)(ctrl_data_t*))
 {
 	if (!url)return 0;
-	std::string urls = url;
+
 	play_ctx* ctx = new play_ctx();
+	ctx->input_filename = url;
+	SDL_sem* sem = SDL_CreateSemaphore(0);
 	auto cb = [=]() {
 		VideoState* is;
 		init_dynload();
@@ -5762,13 +5765,13 @@ void* ff_open(const char* url, void(*dcb)(yuv_info_t*), int (*ctrl_cb)(ctrl_data
 				"Use -h to get full help or, even better, run 'man %s'\n", program_name);
 			exit(1);
 		}
-		ctx->input_filename = urls.c_str();
 		is = ctx->stream_open(ctx->input_filename, ctx->file_iformat);
 		if (is)
 		{
-			ctx->ctrl_cb = ctrl_cb;
+			//ctx->ctrl_cb = ctrl_cb;
 			ctx->tis = is;
 			is->dcb = dcb;
+			SDL_SemPost(sem);
 			ctx->event_loop(is);
 		}
 		else
@@ -5781,10 +5784,28 @@ void* ff_open(const char* url, void(*dcb)(yuv_info_t*), int (*ctrl_cb)(ctrl_data
 	};
 
 	std::thread th(cb);
+	{
+#ifdef _DEBUG
+#ifdef __print_time_h__
+		print_time a("sem wait");
+#endif
+#endif
+		SDL_SemWaitTimeout(sem, 1000);
+	}
+	if (sem)
+		SDL_DestroySemaphore(sem);
 	th.detach();
 	return ctx;
 }
-
+void ff_set(void* p, ctrl_data_t* c)
+{
+	auto ctx = (play_ctx*)p;
+	if (p && c)
+	{
+		ctx->pc = c;
+		ctx->is_ctrl = 1;
+	}
+}
 /* Called from the main */
 int ff_play(int argc, char** argv, bool isdisplay, void(*dcb)(yuv_info_t*))
 {
