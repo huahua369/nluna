@@ -401,12 +401,11 @@ public:
 	std::vector<Uint8> abufv;
 	// 音频线程
 	std::thread audiopt;
-	std::atomic_int16_t is_ctrl;
+	std::atomic_int16_t is_ctrl, thr_count;
 	ctrl_data_t* pc = 0;
 	VideoState* tis = 0;
 	// 事件
 	int et = 1;
-
 public:
 	play_ctx() { is_ctrl = 0; }
 	~play_ctx() {}
@@ -1529,7 +1528,7 @@ void play_ctx::do_exit(VideoState* is)
 			SDL_Quit();
 	}
 	av_log(NULL, AV_LOG_QUIET, "%s", "");
-
+	tis = 0;
 	//exit(0);
 }
 
@@ -3007,11 +3006,13 @@ int play_ctx::stream_component_open(VideoState* is, int stream_index)
 		}
 		if ((ret = decoder_start(&is->auddec, audio_thread1, "audio_decoder", is)) < 0)
 			goto out;
+		thr_count++;
 		SDL_PauseAudioDevice(audio_dev, 0);
 		tis = is;
 		if (ispushaudio)
 		{
 			assert(!audiopt.joinable());
+			thr_count++;
 			std::thread at1([=]() {
 				push_audio_thread();
 				});
@@ -3026,6 +3027,7 @@ int play_ctx::stream_component_open(VideoState* is, int stream_index)
 			goto fail;
 		if ((ret = decoder_start(&is->viddec, video_thread1, "video_decoder", is)) < 0)
 			goto out;
+		thr_count++;
 		is->queue_attachments_req = 1;
 		break;
 	case AVMEDIA_TYPE_SUBTITLE:
@@ -3036,6 +3038,7 @@ int play_ctx::stream_component_open(VideoState* is, int stream_index)
 			goto fail;
 		if ((ret = decoder_start(&is->subdec, subtitle_thread1, "subtitle_decoder", is)) < 0)
 			goto out;
+		thr_count++;
 		break;
 	default:
 		break;
@@ -3636,10 +3639,6 @@ void play_ctx::refresh_wait_event(VideoState* is)
 	double remaining_time = 0.0;
 
 	while (et) {
-		if (pc && is_ctrl > 0)
-		{
-			upctrl(pc); is_ctrl = 0; pc = 0;
-		}
 		if (!cursor_hidden && av_gettime_relative() - cursor_last_shown > CURSOR_HIDE_DELAY) {
 			//SDL_ShowCursor(0);
 			cursor_hidden = 1;
@@ -3652,6 +3651,10 @@ void play_ctx::refresh_wait_event(VideoState* is)
 		remaining_time = REFRESH_RATE;
 		if (is->show_mode != SHOW_MODE_NONE && (!is->paused || is->force_refresh))
 			video_refresh(is, &remaining_time);
+		if (pc && is_ctrl > 0)
+		{
+			upctrl(pc); is_ctrl = 0; pc = 0;
+		}
 	}
 }
 void goto_inc(VideoState* cur_stream, double incr, int seek_by_bytes, double pos = -1)
@@ -3722,7 +3725,7 @@ void play_ctx::event_loop(VideoState* cur_stream)
 	for (; xt;) {
 		double x;
 		refresh_wait_event(cur_stream);
-
+		xt = tis ? true : false;
 	}
 }
 void play_ctx::upctrl(ctrl_data_t* p)
@@ -3734,7 +3737,6 @@ void play_ctx::upctrl(ctrl_data_t* p)
 		if (p->is_exit)
 		{
 			do_exit(cur_stream);
-			et = 0;
 			break;
 		}
 		if (p->full_screen)
