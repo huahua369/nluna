@@ -258,6 +258,7 @@ static int write_option(void *optctx, const OptionDef *po, const char *opt,
                 (uint8_t *)optctx + po->u.off : po->u.dst_ptr;
     int *dstcount;
 
+    char ebuf[AV_ERROR_MAX_STRING_SIZE] = {0};
     if (po->flags & OPT_SPEC) {
         SpecifierOpt **so = dst;
         char *p = strchr(opt, ':');
@@ -294,7 +295,7 @@ static int write_option(void *optctx, const OptionDef *po, const char *opt,
         if (ret < 0) {
             av_log(NULL, AV_LOG_ERROR,
                    "Failed to set value '%s' for option '%s': %s\n",
-                   arg, opt, av_err2str(ret));
+                   arg, opt, av_make_error_string(ebuf, AV_ERROR_MAX_STRING_SIZE, ret));//av_err2str(ret));
             return ret;
         }
     }
