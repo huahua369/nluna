@@ -22,8 +22,9 @@
   * @file
   * simple media player based on the FFmpeg libraries
   */
-#define CONFIG_AVFILTER 1
-  //#include "config.h"
+  //#define CONFIG_AVFILTER 1
+
+#include "config.h"
 #include <inttypes.h>
 #include <math.h>
 #include <limits.h>
@@ -66,6 +67,10 @@ extern "C" {
 #include "libavcodec/bsf.h"
 #include "libavutil/cpu.h"
 
+	//#include "libavutil/avstring.h"
+	//#include "libavutil/pixdesc.h"
+	//#include "libavfilter/buffersink.h"
+
 #if CONFIG_AVFILTER
 # include "libavfilter/avfilter.h"
 # include "libavfilter/buffersink.h"
@@ -74,6 +79,7 @@ extern "C" {
 
 
 #include "cmdutils.h"
+//#include "ffmpeg.h"
 	//#include "opt_common.h"
 #ifdef __cplusplus
 }
@@ -128,6 +134,9 @@ const int program_birth_year = 2003;
 #define CURSOR_HIDE_DELAY 1000000
 
 #define USE_ONEPASS_SUBTITLE_RENDER 1
+
+
+
 
 static unsigned sws_flags = SWS_BICUBIC;
 
@@ -329,7 +338,26 @@ typedef struct VideoState {
 	void(*dcb)(yuv_info_t*);
 	// 用户指针
 	void* userptr = 0;
+
 } VideoState;
+
+struct hwdev_t
+{
+	AVHWDeviceType t = {};
+	AVBufferRef* hdc = 0;//hw_device_ctx
+	std::string name;
+public:
+	AVBufferRef* a() {
+		return av_buffer_ref(hdc);
+	}
+	void unref() {
+		auto n = av_buffer_get_ref_count(hdc);
+		auto p = hdc;
+		if (n > 0)
+			av_buffer_unref(&p);
+	}
+};
+
 class play_ctx
 {
 public:
@@ -404,6 +432,10 @@ public:
 	std::atomic_int16_t is_ctrl, thr_count;
 	ctrl_data_t* pc = 0;
 	VideoState* tis = 0;
+
+	AVPixelFormat hw_device_pixel = {};
+	hwdev_t* hwctx = {};
+	AVFrame* hwframe = 0;
 	// 事件
 	int et = 1;
 public:
@@ -433,7 +465,7 @@ public:
 	int audio_decode_frame(VideoState* is);
 	void sdl_audio_callback(void* opaque, Uint8* stream, int len);
 	int audio_open(void* opaque, AVChannelLayout* wanted_channel_layout, int wanted_sample_rate, struct AudioParams* audio_hw_params);
-	int stream_component_open(VideoState* is, int stream_index);
+	int stream_component_open(VideoState* is, int stream_index, const AVCodec* codec = nullptr);
 	void stream_close(VideoState* is);
 	int read_thread(void* arg);
 	VideoState* stream_open(const char* filename, const AVInputFormat* iformat);
@@ -674,7 +706,8 @@ static int decoder_init(Decoder* d, AVCodecContext* avctx, PacketQueue* queue, S
 
 int play_ctx::decoder_decode_frame(Decoder* d, AVFrame* frame, AVSubtitle* sub) {
 	int ret = AVERROR(EAGAIN);
-
+	AVFrame* hw_frame = hwframe;
+	AVFrame* tmp_frame = NULL;
 	for (;;) {
 		if (d->queue->serial == d->pkt_serial) {
 			do {
@@ -683,6 +716,7 @@ int play_ctx::decoder_decode_frame(Decoder* d, AVFrame* frame, AVSubtitle* sub) 
 
 				switch (d->avctx->codec_type) {
 				case AVMEDIA_TYPE_VIDEO:
+				{
 					ret = avcodec_receive_frame(d->avctx, frame);
 					if (ret >= 0) {
 						if (decoder_reorder_pts == -1) {
@@ -692,7 +726,27 @@ int play_ctx::decoder_decode_frame(Decoder* d, AVFrame* frame, AVSubtitle* sub) 
 							frame->pts = frame->pkt_dts;
 						}
 					}
-					break;
+					auto px = hw_device_pixel;
+					px = (AVPixelFormat)frame->format;
+					if (hwctx && 0)
+					{
+						if (frame->format == hw_device_pixel) {
+							// 如果采用的硬件加速剂，则调用avcodec_receive_frame()函数后，解码后的数据还在GPU中，所以需要通过此函数
+							// 将GPU中的数据转移到CPU中来
+							if ((ret = av_hwframe_transfer_data(hw_frame, frame, 0)) < 0) {
+								//LOGD("av_hwframe_transfer_data fail %d", ret);
+								return -2;
+							}
+							//LOGD("这里2222 解码成功 %d", sum);
+							tmp_frame = frame;
+						}
+						else {
+							//LOGD("这里1111 解码成功 %d", sum);
+							tmp_frame = hw_frame;
+						}
+					}
+				}
+				break;
 				case AVMEDIA_TYPE_AUDIO:
 					ret = avcodec_receive_frame(d->avctx, frame);
 					if (ret >= 0) {
@@ -1174,7 +1228,8 @@ void play_ctx::video_image_display(VideoState* is)
 			SDL_Rect target = { .x = rect.x + sub_rect->x * xratio,
 							   .y = rect.y + sub_rect->y * yratio,
 							   .w = sub_rect->w * xratio,
-							   .h = sub_rect->h * yratio };
+							   .h = sub_rect->h * yratio
+			};
 			SDL_RenderCopy(renderer, is->sub_texture, sub_rect, &target);
 		}
 #endif
@@ -1435,6 +1490,8 @@ void play_ctx::stream_component_close(VideoState* is, int stream_index)
 		}
 		break;
 	case AVMEDIA_TYPE_VIDEO:
+		if (hwctx)
+			hwctx->unref();
 		decoder_abort(&is->viddec, &is->pictq);
 		decoder_destroy(&is->viddec);
 		break;
@@ -2371,6 +2428,7 @@ int play_ctx::video_thread(void* arg)
 {
 	VideoState* is = (VideoState*)arg;
 	AVFrame* frame = av_frame_alloc();
+	hwframe = av_frame_alloc();
 	double pts;
 	double duration;
 	int ret;
@@ -2396,6 +2454,7 @@ int play_ctx::video_thread(void* arg)
 			goto the_end;
 		if (!ret)
 			continue;
+
 
 #if CONFIG_AVFILTER
 		if (last_w != frame->width
@@ -2490,8 +2549,8 @@ int play_ctx::subtitle_thread(void* arg)
 
 		pts = 0;
 		std::string tk = (sp->sub.rects && sp->sub.rects[0]->ass) ? sp->sub.rects[0]->ass : "";
-		if (tk.size())
-			printf("%s\n", tk.c_str());
+		//字幕if (tk.size())
+		//	printf("%s\n", tk.c_str());
 		if (got_subtitle && (sp->sub.format == 0)) {
 			if (sp->sub.pts != AV_NOPTS_VALUE)
 				pts = sp->sub.pts / (double)AV_TIME_BASE;
@@ -2882,13 +2941,646 @@ static int subtitle_thread1(void* arg)
 	auto p = (play_ctx*)((VideoState*)arg)->userptr;
 	return p->subtitle_thread(arg);
 }
+// hw
+#if 1
+
+
+typedef struct HWDevice {
+	const char* name;
+	enum AVHWDeviceType type;
+	AVBufferRef* device_ref;
+} HWDevice;
+
+
+//#include "ffmpeg.h"
+HWDevice* hw_device_get_by_name(const char* name);
+int hw_device_init_from_string(const char* arg, HWDevice** dev);
+void hw_device_free_all(void);
+#ifdef InputStream
+int hw_device_setup_for_decode(InputStream* ist);
+int hw_device_setup_for_encode(OutputStream* ost);
+int hw_device_setup_for_filter(FilterGraph* fg);
+#endif
+
+static int nb_hw_devices;
+static HWDevice** hw_devices;
+
+static HWDevice* hw_device_get_by_type(enum AVHWDeviceType type)
+{
+	HWDevice* found = NULL;
+	int i;
+	for (i = 0; i < nb_hw_devices; i++) {
+		if (hw_devices[i]->type == type) {
+			if (found)
+				return NULL;
+			found = hw_devices[i];
+		}
+	}
+	return found;
+}
+
+HWDevice* hw_device_get_by_name(const char* name)
+{
+	int i;
+	for (i = 0; i < nb_hw_devices; i++) {
+		if (!strcmp(hw_devices[i]->name, name))
+			return hw_devices[i];
+	}
+	return NULL;
+}
+
+static HWDevice* hw_device_add(void)
+{
+	int err;
+	err = av_reallocp_array(&hw_devices, nb_hw_devices + 1,
+		sizeof(*hw_devices));
+	if (err) {
+		nb_hw_devices = 0;
+		return NULL;
+	}
+	hw_devices[nb_hw_devices] = (HWDevice*)av_mallocz(sizeof(HWDevice));
+	if (!hw_devices[nb_hw_devices])
+		return NULL;
+	return hw_devices[nb_hw_devices++];
+}
+
+static char* hw_device_default_name(enum AVHWDeviceType type)
+{
+	// Make an automatic name of the form "type%d".  We arbitrarily
+	// limit at 1000 anonymous devices of the same type - there is
+	// probably something else very wrong if you get to this limit.
+	const char* type_name = av_hwdevice_get_type_name(type);
+	char* name;
+	size_t index_pos;
+	int index, index_limit = 1000;
+	index_pos = strlen(type_name);
+	name = (char*)av_malloc(index_pos + 4);
+	if (!name)
+		return NULL;
+	for (index = 0; index < index_limit; index++) {
+		snprintf(name, index_pos + 4, "%s%d", type_name, index);
+		if (!hw_device_get_by_name(name))
+			break;
+	}
+	if (index >= index_limit) {
+		av_freep(&name);
+		return NULL;
+	}
+	return name;
+}
+
+int hw_device_init_from_string(const char* arg, HWDevice** dev_out)
+{
+	// "type=name"
+	// "type=name,key=value,key2=value2"
+	// "type=name:device,key=value,key2=value2"
+	// "type:device,key=value,key2=value2"
+	// -> av_hwdevice_ctx_create()
+	// "type=name@name"
+	// "type@name"
+	// -> av_hwdevice_ctx_create_derived()
+
+	AVDictionary* options = NULL;
+	const char* type_name = NULL, * name = NULL, * device = NULL;
+	enum AVHWDeviceType type;
+	HWDevice* dev, * src;
+	AVBufferRef* device_ref = NULL;
+	int err;
+	const char* errmsg, * p, * q;
+	size_t k;
+
+	k = strcspn(arg, ":=@");
+	p = arg + k;
+
+	type_name = av_strndup(arg, k);
+	if (!type_name) {
+		err = AVERROR(ENOMEM);
+		goto fail;
+	}
+	type = av_hwdevice_find_type_by_name(type_name);
+	if (type == AV_HWDEVICE_TYPE_NONE) {
+		errmsg = "unknown device type";
+		goto invalid;
+	}
+
+	if (*p == '=') {
+		k = strcspn(p + 1, ":@,");
+
+		name = av_strndup(p + 1, k);
+		if (!name) {
+			err = AVERROR(ENOMEM);
+			goto fail;
+		}
+		if (hw_device_get_by_name(name)) {
+			errmsg = "named device already exists";
+			goto invalid;
+		}
+
+		p += 1 + k;
+	}
+	else {
+		name = hw_device_default_name(type);
+		if (!name) {
+			err = AVERROR(ENOMEM);
+			goto fail;
+		}
+	}
+
+	if (!*p) {
+		// New device with no parameters.
+		err = av_hwdevice_ctx_create(&device_ref, type,
+			NULL, NULL, 0);
+		if (err < 0)
+			goto fail;
+
+	}
+	else if (*p == ':') {
+		// New device with some parameters.
+		++p;
+		q = strchr(p, ',');
+		if (q) {
+			if (q - p > 0) {
+				device = av_strndup(p, q - p);
+				if (!device) {
+					err = AVERROR(ENOMEM);
+					goto fail;
+				}
+			}
+			err = av_dict_parse_string(&options, q + 1, "=", ",", 0);
+			if (err < 0) {
+				errmsg = "failed to parse options";
+				goto invalid;
+			}
+		}
+
+		err = av_hwdevice_ctx_create(&device_ref, type,
+			q ? device : p[0] ? p : NULL,
+			options, 0);
+		if (err < 0)
+			goto fail;
+
+	}
+	else if (*p == '@') {
+		// Derive from existing device.
+
+		src = hw_device_get_by_name(p + 1);
+		if (!src) {
+			errmsg = "invalid source device name";
+			goto invalid;
+		}
+
+		err = av_hwdevice_ctx_create_derived(&device_ref, type,
+			src->device_ref, 0);
+		if (err < 0)
+			goto fail;
+	}
+	else if (*p == ',') {
+		err = av_dict_parse_string(&options, p + 1, "=", ",", 0);
+
+		if (err < 0) {
+			errmsg = "failed to parse options";
+			goto invalid;
+		}
+
+		err = av_hwdevice_ctx_create(&device_ref, type,
+			NULL, options, 0);
+		if (err < 0)
+			goto fail;
+	}
+	else {
+		errmsg = "parse error";
+		goto invalid;
+	}
+
+	dev = hw_device_add();
+	if (!dev) {
+		err = AVERROR(ENOMEM);
+		goto fail;
+	}
+
+	dev->name = name;
+	dev->type = type;
+	dev->device_ref = device_ref;
+
+	if (dev_out)
+		*dev_out = dev;
+
+	name = NULL;
+	err = 0;
+done:
+	av_freep(&type_name);
+	av_freep(&name);
+	av_freep(&device);
+	av_dict_free(&options);
+	return err;
+invalid:
+	av_log(NULL, AV_LOG_ERROR,
+		"Invalid device specification \"%s\": %s\n", arg, errmsg);
+	err = AVERROR(EINVAL);
+	goto done;
+fail:
+	av_log(NULL, AV_LOG_ERROR,
+		"Device creation failed: %d.\n", err);
+	av_buffer_unref(&device_ref);
+	goto done;
+}
+
+static int hw_device_init_from_type(enum AVHWDeviceType type,
+	const char* device,
+	HWDevice** dev_out)
+{
+	AVBufferRef* device_ref = NULL;
+	HWDevice* dev;
+	char* name;
+	int err;
+
+	name = hw_device_default_name(type);
+	if (!name) {
+		err = AVERROR(ENOMEM);
+		goto fail;
+	}
+
+	err = av_hwdevice_ctx_create(&device_ref, type, device, NULL, 0);
+	if (err < 0) {
+		av_log(NULL, AV_LOG_ERROR,
+			"Device creation failed: %d.\n", err);
+		goto fail;
+	}
+
+	dev = hw_device_add();
+	if (!dev) {
+		err = AVERROR(ENOMEM);
+		goto fail;
+	}
+
+	dev->name = name;
+	dev->type = type;
+	dev->device_ref = device_ref;
+
+	if (dev_out)
+		*dev_out = dev;
+
+	return 0;
+
+fail:
+	av_freep(&name);
+	av_buffer_unref(&device_ref);
+	return err;
+}
+
+void hw_device_free_all(void)
+{
+	int i;
+	for (i = 0; i < nb_hw_devices; i++) {
+		av_freep(&hw_devices[i]->name);
+		av_buffer_unref(&hw_devices[i]->device_ref);
+		av_freep(&hw_devices[i]);
+	}
+	av_freep(&hw_devices);
+	nb_hw_devices = 0;
+}
+
+static HWDevice* hw_device_match_by_codec(const AVCodec* codec)
+{
+	const AVCodecHWConfig* config;
+	HWDevice* dev;
+	int i;
+	for (i = 0;; i++) {
+		config = avcodec_get_hw_config(codec, i);
+		if (!config)
+			return NULL;
+		if (!(config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX))
+			continue;
+		dev = hw_device_get_by_type(config->device_type);
+		if (dev)
+			return dev;
+	}
+}
+#ifdef InputStream
+int hw_device_setup_for_decode(InputStream* ist)
+{
+	const AVCodecHWConfig* config;
+	enum AVHWDeviceType type;
+	HWDevice* dev = NULL;
+	int err, auto_device = 0;
+
+	if (ist->hwaccel_device) {
+		dev = hw_device_get_by_name(ist->hwaccel_device);
+		if (!dev) {
+			if (ist->hwaccel_id == HWACCEL_AUTO) {
+				auto_device = 1;
+			}
+			else if (ist->hwaccel_id == HWACCEL_GENERIC) {
+				type = ist->hwaccel_device_type;
+				err = hw_device_init_from_type(type, ist->hwaccel_device,
+					&dev);
+			}
+			else {
+				// This will be dealt with by API-specific initialisation
+				// (using hwaccel_device), so nothing further needed here.
+				return 0;
+			}
+		}
+		else {
+			if (ist->hwaccel_id == HWACCEL_AUTO) {
+				ist->hwaccel_device_type = dev->type;
+			}
+			else if (ist->hwaccel_device_type != dev->type) {
+				av_log(NULL, AV_LOG_ERROR, "Invalid hwaccel device "
+					"specified for decoder: device %s of type %s is not "
+					"usable with hwaccel %s.\n", dev->name,
+					av_hwdevice_get_type_name(dev->type),
+					av_hwdevice_get_type_name(ist->hwaccel_device_type));
+				return AVERROR(EINVAL);
+			}
+		}
+	}
+	else {
+		if (ist->hwaccel_id == HWACCEL_AUTO) {
+			auto_device = 1;
+		}
+		else if (ist->hwaccel_id == HWACCEL_GENERIC) {
+			type = ist->hwaccel_device_type;
+			dev = hw_device_get_by_type(type);
+
+			// When "-qsv_device device" is used, an internal QSV device named
+			// as "__qsv_device" is created. Another QSV device is created too
+			// if "-init_hw_device qsv=name:device" is used. There are 2 QSV devices
+			// if both "-qsv_device device" and "-init_hw_device qsv=name:device"
+			// are used, hw_device_get_by_type(AV_HWDEVICE_TYPE_QSV) returns NULL.
+			// To keep back-compatibility with the removed ad-hoc libmfx setup code,
+			// call hw_device_get_by_name("__qsv_device") to select the internal QSV
+			// device.
+			if (!dev && type == AV_HWDEVICE_TYPE_QSV)
+				dev = hw_device_get_by_name("__qsv_device");
+
+			if (!dev)
+				err = hw_device_init_from_type(type, NULL, &dev);
+		}
+		else {
+			dev = hw_device_match_by_codec(ist->dec);
+			if (!dev) {
+				// No device for this codec, but not using generic hwaccel
+				// and therefore may well not need one - ignore.
+				return 0;
+			}
+		}
+	}
+
+	if (auto_device) {
+		int i;
+		if (!avcodec_get_hw_config(ist->dec, 0)) {
+			// Decoder does not support any hardware devices.
+			return 0;
+		}
+		for (i = 0; !dev; i++) {
+			config = avcodec_get_hw_config(ist->dec, i);
+			if (!config)
+				break;
+			type = config->device_type;
+			dev = hw_device_get_by_type(type);
+			if (dev) {
+				av_log(NULL, AV_LOG_INFO, "Using auto "
+					"hwaccel type %s with existing device %s.\n",
+					av_hwdevice_get_type_name(type), dev->name);
+			}
+		}
+		for (i = 0; !dev; i++) {
+			config = avcodec_get_hw_config(ist->dec, i);
+			if (!config)
+				break;
+			type = config->device_type;
+			// Try to make a new device of this type.
+			err = hw_device_init_from_type(type, ist->hwaccel_device,
+				&dev);
+			if (err < 0) {
+				// Can't make a device of this type.
+				continue;
+			}
+			if (ist->hwaccel_device) {
+				av_log(NULL, AV_LOG_INFO, "Using auto "
+					"hwaccel type %s with new device created "
+					"from %s.\n", av_hwdevice_get_type_name(type),
+					ist->hwaccel_device);
+			}
+			else {
+				av_log(NULL, AV_LOG_INFO, "Using auto "
+					"hwaccel type %s with new default device.\n",
+					av_hwdevice_get_type_name(type));
+			}
+		}
+		if (dev) {
+			ist->hwaccel_device_type = type;
+		}
+		else {
+			av_log(NULL, AV_LOG_INFO, "Auto hwaccel "
+				"disabled: no device found.\n");
+			ist->hwaccel_id = HWACCEL_NONE;
+			return 0;
+		}
+	}
+
+	if (!dev) {
+		av_log(NULL, AV_LOG_ERROR, "No device available "
+			"for decoder: device type %s needed for codec %s.\n",
+			av_hwdevice_get_type_name(type), ist->dec->name);
+		return err;
+	}
+
+	ist->dec_ctx->hw_device_ctx = av_buffer_ref(dev->device_ref);
+	if (!ist->dec_ctx->hw_device_ctx)
+		return AVERROR(ENOMEM);
+
+	return 0;
+}
+
+int hw_device_setup_for_encode(OutputStream* ost)
+{
+	const AVCodecHWConfig* config;
+	HWDevice* dev = NULL;
+	AVBufferRef* frames_ref = NULL;
+	int i;
+
+	if (ost->filter) {
+		frames_ref = av_buffersink_get_hw_frames_ctx(ost->filter->filter);
+		if (frames_ref &&
+			((AVHWFramesContext*)frames_ref->data)->format ==
+			ost->enc_ctx->pix_fmt) {
+			// Matching format, will try to use hw_frames_ctx.
+		}
+		else {
+			frames_ref = NULL;
+		}
+	}
+
+	for (i = 0;; i++) {
+		config = avcodec_get_hw_config(ost->enc, i);
+		if (!config)
+			break;
+
+		if (frames_ref &&
+			config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_FRAMES_CTX &&
+			(config->pix_fmt == AV_PIX_FMT_NONE ||
+				config->pix_fmt == ost->enc_ctx->pix_fmt)) {
+			av_log(ost->enc_ctx, AV_LOG_VERBOSE, "Using input "
+				"frames context (format %s) with %s encoder.\n",
+				av_get_pix_fmt_name(ost->enc_ctx->pix_fmt),
+				ost->enc->name);
+			ost->enc_ctx->hw_frames_ctx = av_buffer_ref(frames_ref);
+			if (!ost->enc_ctx->hw_frames_ctx)
+				return AVERROR(ENOMEM);
+			return 0;
+		}
+
+		if (!dev &&
+			config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX)
+			dev = hw_device_get_by_type(config->device_type);
+	}
+
+	if (dev) {
+		av_log(ost->enc_ctx, AV_LOG_VERBOSE, "Using device %s "
+			"(type %s) with %s encoder.\n", dev->name,
+			av_hwdevice_get_type_name(dev->type), ost->enc->name);
+		ost->enc_ctx->hw_device_ctx = av_buffer_ref(dev->device_ref);
+		if (!ost->enc_ctx->hw_device_ctx)
+			return AVERROR(ENOMEM);
+	}
+	else {
+		// No device required, or no device available.
+	}
+	return 0;
+}
+
+static int hwaccel_retrieve_data(AVCodecContext* avctx, AVFrame* input)
+{
+	InputStream* ist = (InputStream*)avctx->opaque;
+	AVFrame* output = NULL;
+	enum AVPixelFormat output_format = ist->hwaccel_output_format;
+	int err;
+
+	if (input->format == output_format) {
+		// Nothing to do.
+		return 0;
+	}
+
+	output = av_frame_alloc();
+	if (!output)
+		return AVERROR(ENOMEM);
+
+	output->format = output_format;
+
+	err = av_hwframe_transfer_data(output, input, 0);
+	if (err < 0) {
+		av_log(avctx, AV_LOG_ERROR, "Failed to transfer data to "
+			"output frame: %d.\n", err);
+		goto fail;
+	}
+
+	err = av_frame_copy_props(output, input);
+	if (err < 0) {
+		av_frame_unref(output);
+		goto fail;
+	}
+
+	av_frame_unref(input);
+	av_frame_move_ref(input, output);
+	av_frame_free(&output);
+
+	return 0;
+
+fail:
+	av_frame_free(&output);
+	return err;
+}
+
+int hwaccel_decode_init(AVCodecContext* avctx)
+{
+	InputStream* ist = (InputStream*)avctx->opaque;
+
+	ist->hwaccel_retrieve_data = &hwaccel_retrieve_data;
+
+	return 0;
+}
+
+int hw_device_setup_for_filter(FilterGraph* fg, HWDevice* filter_hw_device)
+{
+	HWDevice* dev;
+	int i;
+
+	// Pick the last hardware device if the user doesn't pick the device for
+	// filters explicitly with the filter_hw_device option.
+	if (filter_hw_device)
+		dev = filter_hw_device;
+	else if (nb_hw_devices > 0) {
+		dev = hw_devices[nb_hw_devices - 1];
+
+		if (nb_hw_devices > 1)
+			av_log(NULL, AV_LOG_WARNING, "There are %d hardware devices. device "
+				"%s of type %s is picked for filters by default. Set hardware "
+				"device explicitly with the filter_hw_device option if device "
+				"%s is not usable for filters.\n",
+				nb_hw_devices, dev->name,
+				av_hwdevice_get_type_name(dev->type), dev->name);
+	}
+	else
+		dev = NULL;
+
+	if (dev) {
+		for (i = 0; i < fg->graph->nb_filters; i++) {
+			fg->graph->filters[i]->hw_device_ctx =
+				av_buffer_ref(dev->device_ref);
+			if (!fg->graph->filters[i]->hw_device_ctx)
+				return AVERROR(ENOMEM);
+		}
+	}
+
+	return 0;
+}
+#endif
+
+#endif // 1
+
+enum AVPixelFormat hw_get_format(AVCodecContext* ctx, const enum AVPixelFormat* fmts)
+{
+	auto pc = (play_ctx*)ctx->opaque;
+	const enum AVPixelFormat* p;
+	for (p = fmts; *p != AV_PIX_FMT_NONE; p++) {
+		if (*p == pc->hw_device_pixel) {
+			return *p;
+		}
+	}
+
+	return AV_PIX_FMT_NONE;
+}
+//
+//void init_dxva2(VideoState* is, const AVCodec* codec, AVCodecContext* avctx)
+//{
+//	if (is->hwaccel == AC_HARDWAREACCELERATETYPE_AUTO || is->hwaccel == AC_HARDWAREACCELERATETYPE_DXVA)
+//	{
+//		switch (codec->id)
+//			//dxva2支持的格式
+//		{
+//		case AV_CODEC_ID_MPEG2VIDEO:
+//		case AV_CODEC_ID_H264:
+//		case AV_CODEC_ID_VC1:
+//		case AV_CODEC_ID_WMV3:
+//		case AV_CODEC_ID_HEVC:
+//		case AV_CODEC_ID_VP9:
+//			//while (1)
+//		{
+//		
+//		}
+//		break;
+//		}
+//	}
+//}
+
 
 /* open a given stream. Return 0 if OK */
-int play_ctx::stream_component_open(VideoState* is, int stream_index)
+int play_ctx::stream_component_open(VideoState* is, int stream_index, const AVCodec* codec)
 {
 	AVFormatContext* ic = is->ic;
 	AVCodecContext* avctx;
-	const AVCodec* codec;
 	const char* forced_codec_name = NULL;
 	AVDictionary* opts = NULL;
 	const AVDictionaryEntry* t = NULL;
@@ -2900,154 +3592,212 @@ int play_ctx::stream_component_open(VideoState* is, int stream_index)
 	if (stream_index < 0 || stream_index >= ic->nb_streams)
 		return -1;
 
-	avctx = avcodec_alloc_context3(NULL);
+	avctx = avcodec_alloc_context3(codec);
 	if (!avctx)
 		return AVERROR(ENOMEM);
-
+	bool fail = true;
 	ret = avcodec_parameters_to_context(avctx, ic->streams[stream_index]->codecpar);
-	if (ret < 0)
-		goto fail;
-	avctx->pkt_timebase = ic->streams[stream_index]->time_base;
+	do {
+		if (ret < 0)
+			break;
+		avctx->pkt_timebase = ic->streams[stream_index]->time_base;
+		if (!codec)
+			codec = avcodec_find_decoder(avctx->codec_id);
 
-	codec = avcodec_find_decoder(avctx->codec_id);
+		switch (avctx->codec_type) {
+		case AVMEDIA_TYPE_AUDIO: is->last_audio_stream = stream_index; forced_codec_name = audio_codec_name; break;
+		case AVMEDIA_TYPE_SUBTITLE: is->last_subtitle_stream = stream_index; forced_codec_name = subtitle_codec_name; break;
+		case AVMEDIA_TYPE_VIDEO:
+		{
+			if (hwctx)
+			{
+				auto fc = av_hwdevice_get_hwframe_constraints(hwctx->hdc, 0);
+				//auto kcodec = avcodec_find_decoder_by_name("");
+				avctx->opaque = this;
+				avctx->get_format = hw_get_format;
+				avctx->hw_device_ctx = hwctx->a();
+				for (int i = 0;; i++) {
+					const AVCodecHWConfig* hwcodec = avcodec_get_hw_config(codec, i);
+					if (hwcodec == NULL) break;
 
-	switch (avctx->codec_type) {
-	case AVMEDIA_TYPE_AUDIO: is->last_audio_stream = stream_index; forced_codec_name = audio_codec_name; break;
-	case AVMEDIA_TYPE_SUBTITLE: is->last_subtitle_stream = stream_index; forced_codec_name = subtitle_codec_name; break;
-	case AVMEDIA_TYPE_VIDEO: is->last_video_stream = stream_index; forced_codec_name = video_codec_name; break;
-	}
-	if (forced_codec_name)
-		codec = avcodec_find_decoder_by_name(forced_codec_name);
-	if (!codec) {
-		if (forced_codec_name) av_log(NULL, AV_LOG_WARNING,
-			"No codec could be found with name '%s'\n", forced_codec_name);
-		else                   av_log(NULL, AV_LOG_WARNING,
-			"No decoder could be found for codec %s\n", avcodec_get_name(avctx->codec_id));
-		ret = AVERROR(EINVAL);
-		goto fail;
-	}
+					// 可能一个解码器对应着多个硬件加速方式，所以这里将其挑选出来
+					if (hwcodec->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX && hwcodec->device_type == hwctx->t) {
+						hw_device_pixel = hwcodec->pix_fmt;
+					}
+				}
+				avctx->thread_count = 1;
+			}
+			is->last_video_stream = stream_index; forced_codec_name = video_codec_name;
+		}
+		break;
+		}
 
-	avctx->codec_id = codec->id;
-	if (stream_lowres > codec->max_lowres) {
-		av_log(avctx, AV_LOG_WARNING, "The maximum value for lowres supported by the decoder is %d\n",
-			codec->max_lowres);
-		stream_lowres = codec->max_lowres;
-	}
-	avctx->lowres = stream_lowres;
+		if (forced_codec_name)
+			codec = avcodec_find_decoder_by_name(forced_codec_name);
+		if (!codec) {
+			if (forced_codec_name) av_log(NULL, AV_LOG_WARNING,
+				"No codec could be found with name '%s'\n", forced_codec_name);
+			else                   av_log(NULL, AV_LOG_WARNING,
+				"No decoder could be found for codec %s\n", avcodec_get_name(avctx->codec_id));
+			ret = AVERROR(EINVAL);
+			break;
+		}
+		if (!hwctx || avctx->codec_type != AVMEDIA_TYPE_VIDEO)
+			avctx->codec_id = codec->id;
+		if (stream_lowres > codec->max_lowres) {
+			av_log(avctx, AV_LOG_WARNING, "The maximum value for lowres supported by the decoder is %d\n",
+				codec->max_lowres);
+			stream_lowres = codec->max_lowres;
+		}
+		avctx->lowres = stream_lowres;
 
-	if (fast)
-		avctx->flags2 |= AV_CODEC_FLAG2_FAST;
+		if (fast)
+			avctx->flags2 |= AV_CODEC_FLAG2_FAST;
 
-	opts = filter_codec_opts(codec_opts, avctx->codec_id, ic, ic->streams[stream_index], codec);
-	if (!av_dict_get(opts, "threads", NULL, 0))
-		av_dict_set(&opts, "threads", "auto", 0);
-	if (stream_lowres)
-		av_dict_set_int(&opts, "lowres", stream_lowres, 0);
-	if ((ret = avcodec_open2(avctx, codec, &opts)) < 0) {
-		goto fail;
-	}
-	if ((t = av_dict_get(opts, "", NULL, AV_DICT_IGNORE_SUFFIX))) {
-		av_log(NULL, AV_LOG_ERROR, "Option %s not found.\n", t->key);
-		ret = AVERROR_OPTION_NOT_FOUND;
-		goto fail;
-	}
+		opts = filter_codec_opts(codec_opts, avctx->codec_id, ic, ic->streams[stream_index], codec);
+		if (!av_dict_get(opts, "threads", NULL, 0))
+			av_dict_set(&opts, "threads", "auto", 0);
+		if (stream_lowres)
+			av_dict_set_int(&opts, "lowres", stream_lowres, 0);
+		if ((ret = avcodec_open2(avctx, codec, &opts)) < 0) {
+			break;
+		}
+		if ((t = av_dict_get(opts, "", NULL, AV_DICT_IGNORE_SUFFIX))) {
+			av_log(NULL, AV_LOG_ERROR, "Option %s not found.\n", t->key);
+			ret = AVERROR_OPTION_NOT_FOUND;
+			break;
+		}
 
-	is->eof = 0;
-	ic->streams[stream_index]->discard = AVDISCARD_DEFAULT;
-	switch (avctx->codec_type) {
-	case AVMEDIA_TYPE_AUDIO:
+		fail = false;
+		is->eof = 0;
+		ic->streams[stream_index]->discard = AVDISCARD_DEFAULT;
+		switch (avctx->codec_type) {
+		case AVMEDIA_TYPE_AUDIO:
+		{
 #if CONFIG_AVFILTER
-	{
-		AVFilterContext* sink;
+			AVFilterContext* sink;
 
-		is->audio_filter_src.freq = avctx->sample_rate;
-		ret = av_channel_layout_copy(&is->audio_filter_src.ch_layout, &avctx->ch_layout);
-		if (ret < 0)
-			goto fail;
-		is->audio_filter_src.fmt = avctx->sample_fmt;
-		if ((ret = configure_audio_filters(is, afilters, 0)) < 0)
-			goto fail;
-		sink = is->out_audio_filter;
-		sample_rate = av_buffersink_get_sample_rate(sink);
-		ret = av_buffersink_get_ch_layout(sink, &ch_layout);
-		if (ret < 0)
-			goto fail;
-	}
+			is->audio_filter_src.freq = avctx->sample_rate;
+			ret = av_channel_layout_copy(&is->audio_filter_src.ch_layout, &avctx->ch_layout);
+			if (ret < 0)
+			{
+				fail = true;
+				break;
+			}
+			is->audio_filter_src.fmt = avctx->sample_fmt;
+			if ((ret = configure_audio_filters(is, afilters, 0)) < 0)
+			{
+				fail = true;
+				break;
+			}
+			sink = is->out_audio_filter;
+			sample_rate = av_buffersink_get_sample_rate(sink);
+			ret = av_buffersink_get_ch_layout(sink, &ch_layout);
+			if (ret < 0)
+			{
+				fail = true;
+				break;
+			}
 #else
-		sample_rate = avctx->sample_rate;
-		ret = av_channel_layout_copy(&ch_layout, &avctx->ch_layout);
-		if (ret < 0)
-			goto fail;
+			sample_rate = avctx->sample_rate;
+			ret = av_channel_layout_copy(&ch_layout, &avctx->ch_layout);
+			if (ret < 0)
+				break;
 #endif
 
-		/* prepare audio output */
-		if ((ret = audio_open(is, &ch_layout, sample_rate, &is->audio_tgt)) < 0)
-			goto fail;
-		is->audio_hw_buf_size = ret;
-		is->audio_src = is->audio_tgt;
-		is->audio_buf_size = 0;
-		is->audio_buf_index = 0;
 
-		/* init averaging filter */
-		is->audio_diff_avg_coef = exp(log(0.01) / AUDIO_DIFF_AVG_NB);
-		is->audio_diff_avg_count = 0;
-		/* since we do not have a precise anough audio FIFO fullness,
-		   we correct audio sync only if larger than this threshold */
-		is->audio_diff_threshold = (double)(is->audio_hw_buf_size) / is->audio_tgt.bytes_per_sec;
+			/* prepare audio output */
+			if ((ret = audio_open(is, &ch_layout, sample_rate, &is->audio_tgt)) < 0)
+			{
+				fail = true;
+				break;
+			}
+			is->audio_hw_buf_size = ret;
+			is->audio_src = is->audio_tgt;
+			is->audio_buf_size = 0;
+			is->audio_buf_index = 0;
 
-		is->audio_stream = stream_index;
-		is->audio_st = ic->streams[stream_index];
+			/* init averaging filter */
+			is->audio_diff_avg_coef = exp(log(0.01) / AUDIO_DIFF_AVG_NB);
+			is->audio_diff_avg_count = 0;
+			/* since we do not have a precise anough audio FIFO fullness,
+			   we correct audio sync only if larger than this threshold */
+			is->audio_diff_threshold = (double)(is->audio_hw_buf_size) / is->audio_tgt.bytes_per_sec;
 
-		if ((ret = decoder_init(&is->auddec, avctx, &is->audioq, is->continue_read_thread)) < 0)
-			goto fail;
-		if ((is->ic->iformat->flags & (AVFMT_NOBINSEARCH | AVFMT_NOGENSEARCH | AVFMT_NO_BYTE_SEEK)) && !is->ic->iformat->read_seek) {
-			is->auddec.start_pts = is->audio_st->start_time;
-			is->auddec.start_pts_tb = is->audio_st->time_base;
-		}
-		if ((ret = decoder_start(&is->auddec, audio_thread1, "audio_decoder", is)) < 0)
-			goto out;
-		thr_count++;
-		SDL_PauseAudioDevice(audio_dev, 0);
-		tis = is;
-		if (ispushaudio)
-		{
-			assert(!audiopt.joinable());
+			is->audio_stream = stream_index;
+			is->audio_st = ic->streams[stream_index];
+
+			if ((ret = decoder_init(&is->auddec, avctx, &is->audioq, is->continue_read_thread)) < 0)
+			{
+				fail = true;
+				break;
+			}
+			if ((is->ic->iformat->flags & (AVFMT_NOBINSEARCH | AVFMT_NOGENSEARCH | AVFMT_NO_BYTE_SEEK)) && !is->ic->iformat->read_seek) {
+				is->auddec.start_pts = is->audio_st->start_time;
+				is->auddec.start_pts_tb = is->audio_st->time_base;
+			}
+			if ((ret = decoder_start(&is->auddec, audio_thread1, "audio_decoder", is)) < 0)
+			{
+				fail = false;
+				break;
+			}
 			thr_count++;
-			std::thread at1([=]() {
-				push_audio_thread();
-				});
-			audiopt.swap(at1);
+			SDL_PauseAudioDevice(audio_dev, 0);
+			tis = is;
+			if (ispushaudio)
+			{
+				assert(!audiopt.joinable());
+				thr_count++;
+				std::thread at1([=]() {
+					push_audio_thread();
+					});
+				audiopt.swap(at1);
+			}
 		}
 		break;
-	case AVMEDIA_TYPE_VIDEO:
-		is->video_stream = stream_index;
-		is->video_st = ic->streams[stream_index];
+		case AVMEDIA_TYPE_VIDEO:
+			is->video_stream = stream_index;
+			is->video_st = ic->streams[stream_index];
 
-		if ((ret = decoder_init(&is->viddec, avctx, &is->videoq, is->continue_read_thread)) < 0)
-			goto fail;
-		if ((ret = decoder_start(&is->viddec, video_thread1, "video_decoder", is)) < 0)
-			goto out;
-		thr_count++;
-		is->queue_attachments_req = 1;
-		break;
-	case AVMEDIA_TYPE_SUBTITLE:
-		is->subtitle_stream = stream_index;
-		is->subtitle_st = ic->streams[stream_index];
+			if ((ret = decoder_init(&is->viddec, avctx, &is->videoq, is->continue_read_thread)) < 0)
+			{
+				fail = true;
+				break;
+			}
+			if ((ret = decoder_start(&is->viddec, video_thread1, "video_decoder", is)) < 0)
+			{
+				fail = false;
+				break;
+			}
+			thr_count++;
+			is->queue_attachments_req = 1;
+			break;
+		case AVMEDIA_TYPE_SUBTITLE:
+			is->subtitle_stream = stream_index;
+			is->subtitle_st = ic->streams[stream_index];
 
-		if ((ret = decoder_init(&is->subdec, avctx, &is->subtitleq, is->continue_read_thread)) < 0)
-			goto fail;
-		if ((ret = decoder_start(&is->subdec, subtitle_thread1, "subtitle_decoder", is)) < 0)
-			goto out;
-		thr_count++;
-		break;
-	default:
-		break;
+			if ((ret = decoder_init(&is->subdec, avctx, &is->subtitleq, is->continue_read_thread)) < 0)
+			{
+				fail = true;
+				break;
+			}
+			if ((ret = decoder_start(&is->subdec, subtitle_thread1, "subtitle_decoder", is)) < 0)
+			{
+				fail = false;
+				break;
+			}
+			thr_count++;
+			break;
+		default:
+			break;
+		}
+		ret;
+	} while (0);
+
+	if (fail)
+	{
+		avcodec_free_context(&avctx);
 	}
-	goto out;
-
-fail:
-	avcodec_free_context(&avctx);
-out:
 	av_channel_layout_uninit(&ch_layout);
 	av_dict_free(&opts);
 
@@ -3097,6 +3847,7 @@ int play_ctx::read_thread(void* arg)
 	SDL_mutex* wait_mutex = SDL_CreateMutex();
 	int scan_all_pmts_set = 0;
 	int64_t pkt_ts;
+	const AVCodec* decoder = NULL;
 
 	if (!wait_mutex) {
 		av_log(NULL, AV_LOG_FATAL, "SDL_CreateMutex(): %s\n", SDL_GetError());
@@ -3214,11 +3965,14 @@ int play_ctx::read_thread(void* arg)
 			st_index[i] = INT_MAX;
 		}
 	}
-
 	if (!video_disable)
+	{
 		st_index[AVMEDIA_TYPE_VIDEO] =
-		av_find_best_stream(ic, AVMEDIA_TYPE_VIDEO,
-			st_index[AVMEDIA_TYPE_VIDEO], -1, NULL, 0);
+			av_find_best_stream(ic, AVMEDIA_TYPE_VIDEO,
+				st_index[AVMEDIA_TYPE_VIDEO], -1, &decoder, 0);
+
+	}
+
 	if (!audio_disable)
 		st_index[AVMEDIA_TYPE_AUDIO] =
 		av_find_best_stream(ic, AVMEDIA_TYPE_AUDIO,
@@ -3250,7 +4004,7 @@ int play_ctx::read_thread(void* arg)
 
 	ret = -1;
 	if (st_index[AVMEDIA_TYPE_VIDEO] >= 0) {
-		ret = stream_component_open(is, st_index[AVMEDIA_TYPE_VIDEO]);
+		ret = stream_component_open(is, st_index[AVMEDIA_TYPE_VIDEO], decoder);
 	}
 	if (is->show_mode == SHOW_MODE_NONE)
 		is->show_mode = ret >= 0 ? SHOW_MODE_VIDEO : SHOW_MODE_RDFT;
@@ -5191,7 +5945,11 @@ static void log_callback_report(void* ptr, int level, const char* fmt, va_list v
 		fflush(report_file);
 	}
 }
-
+char* av_err2str_(int ret)
+{
+	static char ebuf[AV_ERROR_MAX_STRING_SIZE] = {};
+	return av_make_error_string(ebuf, AV_ERROR_MAX_STRING_SIZE, ret);
+}
 int init_report(const char* env, FILE** file)
 {
 	char* filename_template = NULL;
@@ -5206,14 +5964,13 @@ int init_report(const char* env, FILE** file)
 		return 0;
 	time(&now);
 	tm = localtime(&now);
-	char ebuf[AV_ERROR_MAX_STRING_SIZE] = {};
 	while (env && *env) {
 		if ((ret = av_opt_get_key_value(&env, "=", ":", 0, &key, &val)) < 0) {
 			if (count)
 			{
 				av_log(NULL, AV_LOG_ERROR,
-					"Failed to parse FFREPORT environment variable: %s\n", av_make_error_string(ebuf, AV_ERROR_MAX_STRING_SIZE, ret));
-				//av_err2str(ret));
+					"Failed to parse FFREPORT environment variable: %s\n",
+					av_err2str_(ret));
 			}
 			break;
 		}
@@ -5414,7 +6171,7 @@ static int print_device_sources(const AVInputFormat* fmt, AVDictionary* opts)
 
 	printf("Auto-detected sources for %s:\n", fmt->name);
 	if ((ret = avdevice_list_input_sources(fmt, NULL, opts, &device_list)) < 0) {
-		printf("Cannot list sources: %s\n", av_err2str(ret));
+		printf("Cannot list sources: %s\n", av_err2str_(ret));
 		goto fail;
 	}
 
@@ -5435,7 +6192,7 @@ static int print_device_sinks(const AVOutputFormat* fmt, AVDictionary* opts)
 
 	printf("Auto-detected sinks for %s:\n", fmt->name);
 	if ((ret = avdevice_list_output_sinks(fmt, NULL, opts, &device_list)) < 0) {
-		printf("Cannot list sinks: %s\n", av_err2str(ret));
+		printf("Cannot list sinks: %s\n", av_err2str_(ret));
 		goto fail;
 	}
 
@@ -5739,6 +6496,9 @@ void play_ctx::new_display()
 		}
 	}
 }
+
+static std::map<std::string, hwdev_t> mhw;
+
 void* ff_open(const char* url, void(*dcb)(yuv_info_t*))//, int (*ctrl_cb)(ctrl_data_t*))
 {
 	if (!url)return 0;
@@ -5750,10 +6510,103 @@ void* ff_open(const char* url, void(*dcb)(yuv_info_t*))//, int (*ctrl_cb)(ctrl_d
 		avdevice_register_all();
 #endif
 		avformat_network_init();
+
+		AVHWDeviceType type = AV_HWDEVICE_TYPE_NONE;
+		AVHWDeviceContext* device_ctx = 0;
+		// ffmepg 支持的加速器列表
+		while ((type = av_hwdevice_iterate_types(type)) != AV_HWDEVICE_TYPE_NONE)
+		{
+			auto c = av_hwdevice_get_type_name(type);
+			mhw[c].t = type;
+			auto& it = mhw[c];
+
+			// 创建硬件加速器的缓冲区
+			if (av_hwdevice_ctx_create(&it.hdc, type, NULL, NULL, 0) < 0) {
+				mhw.erase(c);
+			}
+			else
+			{
+				device_ctx = reinterpret_cast<AVHWDeviceContext*>(it.hdc->data);
+				it.name = c;
+			}
+			/** 如果使用软解码则默认有一个软解码的缓冲区(获取AVFrame的)，而硬解码则需要额外创建硬件解码的缓冲区
+			 *  这个缓冲区变量为hw_frames_ctx，不手动创建，则在调用avcodec_send_packet()函数内部自动创建一个
+			 *  但是必须手动赋值硬件解码缓冲区引用hw_device_ctx(它是一个AVBufferRef变量)
+			 */
+			 // 即hw_device_ctx有值则使用硬件解码
+
+		}
+		bool testb = false;
+		if (testb)
+		{
+			AVCodecID codec_id = AV_CODEC_ID_H264;
+
+			// 1. 查找解码器
+			auto codec = avcodec_find_decoder(codec_id);
+
+			// 2. 根据解码器创建解码器上下文
+			auto c = avcodec_alloc_context3(codec);
+			// 初始化硬件加速上下文
+			AVBufferRef* hw_ctx = nullptr;
+			std::vector<std::string> hwv;
+			{
+
+
+				//////////////////////////////////////////////////
+				/// 硬件加速部分
+
+				auto hw_type = AV_HWDEVICE_TYPE_DXVA2;
+				// 打印所有支持的硬件加速方式
+				for (int i = 0;; i++)
+				{
+					auto config = avcodec_get_hw_config(codec, i);
+					if (!config) break;
+					if (config->device_type)
+						hwv.push_back(av_hwdevice_get_type_name(config->device_type));
+				}
+
+				av_hwdevice_ctx_create(&hw_ctx, hw_type, nullptr, nullptr, 0);
+
+			}
+			std::vector<const AVCodec*> avc;
+			std::map<std::string, std::vector<const AVCodec*>> avn;
+			AVCodec* prev = NULL, * p;
+			void* i = 0;
+			while ((p = (AVCodec*)av_codec_iterate(&i))) {
+				//avc.push_back(p);
+				avn[p->name].push_back(p);
+				prev = p;
+			}
+			for (auto& [k, v] : mhw)
+			{
+				avc.push_back(avcodec_find_decoder_by_name(k.c_str()));
+			}
+			auto codec1 = avcodec_find_decoder_by_name("h264_cuvid");
+		}
+		int n = mhw.size();
+		printf("hw count:\t%d\n", n);
 		});
 
 	play_ctx* ctx = new play_ctx();
 	ctx->input_filename = url;
+
+	if (mhw.size())
+	{
+		for (auto& [k, v] : mhw)
+		{
+			if (k.find("d3d11") != std::string::npos)
+			{
+				ctx->hwctx = &v;
+			}
+		}
+		if (!ctx->hwctx)
+		{
+			auto& hw = *mhw.begin();
+			ctx->hwctx = &hw.second;
+		}
+		//ctx->video_codec_name = hw.first.c_str();
+	}
+
 	SDL_sem* sem = SDL_CreateSemaphore(0);
 	auto cb = [=]() {
 		VideoState* is;
