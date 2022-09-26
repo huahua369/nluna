@@ -414,6 +414,8 @@ public:
 
 	/* current context */
 	bool is_full_screen = 0;
+	// 复制到内存。也就是hwframe
+	bool is_cp2mem = false;
 	int64_t audio_callback_time = 0;
 
 #define FF_QUIT_EVENT    (SDL_USEREVENT + 2)
@@ -728,7 +730,7 @@ int play_ctx::decoder_decode_frame(Decoder* d, AVFrame* frame, AVSubtitle* sub) 
 					}
 					auto px = hw_device_pixel;
 					px = (AVPixelFormat)frame->format;
-					if (hwctx && 0)
+					if (hwctx && is_cp2mem)
 					{
 						if (frame->format == hw_device_pixel) {
 							// 如果采用的硬件加速剂，则调用avcodec_receive_frame()函数后，解码后的数据还在GPU中，所以需要通过此函数
@@ -2530,6 +2532,7 @@ the_end:
 	avfilter_graph_free(&graph);
 #endif
 	av_frame_free(&frame);
+	av_frame_free(&hwframe);
 	return 0;
 }
 
