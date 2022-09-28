@@ -3999,7 +3999,6 @@ int play_ctx::read_thread(void* arg)
 		if (codecpar->width)
 			set_default_window_size(codecpar->width, codecpar->height, sar);
 	}
-
 	/* open the streams */
 	if (st_index[AVMEDIA_TYPE_AUDIO] >= 0) {
 		stream_component_open(is, st_index[AVMEDIA_TYPE_AUDIO]);
