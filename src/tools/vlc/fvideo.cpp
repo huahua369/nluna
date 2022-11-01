@@ -1290,6 +1290,7 @@ void play_ctx::video_image_display1(VideoState* is)
 		auto fmt = (AVPixelFormat)frame->format;
 		if (is->dcb && (frame->linesize[0] > 0 && frame->linesize[1] > 0/* && frame->linesize[2] > 0*/)) {
 			int h = (frame->height + 1) / 2;
+			yf.ctx = this;
 
 			int ms3[] = { (frame->linesize[0] * frame->height) , (frame->linesize[1] * h) , (frame->linesize[2] * h) };// mt.get_file_size();
 			int ms = ms3[0] + ms3[1] + ms3[2];
@@ -2779,7 +2780,7 @@ int play_ctx::audio_decode_frame(VideoState* is)
 			is->audio_clock - last_clock,
 			is->audio_clock, audio_clock0);
 		last_clock = is->audio_clock;
-}
+	}
 #endif
 	return resampled_data_size;
 }
@@ -3771,7 +3772,7 @@ int play_ctx::stream_component_open(VideoState* is, int stream_index, const AVCo
 					});
 				audiopt.swap(at1);
 			}
-			}
+		}
 		break;
 		case AVMEDIA_TYPE_VIDEO:
 			is->video_stream = stream_index;
@@ -3810,17 +3811,17 @@ int play_ctx::stream_component_open(VideoState* is, int stream_index, const AVCo
 			break;
 		}
 		ret;
-		} while (0);
+	} while (0);
 
-		if (fail)
-		{
-			avcodec_free_context(&avctx);
-		}
-		av_channel_layout_uninit(&ch_layout);
-		av_dict_free(&opts);
-
-		return ret;
+	if (fail)
+	{
+		avcodec_free_context(&avctx);
 	}
+	av_channel_layout_uninit(&ch_layout);
+	av_dict_free(&opts);
+
+	return ret;
+}
 
 static int decode_interrupt_cb(void* ctx)
 {
@@ -4522,7 +4523,6 @@ void play_ctx::upctrl(ctrl_data_t* p)
 			do_exit(cur_stream);
 			break;
 		}
-		p->second = get_ts(cur_stream);
 
 		if (p->full_screen)
 		{
@@ -4674,7 +4674,7 @@ void play_ctx::event_loop1(VideoState* cur_stream)
 				break;
 			default:
 				break;
-				}
+			}
 			break;
 		case SDL_MOUSEBUTTONDOWN:
 			if (exit_on_mousedown) {
@@ -4755,9 +4755,9 @@ void play_ctx::event_loop1(VideoState* cur_stream)
 			break;
 		default:
 			break;
-			}
 		}
 	}
+}
 
 int play_ctx::opt_width(void* optctx, const char* opt, const char* arg)
 {
@@ -5066,7 +5066,7 @@ static void print_buildconf(int flags, int level)
 	while (splitconf != NULL) {
 		av_log(NULL, level, "%s%s%s\n", indent, indent, splitconf);
 		splitconf = strtok(NULL, "~");
-}
+	}
 #endif
 }
 
@@ -5683,7 +5683,7 @@ int show_filters(void* optctx, const char* opt, const char* arg)
 	printf("No filters available: libavfilter disabled\n");
 #endif
 	return 0;
-	}
+}
 
 static int is_device(const AVClass* avclass)
 {
@@ -6705,6 +6705,24 @@ void ff_set(void* p, ctrl_data_t* c)
 		ctx->pc = c;
 		ctx->is_ctrl = 1;
 	}
+}
+
+av_time_t ff_get_time(void* p)
+{
+	av_time_t r = {};
+	auto ctx = (play_ctx*)p;
+	if (ctx && ctx->tis && ctx->tis->ic)
+	{
+		int tns, thh, tmm, tss;
+		r.second = tns = ctx->tis->ic->duration / 1000000LL;
+		thh = tns / 3600;
+		tmm = (tns % 3600) / 60;
+		tss = (tns % 60);
+		r.hms[0] = thh;
+		r.hms[1] = tmm;
+		r.hms[2] = tss;
+	}
+	return r;
 }
 /* Called from the main */
 int ff_play(int argc, char** argv, bool isdisplay, void(*dcb)(yuv_info_t*))

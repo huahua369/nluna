@@ -21,13 +21,16 @@ struct yuv_info_t {
 #else
 struct yuv_info_t;
 #endif
-
+//
+struct av_time_t
+{
+	int second = 0;		// 返回秒数
+	int hms[3] = {};	// Hour minute second
+};
 // 在回调函数修改一次设置成功后自动还原默认值
 struct ctrl_data_t
 {
 	void* ctx = 0;
-	// 返回
-	int second = 0;		// 返回秒数
 	// set
 	int ploop = 0;		// 循环次数
 	int volume = -1;	// 0-128
@@ -46,6 +49,8 @@ struct ctrl_data_t
 void* ff_open(const char* url, void(*dcb)(yuv_info_t*));
 // ff_set可以多线程调用
 void ff_set(void* p, ctrl_data_t* c);
+// 获取时间
+av_time_t ff_get_time(void* p);
 
 // test api
 int ff_play(int argc, char** argv, bool isdisplay, void(*dcb)(yuv_info_t*));
