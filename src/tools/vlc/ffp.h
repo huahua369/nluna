@@ -17,6 +17,7 @@ struct yuv_info_t {
 	int8_t b = 8;			// 8,16
 	int8_t t = 0;			// 1plane时422才有0=gbr, 1=brg
 	int8_t plane = 0;		// 1 2 3
+	int8_t bpp = 0;			// 10 12
 };
 #else
 struct yuv_info_t;
@@ -26,6 +27,9 @@ struct yuv_info_t;
 struct ctrl_data_t
 {
 	void* ctx = 0;
+	// 返回
+	int second = 0;		// 返回秒数
+	// set
 	int ploop = 0;		// 循环次数
 	int volume = -1;	// 0-128
 	int volume_inc = 0;	// 音量平滑步进1，

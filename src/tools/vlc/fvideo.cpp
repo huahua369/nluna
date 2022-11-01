@@ -1290,6 +1290,7 @@ void play_ctx::video_image_display1(VideoState* is)
 		auto fmt = (AVPixelFormat)frame->format;
 		if (is->dcb && (frame->linesize[0] > 0 && frame->linesize[1] > 0/* && frame->linesize[2] > 0*/)) {
 			int h = (frame->height + 1) / 2;
+
 			int ms3[] = { (frame->linesize[0] * frame->height) , (frame->linesize[1] * h) , (frame->linesize[2] * h) };// mt.get_file_size();
 			int ms = ms3[0] + ms3[1] + ms3[2];
 			//0 = 420, 1 = 422, 2 = 444
@@ -1302,6 +1303,14 @@ void play_ctx::video_image_display1(VideoState* is)
 			else if (fmt == AVPixelFormat::AV_PIX_FMT_YUV444P)
 			{
 				yf.format = 2;
+			}
+			if (fmt == AVPixelFormat::AV_PIX_FMT_P010LE)
+			{
+			}
+			const AVPixFmtDescriptor* d = av_pix_fmt_desc_get(fmt);
+			if (d)
+			{
+				yf.bpp = d->comp[0].depth;
 			}
 			yf.plane = 0;
 			yf.width = frame->width;
@@ -2773,7 +2782,7 @@ int play_ctx::audio_decode_frame(VideoState* is)
 }
 #endif
 	return resampled_data_size;
-	}
+}
 
 /* prepare a new audio buffer */
 void play_ctx::sdl_audio_callback(void* opaque, Uint8* stream, int len)
@@ -3544,7 +3553,7 @@ int hw_device_setup_for_filter(FilterGraph* fg, HWDevice* filter_hw_device)
 	}
 
 	return 0;
-	}
+}
 #endif
 
 #endif // 1
@@ -4448,6 +4457,18 @@ void goto_inc(VideoState* cur_stream, double incr, int seek_by_bytes, double pos
 		stream_seek(cur_stream, (int64_t)(pos * AV_TIME_BASE), (int64_t)(incr * AV_TIME_BASE), 0);
 	}
 }
+// 获取秒数
+int get_ts(VideoState* cur_stream)
+{
+	int64_t ts;
+	int ns, hh, mm, ss;
+	int tns, thh, tmm, tss;
+	tns = cur_stream->ic->duration / 1000000LL;
+	thh = tns / 3600;
+	tmm = (tns % 3600) / 60;
+	tss = (tns % 60);
+	return tns;
+}
 // 设置偏移百分比0-1.0
 void seek_pos(VideoState* cur_stream, double xs, int seek_by_bytes)
 {
@@ -4501,6 +4522,8 @@ void play_ctx::upctrl(ctrl_data_t* p)
 			do_exit(cur_stream);
 			break;
 		}
+		p->second = get_ts(cur_stream);
+
 		if (p->full_screen)
 		{
 			toggle_full_screen(tis);
@@ -4651,7 +4674,7 @@ void play_ctx::event_loop1(VideoState* cur_stream)
 				break;
 			default:
 				break;
-			}
+				}
 			break;
 		case SDL_MOUSEBUTTONDOWN:
 			if (exit_on_mousedown) {
@@ -4732,9 +4755,9 @@ void play_ctx::event_loop1(VideoState* cur_stream)
 			break;
 		default:
 			break;
+			}
 		}
 	}
-}
 
 int play_ctx::opt_width(void* optctx, const char* opt, const char* arg)
 {
@@ -5043,7 +5066,7 @@ static void print_buildconf(int flags, int level)
 	while (splitconf != NULL) {
 		av_log(NULL, level, "%s%s%s\n", indent, indent, splitconf);
 		splitconf = strtok(NULL, "~");
-	}
+}
 #endif
 }
 
@@ -5660,7 +5683,7 @@ int show_filters(void* optctx, const char* opt, const char* arg)
 	printf("No filters available: libavfilter disabled\n");
 #endif
 	return 0;
-}
+	}
 
 static int is_device(const AVClass* avclass)
 {
@@ -6675,6 +6698,7 @@ void* ff_open(const char* url, void(*dcb)(yuv_info_t*))//, int (*ctrl_cb)(ctrl_d
 }
 void ff_set(void* p, ctrl_data_t* c)
 {
+	p = (c && !p) ? c->ctx : p;
 	auto ctx = (play_ctx*)p;
 	if (p && c)
 	{
