@@ -14,10 +14,9 @@ struct yuv_info_t {
 	uint32_t size[3] = {};
 	uint32_t width = 0, height = 0;
 	int8_t format;			// 0=420, 1=422, 2=444
-	int8_t b = 8;			// 8,16
+	int8_t b = 8;			// bpp=8,10,12,16
 	int8_t t = 0;			// 1plane ±422≤≈”–0=gbr, 1=brg
 	int8_t plane = 0;		// 1 2 3
-	int8_t bpp = 0;			// 10 12
 };
 #else
 struct yuv_info_t;

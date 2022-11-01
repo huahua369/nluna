@@ -1310,7 +1310,7 @@ void play_ctx::video_image_display1(VideoState* is)
 			const AVPixFmtDescriptor* d = av_pix_fmt_desc_get(fmt);
 			if (d)
 			{
-				yf.bpp = d->comp[0].depth;
+				yf.b = d->comp[0].depth;
 			}
 			yf.plane = 0;
 			yf.width = frame->width;
