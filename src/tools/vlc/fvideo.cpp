@@ -1271,6 +1271,20 @@ void play_ctx::video_image_display1(VideoState* is)
 	set_sdl_yuv_conversion_mode(vp->frame);
 
 	if (!vp->uploaded) {
+		/*
+		1、I420、YV12、NV12、NV21的存储格式(采样格式是YUV420planar)
+			I420： YYYYYYYYUUVV
+			YV12：YYYYYYYYVVUU
+			NV12：YYYYYYYYUVUV
+			NV21：YYYYYYYYVUVU
+
+			2.YUYV的存储格式(采样格式是YUV420packed)
+			YUYV：YUYVYUYVYUYV（两个Y分量共用一组UV分量，存储顺序是YUYV）
+
+			YVYU：YVYUYVYUYVYU
+
+			UYVY：UYVYUYVYUYVY
+		*/
 		yuv_info_t yf = {};
 		auto frame = hwframe && is_cp2mem ? hwframe : vp->frame;
 		auto fmt = (AVPixelFormat)frame->format;
@@ -1279,9 +1293,15 @@ void play_ctx::video_image_display1(VideoState* is)
 			int ms3[] = { (frame->linesize[0] * frame->height) , (frame->linesize[1] * h) , (frame->linesize[2] * h) };// mt.get_file_size();
 			int ms = ms3[0] + ms3[1] + ms3[2];
 			//0 = 420, 1 = 422, 2 = 444
-			if (fmt == AVPixelFormat::AV_PIX_FMT_NV12)
+			AVPixelFormat pixs[] = { AV_PIX_FMT_YUV420P , AV_PIX_FMT_NV12 ,AV_PIX_FMT_NV21
+				,AV_PIX_FMT_YUYV422,AV_PIX_FMT_YUV422P,AV_PIX_FMT_YUV444P };
+			if (fmt == AVPixelFormat::AV_PIX_FMT_YUV422P)
 			{
-				yf.format = 0;
+				yf.format = 1;
+			}
+			else if (fmt == AVPixelFormat::AV_PIX_FMT_YUV444P)
+			{
+				yf.format = 2;
 			}
 			yf.plane = 0;
 			yf.width = frame->width;
@@ -2750,10 +2770,10 @@ int play_ctx::audio_decode_frame(VideoState* is)
 			is->audio_clock - last_clock,
 			is->audio_clock, audio_clock0);
 		last_clock = is->audio_clock;
-	}
+}
 #endif
 	return resampled_data_size;
-}
+	}
 
 /* prepare a new audio buffer */
 void play_ctx::sdl_audio_callback(void* opaque, Uint8* stream, int len)
@@ -3524,7 +3544,7 @@ int hw_device_setup_for_filter(FilterGraph* fg, HWDevice* filter_hw_device)
 	}
 
 	return 0;
-}
+	}
 #endif
 
 #endif // 1
@@ -3742,7 +3762,7 @@ int play_ctx::stream_component_open(VideoState* is, int stream_index, const AVCo
 					});
 				audiopt.swap(at1);
 			}
-		}
+			}
 		break;
 		case AVMEDIA_TYPE_VIDEO:
 			is->video_stream = stream_index;
@@ -3781,17 +3801,17 @@ int play_ctx::stream_component_open(VideoState* is, int stream_index, const AVCo
 			break;
 		}
 		ret;
-	} while (0);
+		} while (0);
 
-	if (fail)
-	{
-		avcodec_free_context(&avctx);
+		if (fail)
+		{
+			avcodec_free_context(&avctx);
+		}
+		av_channel_layout_uninit(&ch_layout);
+		av_dict_free(&opts);
+
+		return ret;
 	}
-	av_channel_layout_uninit(&ch_layout);
-	av_dict_free(&opts);
-
-	return ret;
-}
 
 static int decode_interrupt_cb(void* ctx)
 {
