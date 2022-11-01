@@ -393,7 +393,7 @@ public:
 	/* current context */
 	bool is_full_screen = 0;
 	// 复制到内存。也就是hwframe
-	bool is_cp2mem = false;
+	bool is_cp2mem = true;
 	int64_t audio_callback_time = 0;
 
 #define FF_QUIT_EVENT    (SDL_USEREVENT + 2)
@@ -1272,23 +1272,31 @@ void play_ctx::video_image_display1(VideoState* is)
 
 	if (!vp->uploaded) {
 		yuv_info_t yf = {};
-		if (is->dcb && (vp->frame->linesize[0] > 0 && vp->frame->linesize[1] > 0 && vp->frame->linesize[2] > 0)) {
-			int h = (vp->frame->height + 1) / 2;
-			int ms3[] = { (vp->frame->linesize[0] * vp->frame->height) , (vp->frame->linesize[1] * h) , (vp->frame->linesize[2] * h) };// mt.get_file_size();
+		auto frame = hwframe && is_cp2mem ? hwframe : vp->frame;
+		auto fmt = (AVPixelFormat)frame->format;
+		if (is->dcb && (frame->linesize[0] > 0 && frame->linesize[1] > 0/* && frame->linesize[2] > 0*/)) {
+			int h = (frame->height + 1) / 2;
+			int ms3[] = { (frame->linesize[0] * frame->height) , (frame->linesize[1] * h) , (frame->linesize[2] * h) };// mt.get_file_size();
 			int ms = ms3[0] + ms3[1] + ms3[2];
-
-			yf.width = vp->frame->width;
-			yf.height = vp->frame->height;
+			//0 = 420, 1 = 422, 2 = 444
+			if (fmt == AVPixelFormat::AV_PIX_FMT_NV12)
+			{
+				yf.format = 0;
+			}
+			yf.plane = 0;
+			yf.width = frame->width;
+			yf.height = frame->height;
 			for (size_t i = 0; i < AV_NUM_DATA_POINTERS; i++)
 			{
-				if (vp->frame->data[i] == 0)break;
-				yf.data[i] = vp->frame->data[i];
+				if (frame->data[i] == 0)break;
+				yf.data[i] = frame->data[i];
 				yf.size[i] = ms3[i];
+				yf.plane++;
 			}
 			is->dcb(&yf);
 		}
 		vp->uploaded = 1;
-		vp->flip_v = vp->frame->linesize[0] < 0;
+		vp->flip_v = frame->linesize[0] < 0;
 	}
 }
 
