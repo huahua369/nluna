@@ -66,6 +66,11 @@ extern "C" {
 #include <SDL_thread.h>
 #include "ffp.h"
 
+// 内存泄漏检测--editable
+#ifdef _DEBUG
+#define new new( _CLIENT_BLOCK, __FILE__, __LINE__)
+#endif
+
 const char program_name[] = "ffplay";
 const int program_birth_year = 2003;
 
@@ -360,7 +365,8 @@ public:
 	int alwaysontop = 0;
 	int startup_volume = 100;
 	int show_status = -1;
-	int av_sync_type = AV_SYNC_AUDIO_MASTER;
+	int av_sync_type = 0;// AV_SYNC_AUDIO_MASTER;
+
 	int64_t start_time = AV_NOPTS_VALUE;
 	int64_t duration = AV_NOPTS_VALUE;
 	int fast = 0;
@@ -410,7 +416,7 @@ public:
 	// 音频线程
 	std::thread audiopt;
 	std::atomic_int16_t is_ctrl, thr_count;
-	ctrl_data_t* pc = 0;
+	ctrl_data_t pc = {};
 	VideoState* tis = 0;
 
 	AVPixelFormat hw_device_pixel = {};
@@ -1288,13 +1294,11 @@ void play_ctx::video_image_display1(VideoState* is)
 		yuv_info_t yf = {};
 		auto frame = hwframe && is_cp2mem ? hwframe : vp->frame;
 		auto fmt = (AVPixelFormat)frame->format;
-		if (is->dcb && (frame->linesize[0] > 0 && frame->linesize[1] > 0/* && frame->linesize[2] > 0*/)) {
-			int h = (frame->height + 1) / 2;
-			yf.ctx = this;
-
-			int ms3[] = { (frame->linesize[0] * frame->height) , (frame->linesize[1] * h) , (frame->linesize[2] * h) };// mt.get_file_size();
-			int ms = ms3[0] + ms3[1] + ms3[2];
-			//0 = 420, 1 = 422, 2 = 444
+		if (is->dcb && (frame->linesize[0] > 0 /*&& frame->linesize[1] > 0 && frame->linesize[2] > 0*/)) {
+			/*SDL_UpdateYUVTexture(0, NULL, frame->data[0], frame->linesize[0],
+			   frame->data[1], frame->linesize[1],
+			   frame->data[2], frame->linesize[2]);*/
+			   //0 = 420, 1 = 422, 2 = 444
 			AVPixelFormat pixs[] = { AV_PIX_FMT_YUV420P , AV_PIX_FMT_NV12 ,AV_PIX_FMT_NV21
 				,AV_PIX_FMT_YUYV422,AV_PIX_FMT_YUV422P,AV_PIX_FMT_YUV444P };
 			if (fmt == AVPixelFormat::AV_PIX_FMT_YUV422P)
@@ -1308,6 +1312,13 @@ void play_ctx::video_image_display1(VideoState* is)
 			if (fmt == AVPixelFormat::AV_PIX_FMT_P010LE)
 			{
 			}
+			int h = (frame->height + 1);
+			if (yf.format < 2)
+				h /= 2;
+
+			yf.ctx = this;
+			int ms3[] = { (frame->linesize[0] * frame->height) , (frame->linesize[1] * h) , (frame->linesize[2] * h) };
+			int ms = ms3[0] + ms3[1] + ms3[2];
 			const AVPixFmtDescriptor* d = av_pix_fmt_desc_get(fmt);
 			if (d)
 			{
@@ -4423,10 +4434,11 @@ void play_ctx::refresh_wait_event(VideoState* is)
 		remaining_time = REFRESH_RATE;
 		if (is->show_mode != SHOW_MODE_NONE && (!is->paused || is->force_refresh))
 			video_refresh(is, &remaining_time);
-		if (pc && is_ctrl > 0)
+		if (pc.ctx && is_ctrl > 0)
 		{
-			upctrl(pc); is_ctrl = 0; pc = 0;
+			upctrl(&pc); pc.ctx = 0;
 		}
+		is_ctrl = 0;
 	}
 }
 void goto_inc(VideoState* cur_stream, double incr, int seek_by_bytes, double pos = -1)
@@ -6640,11 +6652,11 @@ void* ff_open(const char* url, void(*dcb)(yuv_info_t*))//, int (*ctrl_cb)(ctrl_d
 
 	SDL_sem* sem = SDL_CreateSemaphore(0);
 	auto cb = [=]() {
-		VideoState* is;
+		VideoState* is = 0;
 		init_options(ctx);
 		ctx->ispushaudio = true;
 		//ctx->infinite_buffer = 0;
-		ctx->av_sync_type = 0;// AV_SYNC_VIDEO_MASTER;// AV_SYNC_EXTERNAL_CLOCK;// 同步到外部时钟
+		ctx->av_sync_type = AV_SYNC_VIDEO_MASTER;// AV_SYNC_EXTERNAL_CLOCK;// AV_SYNC_AUDIO_MASTER;// ;// 同步到外部时钟
 		av_log_set_flags(AV_LOG_SKIP_REPEATED);
 		auto options = ctx->options.data();
 		//parse_loglevel(argc, argv, options);
@@ -6662,9 +6674,10 @@ void* ff_open(const char* url, void(*dcb)(yuv_info_t*))//, int (*ctrl_cb)(ctrl_d
 			av_log(NULL, AV_LOG_FATAL, "An input file must be specified\n");
 			av_log(NULL, AV_LOG_FATAL,
 				"Use -h to get full help or, even better, run 'man %s'\n", program_name);
-			exit(1);
+			//exit(1);
 		}
-		is = ctx->stream_open(ctx->input_filename, ctx->file_iformat);
+		else
+			is = ctx->stream_open(ctx->input_filename, ctx->file_iformat);
 		if (is)
 		{
 			//ctx->ctrl_cb = ctrl_cb;
@@ -6702,7 +6715,9 @@ void ff_set(void* p, ctrl_data_t* c)
 	auto ctx = (play_ctx*)p;
 	if (p && c)
 	{
-		ctx->pc = c;
+		if (!c->ctx)
+			c->ctx = p;
+		ctx->pc = *c;
 		ctx->is_ctrl = 1;
 	}
 }
