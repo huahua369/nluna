@@ -321,7 +321,7 @@ typedef struct VideoState {
 	void(*dcb)(yuv_info_t*);
 	// ÓÃ»§Ö¸Õë
 	void* userptr = 0;
-
+	int isquit = 0;
 } VideoState;
 
 struct hwdev_t
@@ -2509,6 +2509,7 @@ int play_ctx::video_thread(void* arg)
 				event.type = FF_QUIT_EVENT;
 				event.user.data1 = is;
 				SDL_PushEvent(&event);
+				is->isquit = 1;
 				goto the_end;
 			}
 			filt_in = is->in_video_filter;
@@ -4197,6 +4198,8 @@ fail:
 		event.type = FF_QUIT_EVENT;
 		event.user.data1 = is;
 		SDL_PushEvent(&event);
+
+		is->isquit = 1;
 	}
 	SDL_DestroyMutex(wait_mutex);
 	return 0;
@@ -4421,7 +4424,8 @@ void play_ctx::refresh_wait_event(VideoState* is)
 {
 	double remaining_time = 0.0;
 
-	while (et) {
+	while (et && is) {
+		if (is->isquit)break;
 		if (!cursor_hidden && av_gettime_relative() - cursor_last_shown > CURSOR_HIDE_DELAY) {
 			//SDL_ShowCursor(0);
 			cursor_hidden = 1;
@@ -4518,10 +4522,9 @@ void play_ctx::event_loop(VideoState* cur_stream)
 	SDL_Event event = {};
 	double incr, pos, frac;
 	bool xt = true;
-	for (; xt;) {
+	for (; tis && !tis->isquit;) {
 		double x;
 		refresh_wait_event(cur_stream);
-		xt = tis ? true : false;
 	}
 }
 void play_ctx::upctrl(ctrl_data_t* p)
