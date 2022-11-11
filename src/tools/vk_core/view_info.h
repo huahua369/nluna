@@ -10,11 +10,12 @@
 #ifndef YUV_INFO_ST
 #define YUV_INFO_ST
 struct yuv_info_t {
+	void* ctx = 0;
 	void* data[3] = {};
 	uint32_t size[3] = {};
 	uint32_t width = 0, height = 0;
-	int8_t format;			// 0=420, 1=422, 2=444
-	int8_t b = 8;			// 8,16
+	int8_t format = 0;		// 0=420, 1=422, 2=444
+	int8_t b = 8;			// bpp=8,10,12,16
 	int8_t t = 0;			// 1plane时422才有0=gbr, 1=brg
 	int8_t plane = 0;		// 1 2 3
 };
@@ -104,7 +105,7 @@ namespace hz {
 		on_input,		// 输入法字符，需要输入焦点
 		on_editing,		// 输入法: 显示编辑的字符
 
-		on_click,
+		on_click,		// 单击双击三击时鼠标在目标范围才能触发
 		on_dblclick,
 		on_tripleclick,
 		on_enter,		// 鼠标进入
@@ -653,18 +654,18 @@ namespace hz {
 		float new_alpha = -1;
 		bool mixed = false;					// 不满
 	};
-	// 图像基本属性有：区域、偏移、九宫格；72字节
+	// 图像基本属性有：区域、偏移、九宫格；
 	struct image_cs
 	{
 		glm::vec2 pos = {};
-		Image* img = 0;				// *所在图像
-		dvk_texture* tex = 0;		// *纹理二选一
+		Image* img = 0;				// *图像类
+		dvk_texture* tex = 0;		// *纹理，img\tex二选一
 		glm::ivec4 rect = {};		// *区域
 		glm::vec2 size = {};		// *大小	
 		glm::vec4 sliced = {};		// 九宫格渲染 left top right bottom
 		uint32_t color = col_white;	// 混合颜色，默认白色不混合
 	};
-	// 图像min：区域、偏移；64字节
+	// 图像min：区域、偏移；cluster、advx渲染文本用
 	struct image_m_cs
 	{
 		glm::vec2 pos = {};

@@ -16,10 +16,15 @@
 #define VK_DEFINE_NON_DISPATCHABLE_HANDLE(object) typedef uint64_t object;
 #endif
 #define VK_DEFINE_HANDLE(object) typedef struct object##_T* object;
-typedef uint32_t VkFlags;
+#endif
+#ifndef VkBool32
 typedef uint32_t VkBool32;
+typedef uint64_t VkDeviceAddress;
 typedef uint64_t VkDeviceSize;
+typedef uint32_t VkFlags;
+typedef VkFlags VkMemoryPropertyFlags;
 typedef uint32_t VkSampleMask;
+#endif
 VK_DEFINE_HANDLE(VkInstance)
 VK_DEFINE_HANDLE(VkPhysicalDevice)
 VK_DEFINE_HANDLE(VkDevice)
@@ -45,20 +50,23 @@ VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkDescriptorPool)
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkDescriptorSet)
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkFramebuffer)
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkCommandPool)
+
 #ifndef VK_KHR_surface
 #define VK_KHR_surface 1
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkSurfaceKHR)
 #define VK_KHR_swapchain 1
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkSwapchainKHR)
+VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkSamplerYcbcrConversion)
 #endif // !VK_KHR_surface
 
 
-
-#endif
-
+typedef struct VkPhysicalDeviceFeatures VkPhysicalDeviceFeatures;
+typedef struct VkDescriptorBufferInfo VkDescriptorBufferInfo;
 typedef struct VkDescriptorImageInfo VkDescriptorImageInfo;
 typedef struct VkPhysicalDeviceLimits VkPhysicalDeviceLimits;
-
+typedef struct VkPipelineShaderStageCreateInfo VkPipelineShaderStageCreateInfo;
+typedef struct VkPhysicalDeviceMemoryProperties VkPhysicalDeviceMemoryProperties;
+typedef struct VkSubmitInfo VkSubmitInfo;
 #ifndef hz_FLOBYTE
 #define hz_FLOBYTE(c)           ((unsigned char)(((size_t)(c)) & 0xff))
 #endif// !LOBYTE
@@ -97,17 +105,49 @@ namespace hz
 	class dvk_queue;
 	class dev_info;
 	class game_time;
+#ifdef VK_EXT_extended_dynamic_state
+#define DSEXT(n) PFN_vk##n n
+	struct dynamic_state_ext_cb {
+		DSEXT(CmdSetCullModeEXT);
+		DSEXT(CmdSetFrontFaceEXT);
+		DSEXT(CmdSetPrimitiveTopologyEXT);
+		DSEXT(CmdSetViewportWithCountEXT);
+		DSEXT(CmdSetScissorWithCountEXT);
+		DSEXT(CmdBindVertexBuffers2EXT);
+		DSEXT(CmdSetDepthTestEnableEXT);
+		DSEXT(CmdSetDepthWriteEnableEXT);
+		DSEXT(CmdSetDepthCompareOpEXT);
+		DSEXT(CmdSetDepthBoundsTestEnableEXT);
+		DSEXT(CmdSetStencilTestEnableEXT);
+		DSEXT(CmdSetStencilOpEXT);
+	};
+#undef DSEXT
+#else
 	struct dynamic_state_ext_cb;
+#endif
+	enum class dynamic_state_e
+	{
+		enable = 1,						// 是否启用动态状态
+		CullMode = 2,
+		PrimitiveTopology = 4,			// 图元拓扑，默认是三角形
+		DepthTest = 8,					// 深度测试
+		DepthWrite = 10,				// 深度写入，ui默认关闭深度写入
+		StencilTest = 20,				// 深度写入，ui默认关闭深度写入
+	};
+
 	class Image;
 	// todo dvk_device
 	class dvk_device
 	{
 	public:
-		VkDevice _dev = 0;
+		VkDevice device = 0;
 		VkPhysicalDevice physicalDevice = 0;
 		VkSampler _sampler = 0;
 		dev_info* _info = 0;
+		std::function<void(VkPhysicalDeviceFeatures* features, VkPhysicalDeviceFeatures* enabledFeatures)> enabled_features_cb;
+		// 扩展
 		std::set<std::string> supportedExtensions;
+		std::set<std::string>* instanceExtensions = 0;
 		struct
 		{
 			uint32_t graphics;
@@ -126,21 +166,51 @@ namespace hz
 			//支持用于更新稀疏资源的内存绑定操作。
 			VkQueue sparse_binding = 0;
 		}_queue1;
-		// 是否启用debug
-		bool enableDebugMarkers = false;
 		VkPhysicalDeviceLimits* _limits = {};
 		// 动态修改状态函数
 		dynamic_state_ext_cb* ds_cb = 0;
-	private:
+#ifdef VK_KHR_push_descriptor
+		PFN_vkCmdPushDescriptorSetKHR vkCmdPushDescriptorSet = {};
+#else
+		typedef enum VkPipelineBindPoint {
+			VK_PIPELINE_BIND_POINT_GRAPHICS = 0,
+			VK_PIPELINE_BIND_POINT_COMPUTE = 1,
+			VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR = 1000165000,
+			VK_PIPELINE_BIND_POINT_SUBPASS_SHADING_HUAWEI = 1000369003,
+			VK_PIPELINE_BIND_POINT_RAY_TRACING_NV = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+			VK_PIPELINE_BIND_POINT_MAX_ENUM = 0x7FFFFFFF
+		} VkPipelineBindPoint;
+		struct VkWriteDescriptorSet;
+		void (*vkCmdPushDescriptorSet)(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout layout, uint32_t set, uint32_t descriptorWriteCount, const VkWriteDescriptorSet* pDescriptorWrites);
+#endif
+	public:
 		std::vector<VkQueue> graphics_queues;
 		std::vector<VkQueue> compute_queues;
 		std::vector<dvk_queue*> graphics_queue_cxs;
 		std::vector<dvk_queue*> compute_queue_cxs;
 	public:
+		// 是否启用debug
+		bool enableDebugMarkers = false;
+		bool supportsBlit = true;
+		bool _iscompute = false;
+	public:
 		dvk_device();
 
 		~dvk_device();
 		void init(VkInstance inst, bool iscompute);
+		void init_info(VkInstance inst);
+		uint32_t		get_ubo_range();
+		VkDeviceSize	get_ubo_align();
+		uint32_t		get_ssbo_range();
+		VkDeviceSize	get_ssbo_align();
+		uint32_t		get_constant_size();
+		VkDeviceSize	get_align_memory_map();
+		VkDeviceSize	get_align_texel_offset();
+		VkDeviceSize	get_align_optimal_offset();
+		VkDeviceSize	get_align_optimal_rowpitch_offset();
+		// 重置设备
+		void reset0();
+		void freeres();
 	public:
 		// new
 		void free_shader(VkShaderModule s);
@@ -163,12 +233,24 @@ namespace hz
 		bool new_set_pool(set_pool_info* sp);
 		VkDescriptorPool new_desc_pool(std::map<uint32_t, uint32_t>& mps, uint32_t maxSets);
 		bool alloc_set(VkDescriptorPool pool, VkDescriptorSetLayout* pSetLayouts, uint32_t descriptorSetCount, std::vector<VkDescriptorSet>& dset);
-		// VkCommandBufferLevel
+		// VkCommandBufferLevel，0主，1次级， VK_COMMAND_BUFFER_LEVEL_PRIMARY = 0, VK_COMMAND_BUFFER_LEVEL_SECONDARY = 1
 		int new_cmd(VkCommandPool pool, uint32_t level, VkCommandBuffer* outptr, uint32_t count);
 		void free_cmd(VkCommandPool pool, VkCommandBuffer* pcbs, uint32_t count);
 		// 创建RenderPass
 		VkRenderPass new_render_pass(uint32_t color_format1, uint32_t depth_format1);
+
+
 		std::string get_name();
+		// 创建管理缓存
+		VkPipelineCache load_pipeline_cache(const void* d, size_t size);
+		size_t get_pipeline_cache(VkPipelineCache pc, std::vector<char>* dst);
+		bool merge_pipeline_cache(VkPipelineCache pc, VkPipelineCache* src_pc, uint32_t n);
+
+		// pipeline cache
+		VkPipelineCache _pipelineCache = {};
+		void CreatePipelineCache();
+		void DestroyPipelineCache();
+		VkPipelineCache GetPipelineCache();
 	public:
 		uint32_t  get_familyIndex(int idx);
 		//uint32_t getMemoryType(uint32_t typeBits, VkMemoryPropertyFlags properties, VkBool32* memTypeFound = nullptr);
@@ -182,6 +264,9 @@ namespace hz
 		uint32_t get_cqueue_size();
 
 		void wait_idle();
+		VkPhysicalDeviceMemoryProperties* get_dmp();
+
+		uint32_t get_device_memory_type(uint32_t image_bits, VkMemoryPropertyFlags properties, VkBool32* memTypeFound = 0);
 	public:
 		VkShaderModule CreateShaderModule(const char* filename, size_t len = 0);
 		void mkDeviceQueue();
@@ -195,8 +280,8 @@ namespace hz
 		VkDevice device = 0;
 		VkDeviceMemory memory = 0;
 		dvk_device* _dev = 0;
-		//VkDescriptorBufferInfo descriptor;
-		std::vector<char> descriptors;
+		VkDescriptorBufferInfo* descriptor = 0;
+		//std::vector<char> descriptors;
 		//VkDescriptorType	dtype;// =
 		/*
 			VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER = 4,
@@ -227,7 +312,7 @@ namespace hz
 		uint32_t fpos = -1;
 		uint32_t fsize = 0;
 		//std::vector<char>				data;
-
+		std::vector<VkDeviceSize> pOffsets;
 	public:
 		dvk_buffer(dvk_device* dev, uint32_t usage, uint32_t mempro, uint32_t size, void* data);
 		virtual ~dvk_buffer();
@@ -242,7 +327,9 @@ namespace hz
 		static dvk_buffer* new_indirect(dvk_device* dev, bool device_local, uint32_t size, void* data = nullptr);
 		// 索引数量count，type 0=16，1=32
 		static dvk_buffer* new_ibo(dvk_device* dev, int type, bool device_local, uint32_t count, void* data = nullptr);
-		static dvk_buffer* new_ubo(dvk_device* dev, bool storage, uint32_t size);
+		// , uint32_t usage1可以增加vbo\ibo使用
+		static dvk_buffer* new_ubo(dvk_device* dev, uint32_t size, void* data = nullptr, uint32_t usage1 = 0);
+		static dvk_buffer* new_ssbo(dvk_device* dev, uint32_t size, void* data = nullptr);
 		// todo*不能用
 		static void copy_buffer(dvk_buffer* dst, dvk_buffer* src, uint64_t dst_offset = 0, uint64_t src_offset = 0, int64_t size = -1);
 	public:
@@ -250,8 +337,6 @@ namespace hz
 
 		void setDesType(uint32_t dt);
 
-		void* get_dbi();
-		uint32_t get_dbi_count();
 		// 重置大小
 		void resize(size_t size);
 	public:
@@ -294,8 +379,8 @@ namespace hz
 		* @param size Size of the data to copy in machine units
 		*
 		*/
-		size_t set_data(void* data, size_t size, size_t offset, bool is_flush);
-
+		size_t set_data(void* data, size_t size, size_t offset, bool is_flush, bool iscp = true);
+		void copy_to(void* data, size_t size);
 		/**
 		* Flush a memory range of the buffer to make it visible to the device
 		*
@@ -343,6 +428,8 @@ namespace hz
 		virtual	~dvk_staging_buffer();
 		void freeBuffer();
 		void initBuffer(dvk_device* dev, VkDeviceSize size);
+		char* map();
+		void unmap();
 		void copyToBuffer(void* data, size_t bsize);
 		void copyGetBuffer(std::vector<char>& outbuf);
 		size_t getBufSize();
@@ -354,9 +441,9 @@ namespace hz
 
 	struct pipe_info_s
 	{
-		//std::vector<VkPipelineShaderStageCreateInfo>* v;
-		void* v = nullptr;
-		int n = 0;
+		std::vector<VkPipelineShaderStageCreateInfo*> v;
+		//void* v = nullptr;
+		//int n = 0;
 		dvk_device* dev = nullptr;
 	};
 
@@ -364,8 +451,9 @@ namespace hz
 		uint64_t u;
 		struct {
 			uint32_t descriptorType;
-			uint8_t descriptorCount;
 			uint16_t stageFlags;
+			uint8_t descriptorCount;
+			uint8_t pad;
 		};
 	};
 
@@ -466,81 +554,27 @@ namespace hz
 		std::vector<std::string> get_tex_name();
 	public:
 		// 设置多个VBO绑定
-		void add_input_binding(int location, bool instance, uint16_t stride)
-		{
-			inbind_desc d = {};
-			d.location = location;
-			d.binding = input_binding.size();
-			d.stride = stride;
-			d.inputRate = instance ? 1 : 0;
-			input_binding.push_back(d);
-		}
+		void add_input_binding(int location, bool instance, uint16_t stride);
 		// 合并set绑定
-		size_t union_binding(spv_res_info* sp)
-		{
-			size_t c = 0;
-			for (auto& [s, v] : sp->bindings)
-			{
-				auto& dst = bindings[s];
-				for (auto& [b, t] : v)
-				{
-					t.stageFlags |= dst[b].descriptorType;
-					dst[b] = t;
-					c++;
-				}
-			}
-			for (auto& [k, v] : sp->input_info)
-			{
-				input_info[k] = v;
-			}
-			for (auto& [k, v] : sp->bufferParams)
-			{
-				bufferParams[k] = v;
-			}
-			for (auto& [k, v] : sp->imageParams)
-			{
-				imageParams[k] = v;
-			}
-			for (auto& [k, v] : sp->paramsMap)
-			{
-				paramsMap[k] = v;
-			}
-			return c;
-		}
-		void make_input()
-		{
-			if (input_binding.empty())
-			{
-				return;
-			}
-			int stride = 0;
-			size_t i = 0;
-			auto it = input_binding.begin();
-			for (auto& [k, v] : input_info)
-			{
-				if (it->location > v.location)
-				{
-					i++;
-					it++;
-					it->stride = stride;
-					stride = 0;
-				}
-				v.binding = i;
-				stride += v.stride_size;
-			}
-		}
+		size_t union_binding(spv_res_info* sp);
+		void make_input();
 	private:
 
 	};
-
+	struct EntryPoint_t {
+		std::string name;
+		size_t stage;
+	};
 	struct pipe_create_info {
 		const char* data;
 		size_t size;
 		size_t stage;
-		const char* pName = "main";
+		std::string name = "main";
 		std::string fn;
+		bool is_comp = false;
 		uint64_t _module = 0;
 		spv_res_info* spv_info = nullptr;
+		std::vector<EntryPoint_t> eps;
 	};
 
 
@@ -560,21 +594,17 @@ namespace hz
 		std::vector<VkDescriptorPool> pools;
 		size_t pools_idx = 0;
 		std::map<uint32_t, uint32_t> _ps;
-
-		int max_sets = 32;
+		int max_sets = 32;								//一个池最多数量
 		uint16_t push_constant_size = 128;
 		uint16_t pct_vert = 64;
 		uint16_t pct_frag = 64;
 		std::vector<uint32_t> sets;// = VK_SHADER_STAGE_ALL_GRAPHICS;
 		// set,bind,type
 		std::map<int, std::map<int, desc_type>> _binding;
-
-
-	public:
 		std::vector<std::string> names;
+		VkSampler immutableSamplers = {};
 	public:
 		set_pool_info();
-
 		~set_pool_info();
 		void set_push_constant_size(int vert_size, int frag_size);
 		// VERTEX_BIT=1,FRAGMENT_BIT=2,COMPUTE_BIT=4
@@ -631,7 +661,6 @@ namespace hz
 		VkDescriptorSet dset = 0;
 		uint32_t first_set = 0;
 		uint32_t offsets = 0;
-		uint32_t offsetsa = 0;		// 64k范围偏移
 		uint32_t size = 0;			// 大小
 	};
 	// todo dvk_set
@@ -656,6 +685,7 @@ namespace hz
 
 		//dvk_set();
 		~dvk_set();
+		ubo_set_t get_binding(const std::string& name);
 		ubo_set_t write_image(const std::string& name, dvk_texture* texture, VkDescriptorSet dstSet = 0);
 		VkDescriptorSet write_image(int set, int binding, uint32_t descriptorType, dvk_texture* texture, VkDescriptorSet dstSet = 0);
 
@@ -691,6 +721,8 @@ namespace hz
 	public:
 		// out
 		VkPipeline _pipe[2] = {};
+		VkPipeline wireframe = {};
+		VkPipeline no_depth_write = {};
 
 		dvk_device* _dev = nullptr;
 
@@ -711,12 +743,14 @@ namespace hz
 	public:
 		int isDynamic(int first, int n);
 		VkPipelineLayout get_pipelineLayout();
-		VkPipeline get_vkpipe(bool depthWriteEnable = true);
+		VkPipeline get_vkpipe();
+		VkPipeline get_vkpipe(bool depthTestEnable, bool depthWriteEnable);
 		//创建全部set
 		std::vector<VkDescriptorSet> new_sets();
 		size_t new_sets(std::vector<VkDescriptorSet>& out);
 		// 创建分散set
 		size_t new_sets(std::vector<VkDescriptorSet>& out, int idx, int n);
+		size_t new_sets(int idx, int n, VkDescriptorSet* out);
 	public:
 		dvk_set* new_dvkset();
 		//dvk_set* new_dvkset(int n);
@@ -760,11 +794,12 @@ namespace hz
 		std::vector<glm::ivec2> vinput_info;
 		std::string name;
 		int align = sizeof(size_t);
+		bool ismepc = false;
 	public:
 		pipeline_ptr_info();
 		~pipeline_ptr_info();
 	public:
-		void init(VkRenderPass render_pass);
+		void init(VkRenderPass render_pass, VkPipelineCache pipeline_cache);
 		//n = 属性数量，t = 顶点0、实例1
 		void add_input_vbo(int n, int t);
 	};
@@ -773,7 +808,12 @@ namespace hz
 	class gpu_info;
 	class submit_info;
 	class fbo_info_cx;
-
+	struct cmds_t
+	{
+		VkCommandBuffer* buf = 0;
+		uint32_t count = 0;
+		int order = 0;
+	};
 	// todo vk_cmd_pool
 	class dvk_cmd_pool
 	{
@@ -782,6 +822,7 @@ namespace hz
 		dvk_device* _dev = nullptr;
 		std::vector<VkCommandBuffer> cmdv;
 		std::vector<uint32_t> _count;
+		std::vector<dvk_cmd*> _fdc;
 	public:
 		dvk_cmd_pool();
 		dvk_cmd_pool(VkCommandPool cp, dvk_device* dev);
@@ -794,6 +835,8 @@ namespace hz
 		*/
 		dvk_cmd* new_cmd(bool secondary, bool isc);
 		void new_cmd(std::vector<VkCommandBuffer>& out, bool secondary);
+		void new_cmd_secondary(VkCommandBuffer* buf, uint32_t count);
+		void free_cmd(VkCommandBuffer* buf, uint32_t count);
 	public:
 	};
 	// todo dvk_fence
@@ -810,7 +853,7 @@ namespace hz
 		void init(VkDevice d);
 	public:
 		void reset();
-		void wait_for();
+		int wait_for();
 		int get_status();
 		//operator VkFence() { return fence; };
 		VkFence get() { return fence; };
@@ -844,6 +887,26 @@ namespace hz
 	class dvk_swapchain
 	{
 	public:
+		class scb_t
+		{
+		public:
+			VkImage image = 0;
+			VkImageView _view = 0;
+			//VkFormat colorFormat;
+			uint32_t colorFormat = 0;
+		public:
+			scb_t()
+			{
+			}
+
+			~scb_t()
+			{
+			}
+
+		private:
+
+		};
+	public:
 		VkSurfaceKHR surface = 0;
 		dvk_device* _dev = 0;
 
@@ -861,29 +924,11 @@ namespace hz
 		uint32_t queueNodeIndex = UINT32_MAX;
 		uint32_t _width = 0, _height = 0;
 		uint32_t c_width = 0, c_height = 0;
-		int _semaphoreIndex = 0;
+
 		uint64_t _NumAcquireCalls = 0;
 		uint32_t _curr_imageIndex = 0;
-		class scb_t
-		{
-		public:
-			VkImage image = 0;
-			VkImageView view = 0;
-			//VkFormat colorFormat;
-			uint32_t colorFormat = 0;
-		public:
-			scb_t()
-			{
-			}
-
-			~scb_t()
-			{
-			}
-
-		private:
-
-		};
 		std::vector<scb_t> buffers;
+		uint32_t _semaphoreIndex = 0, _prevSemaphoreIndex = 0;
 	public:
 		dvk_swapchain(dvk_device* dev, VkSurfaceKHR surfacekhr);
 		virtual ~dvk_swapchain();
@@ -925,8 +970,8 @@ namespace hz
 		*
 		* @return VkResult of the image acquisition
 		*/
-		uint32_t acquireNextImage(VkSemaphore presentCompleteSemaphore, uint32_t* imageIndex);
-
+		uint32_t acquireNextImage(uint32_t* imageIndex);
+		VkSemaphore get_sem();
 		/**
 		* Destroy and free Vulkan resources used for the swapchain
 		*/
@@ -948,13 +993,13 @@ namespace hz
 	private:
 		fbo_info_cx* ctx = 0;
 		dvk_device* _dev = nullptr;
-		int _width = 0; int _height = 0; unsigned int _clear_color = 0;
-		dvk_swapchain* _swapcain = 0;
 		dvk_queue* _queue = 0;
 		dvk_cmd_pool* cmd_pool = 0;
 		submit_info* _submitinfo = 0;
-		VkSemaphore _presentComplete = 0;
-		std::atomic_int _isreset;
+		// todo **
+		//VkSemaphore _presentComplete = 0;
+
+		std::atomic_int _isreset = 0;
 		int r_width = 0; int r_height = 0;
 		void* uds[6] = {};
 		game_time* _gt = 0;
@@ -967,9 +1012,14 @@ namespace hz
 		bool _is_getsize = false;
 		auto_destroy_cx dc;
 	public:
+		int _width = 0; int _height = 0;
+		unsigned int _clear_color = 0;
+		dvk_swapchain* _swapcain = 0;
+
 		double _gstime = 0.0;
 		double _fixed_gs_time = 0.1;
-		std::atomic_int _upinc;
+		std::atomic_int _upinc = 0;
+		bool unm = true;
 	public:
 		fbo_cx(int width, int height, unsigned int clear_color);
 
@@ -979,8 +1029,8 @@ namespace hz
 		void set_clear_color(unsigned int clear_color);
 		void build_cmd(int idx, std::function<void(dvk_cmd* cmd)> cb);
 		void build_cmd_cb();
-		void submit(int idx = -1);
-		void save_image(const std::string& fn);
+		//void submit(int idx = -1);
+		void save_image(const std::string& fn, int idx);
 		void to_image(Image* img, int idx);
 		// 获取所属设备
 		dvk_device* get_dev();
@@ -995,7 +1045,7 @@ namespace hz
 		template<typename Function, typename... Args>
 		void push_drawcb(const Function& func, Args... args)
 		{
-			drawcb_func f = [&func, args...](dvk_cmd* cmd){ return func(cmd, args...); };
+			drawcb_func f = [&func, args...](dvk_cmd* cmd) { return func(cmd, args...); };
 			draw_call_cbs.push_back(f);
 		}
 		//void set_drawcb(std::function<void(dvk_cmd* cmd)> cb);
@@ -1004,7 +1054,8 @@ namespace hz
 		// 设置正交投影ubo，窗口改变时自动更新ubo
 		void set_ortho_ubo(dvk_buffer* ubo, uint32_t offset);
 	public:
-		void acquire(uint32_t* imageIndex);
+		int acquire(uint32_t* imageIndex);
+		submit_info* get_submit(int idx);
 		submit_info* get_cur_submit();
 		// 重置大小
 		bool resize(int width, int height);
@@ -1019,6 +1070,7 @@ namespace hz
 		void set_gs();
 		void close_gs();
 		bool is_gs();
+		size_t count();
 	private:
 		void draw_call_cb(dvk_cmd* cmd);
 	};
@@ -1031,23 +1083,24 @@ namespace hz
 		vk_base_info* ctx = nullptr;
 		VkInstance _instance = nullptr;
 		gpu_info* _gpu = 0;
+		std::set<std::string> ext;
 		auto_destroy_cx dc;
 	public:
 		vk_render_cx();
-
 		~vk_render_cx();
-
-	public:
-
 	public:
 		// , void* pass可以设置nullptr
 		fbo_cx* new_fbo_swapchain(int width, int height, int* count, VkSurfaceKHR surface, unsigned int clear_color, dvk_device* dev, void* pass = nullptr);
+		fbo_cx* reset_fbo_swapchain(fbo_cx* p, int width, int height, int* count, VkSurfaceKHR surface, unsigned int clear_color, dvk_device* dev, void* pass);
 		fbo_cx* new_fbo_image(int width, int height, int count, unsigned int clear_color, dvk_device* dev, void* pass = nullptr);
 		dvk_device* get_dev(unsigned int idx);
-		dvk_device* get_dev(const char* name);
-		void load_pipe(dvk_device* dev_, pipe_create_info* info, uint16_t count, pipe_info_s* out);
+		dvk_device* get_dev(const std::string& name);
+		void init_dev(const std::string& name);
+		int load_pipe(dvk_device* dev_, pipe_create_info** info, uint16_t count, pipe_info_s* out);
 		bool new_pipeline(dvk_device* dev_, pipeline_ptr_info* info);
 		void free_pipe_info(pipe_info_s* p);
+
+		VkSurfaceKHR new_surface(void* d);
 	public:
 		int get_push_constant_size(size_t idx);
 		VkInstance get_instance();
@@ -1066,13 +1119,15 @@ namespace hz
 			std::vector<char> data;
 		};
 	private:
-		pipe_info_s ps[1] = {};
+		pipe_info_s _pis[1] = {};
 		dvk_device* _dev = nullptr;
 		vk_render_cx* _ctx = nullptr;
-		std::vector<pipe_od> sod;
-		std::vector<pipe_create_info> pci;
+		std::vector<pipe_od*> sod;
+		std::vector<pipe_create_info*> pci;
 		auto_destroy_cx dc;
-
+#ifdef _pmr_pool_nt
+		usp_ac uac;
+#endif
 		// json 数据
 		std::vector<njson> _jnd;
 		size_t pipeidx = 0;
@@ -1084,19 +1139,36 @@ namespace hz
 		~shader_hp();
 		// shader_path存放shader目录
 		void init(vk_render_cx* ctx, dvk_device* dev, const t_vector<t_string>& shader_path_fn);
+		// 增加一个shader：名称，路径，len大于0则为输入spv数据
+		bool add(const char* n, const char* path, int len = 0, bool is_comp = false);
 		void clear();
 		// todo layout(set=0, binding=0) uniform、uniform sampler2D、uniform sampler2DArray
 		// idx空的话，则选择fns全部
 		pipeline_ptr_info* new_pipe(pipeline_ptr_info* sp, const std::vector<std::string>& fns, const std::vector<int>& idx = {});
-		ut_compute* new_compute(dvk_device* dev_, const std::vector<std::string>& fns, const std::vector<int>& idx = {});
-		int new_pipe(const njson& info, VkRenderPass render_pass);
-		std::map<std::string, pipeline_ptr_info*>& mk_pipe(VkRenderPass render_pass);
+		ut_compute* new_compute(const std::vector<std::string>& fns, const std::vector<int>& idx = {});
+		// 创建单个管线
+		pipeline_ptr_info* new_pipe(const char* k, const njson& info, VkRenderPass render_pass, VkSampler immutableSamplers);
+		int new_pipe(const njson& info, VkRenderPass render_pass, VkSampler immutableSamplers);
+		std::map<std::string, pipeline_ptr_info*>& mk_pipe(VkRenderPass render_pass, VkSampler immutableSamplers);
+		auto& get_pipelist() { return mpipe; }
+		size_t size() {
+			return pci.size();
+		}
+
+		pipeline_ptr_info* new_pipe1(const std::string& newname, const std::string& k, VkRenderPass render_pass, VkSampler immutableSamplers);
+
+	public:
+		dvk_device* get_dev();
 	private:
 		shader_info* init_pipe(shader_info* sp, const std::vector<std::string>& fns, const std::vector<int>& idx = {});
-		void load_shader_zip(const std::string& zfn, std::vector<pipe_od>& sod, std::vector<pipe_create_info>& out);
-		void load_file(const std::string& path, std::vector<pipe_od>& sod, std::vector<pipe_create_info>& out);
+		void load_shader_zip(const std::string& zfn, std::vector<pipe_od*>& sod, std::vector<pipe_create_info*>& out);
+		void load_file(const std::string& path, std::vector<pipe_od*>& sod, std::vector<pipe_create_info*>& out);
+
+		void enum_read_file(const std::string rfn, std::vector<std::string>& fns, std::vector<shader_hp::pipe_od*>& sod);
 	};
 
 
+
+	std::string format(const char* format, ...);
 }
 //!hz
