@@ -10,6 +10,7 @@ extern "C" {
 #ifndef YUV_INFO_ST
 #define YUV_INFO_ST
 struct yuv_info_t {
+	void* ctx = 0;
 	void* data[3] = {};
 	uint32_t size[3] = {};
 	uint32_t width = 0, height = 0;
