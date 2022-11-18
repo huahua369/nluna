@@ -3367,6 +3367,7 @@ namespace hz {
 		return data;
 	}
 	struct yuv_info_t0 {
+		void* ctx = 0;
 		void* data[3] = {};
 		uint32_t size[3] = {};
 		uint32_t width = 0, height = 0;
