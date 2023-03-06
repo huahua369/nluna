@@ -22,6 +22,8 @@ TrueType和OpenType表的标记
 #define TAG_CBLC  "CBLC"
 #define TAG_CFF   "CFF "
 #define TAG_CID   "CID "
+#define TAG_CPAL  "CPAL"
+#define TAG_COLR  "COLR"
 #define TAG_cmap  "cmap"
 #define TAG_cvar  "cvar"
 #define TAG_cvt   "cvt "

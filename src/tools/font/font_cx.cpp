@@ -431,6 +431,7 @@ namespace hz
 		*/
 		struct font_impl {
 			stbtt_fontinfo font;
+			std::map<std::string, sfnt_header> _tb;
 			// EBLC	Embedded bitmap location data	嵌入式位图位置数据
 			int eblc = 0;
 			uint32_t sbit_table_size = 0;
@@ -441,7 +442,7 @@ namespace hz
 			uint32_t ebdt_size = 0;
 			// EBSC	Embedded bitmap scaling data	嵌入式位图缩放数据
 			uint32_t ebsc = 0;
-			std::map<std::string, sfnt_header> _tb;
+			int format = 0;
 		};
 		typedef struct font_impl font_impl;
 	public:
@@ -482,6 +483,8 @@ namespace hz
 			int fso = get_offset(data, idx);
 			stbError = stbtt_InitFont(&font->font, (unsigned char*)data, fso);
 			stbError = init_table(font, (unsigned char*)data, fso);
+			// 字体格式
+			font->format = ttUSHORT(font->font.data + font->font.index_map + 0);
 			return stbError;
 		}
 		static int get_numbers(const void* data)
@@ -571,8 +574,19 @@ namespace hz
 #define BYTE_U16( p, i, s1 )  ( (uint16_t)( BYTE_( p, i ) ) << (s1) )
 #define BYTE_U32( p, i, s1 )  ( (uint32_t)( BYTE_( p, i ) ) << (s1) )
 #define PEEK_USHORT( p )  uint16_t( BYTE_U16( p, 0, 8 ) | BYTE_U16( p, 1, 0 ) )
+#define PEEK_LONG( p )  int32_t( BYTE_U32( p, 0, 24 ) | BYTE_U32( p, 1, 16 ) | BYTE_U32( p, 2,  8 ) | BYTE_U32( p, 3,  0 ) )
+#define PEEK_ULONG( p )  uint32_t(BYTE_U32( p, 0, 24 ) | BYTE_U32( p, 1, 16 ) | BYTE_U32( p, 2,  8 ) | BYTE_U32( p, 3,  0 ) )
+
+#define NEXT_CHAR( buffer ) ( (signed char)*buffer++ )
+
+#define NEXT_BYTE( buffer ) ( (unsigned char)*buffer++ )
 #define NEXT_SHORT( b ) ( (short)( b += 2, PEEK_USHORT( b - 2 ) ) )
 #define NEXT_USHORT( b ) ( (unsigned short)( b += 2, PEEK_USHORT( b - 2 ) ) )
+#define NEXT_LONG( buffer ) ( (long)( buffer += 4, PEEK_LONG( buffer - 4 ) ) )
+#define NEXT_ULONG( buffer ) ( (unsigned long)( buffer += 4, PEEK_ULONG( buffer - 4 ) ) )
+
+
+
 		static unsigned char* tt_cmap2_get_subheader(unsigned char* table, unsigned int char_code)
 		{
 			unsigned char* result = NULL;
@@ -650,6 +664,7 @@ namespace hz
 			}
 			return ret;
 		}
+		// GBK字符串
 		static int get_glyph_index2(font_impl* font, const char* t)
 		{
 			const stbtt_fontinfo* info = &font->font;
@@ -673,8 +688,7 @@ namespace hz
 
 		static int getGlyphIndex(font_impl* font, int codepoint)
 		{
-			int idx = stbtt_FindGlyphIndex(&font->font, codepoint);
-			return idx ? idx : get_ext_glyph_index(&font->font, codepoint);
+			return font->format == 2 ? get_ext_glyph_index(&font->font, codepoint) : stbtt_FindGlyphIndex(&font->font, codepoint);
 		}
 
 		static int buildGlyphBitmap(font_impl* font, int glyph, float scale,
@@ -791,31 +805,32 @@ namespace hz
 			double adv = ceil((double)advancei * scale);
 			//stbtt_GetCodepointBitmapBoxSubpixel(&font->font, ch, scale, scale, shiftX, shiftY, &x0, &y0, &x1, &y1);
 			stbtt_GetGlyphBitmapBoxSubpixel(&font->font, gidx, scale * lcd.x, scale * lcd.y, shift_x, shift_y, &x0, &y0, &x1, &y1);
-
+			glm::ivec4 ot0 = {};
+			if (!ot)ot = &ot0;
 			*advance = adv;
 			ot->x = x0;
 			ot->y = y0;
 			ot->z = x1 - x0;
 			ot->w = y1 - y0;
 			size_t pcs = (int64_t)ot->z * ot->w;
-			if (pcs == 117)
+			char* pxs = 0;
+			if (out)
 			{
-				pcs = 117;
+				if (out->size() < pcs)
+				{
+					out->resize(pcs);
+				}
+				pxs = out->data();
+				memset(pxs, 0, out->size());
+				stbtt_MakeGlyphBitmapSubpixel(&font->font,
+					(unsigned char*)pxs,
+					x1 - x0,
+					y1 - y0,
+					x1 - x0, // screen width ( stride )
+					scale * lcd.x, scale * lcd.y,
+					shift_x, shift_y, // shift x, shift y
+					gidx);
 			}
-			if (out->size() < pcs)
-			{
-				out->resize(pcs);
-			}
-			char* pxs = out->data();
-			memset(pxs, 0, out->size());
-			stbtt_MakeGlyphBitmapSubpixel(&font->font,
-				(unsigned char*)pxs,
-				x1 - x0,
-				y1 - y0,
-				x1 - x0, // screen width ( stride )
-				scale * lcd.x, scale * lcd.y,
-				shift_x, shift_y, // shift x, shift y
-				gidx);
 
 			return pxs;
 		}
@@ -1019,6 +1034,7 @@ namespace hz
 		static int init_table(font_impl* font, unsigned char* data, int fontstart)
 		{
 			enum_table(data, fontstart, font->_tb);
+
 			return 1;
 		}
 	private:
@@ -1632,7 +1648,7 @@ namespace hz
 		short x0 = 0, y0 = 0, x1 = 0, y1 = 0;
 		short xadv = 0, xoff = 0, yoff = 0;
 		unsigned int _width = 0, _height = 0;
-		std::vector<unsigned char> bitmap;
+		std::vector<unsigned char>* bitmap = 0;
 	public:
 		Glyph()
 		{
@@ -1640,16 +1656,21 @@ namespace hz
 
 		~Glyph()
 		{
+			if (bitmap)
+				delete bitmap;
+			bitmap = 0;
 		}
 		unsigned char* resize_bitmap(int64_t w, int64_t h)
 		{
 			size_t s = w * h;
-			if (s != bitmap.size())
+			if (!bitmap)
+				bitmap = new std::vector<unsigned char>();
+			if (s != bitmap->size())
 			{
 				_width = w; _height = h;
-				bitmap.resize(s);
+				bitmap->resize(s);
 			}
-			return (unsigned char*)bitmap.data();
+			return (unsigned char*)bitmap->data();
 		}
 	private:
 
@@ -2354,7 +2375,7 @@ namespace hz
 	{
 		return (idx < 0 || idx > _fonts.size()) ? nullptr : _fonts[idx];
 	}
-	int Fonts::add_font_file(const std::string& fn)
+	int Fonts::add_font_file(const std::string& fn, njson* pname)
 	{
 		int ret = 0;
 #if 0
@@ -2392,7 +2413,7 @@ namespace hz
 		{
 			//print_time pti("add_font_file afm");
 			auto& fdi = fd_data.emplace_back(fd_info{ mv });
-			ret = add_font_mem(fdi.data(), fdi.size(), false);
+			ret = add_font_mem(fdi.data(), fdi.size(), false, pname);
 		}
 		return ret;
 	}
@@ -2400,7 +2421,7 @@ namespace hz
 	// todo 初始化位图信息
 	void nsimsun_ascii(bitmap_ttinfo* obt);
 
-	int Fonts::add_font_mem(const char* data, size_t len, bool iscp)
+	int Fonts::add_font_mem(const char* data, size_t len, bool iscp, njson* pname)
 	{
 		int ret = 0;
 		std::vector<stb_font::font_impl*> fp;
@@ -2417,10 +2438,11 @@ namespace hz
 			hr = ft.loadFont(fi, data, i, font);
 			if (hr)
 			{
+				font->num_glyphs = fi->font.numGlyphs;
 				int ascent = 0, descent = 0, lineGap = 0;
 				ft.getFontVMetrics(fi, &ascent, &descent, &lineGap);
 				auto fh = ascent - descent;
-				//njson fot;
+				//njson fot;num_glyphs
 				//fot["ascender"] = (float)ascent / (float)fh;
 				//fot["descender"] = (float)descent / (float)fh;
 				//fot["lineh"] = (float)(fh + lineGap) / (float)fh;
@@ -2436,6 +2458,12 @@ namespace hz
 				font->descender = (float)descent / (float)fh;
 				font->lineh = (float)(fh + lineGap) / (float)fh;
 				font->_name = font->get_info_str(def_language_id);
+				if (pname)
+				{
+					if (!pname->is_array())
+						*pname = njson::array();
+					pname->push_back(font->_name);
+				}
 				auto cn_name = font->get_info_str(1033);
 				font->_aname = u8_gbk(font->_name);
 				auto a_style = font->get_info_str(2052, 2);
@@ -2457,6 +2485,7 @@ namespace hz
 				{
 					// print_time pti("add_font_mem");
 					font->init_post_table();
+					font->init_color();
 #ifndef _FONT_NO_BITMAP
 					font->init_sbit();
 					if (cn_name == "NSimSun")
@@ -3380,6 +3409,27 @@ namespace hz
 		}
 		return ret;
 	}
+	Image* Fonts::push_cache_bitmap(Bitmap* bitmap, glm::ivec2* pos, unsigned int col, Image* ret, int linegap)
+	{
+		int width = bitmap->width + linegap, height = bitmap->rows + linegap;
+		glm::ivec4 rc4 = { 0, 0, bitmap->width, bitmap->rows };
+		if (!ret)
+			ret = _packer.push_rect({ width, height }, pos);
+		if (ret)
+		{
+			rc4.x += pos->x;
+			rc4.y += pos->y;
+			//ret->draw_rect(rc4, 0, col);
+			if (bitmap->lcd_mode)
+			{
+				lcd_filter_fir(bitmap, 0, 0);
+				lcd_filter_fir(bitmap, 0, 0);
+			}
+			if (col)
+				ret->copy_to_image(bitmap->buffer, bitmap->pitch, rc4, col, bitmap->pixel_mode, bitmap->lcd_mode);
+		}
+		return ret;
+	}
 
 	std::vector<Image*> Fonts::get_all_cacheimage()
 	{
@@ -3396,10 +3446,10 @@ namespace hz
 			{
 				std::string fn = fdn + std::to_string(i);
 #ifdef __FILE__h__
-				img->saveImage(fn + ".png");
+		img->saveImage(fn + ".png");
 #else
-				auto d = img->png_data();
-				save_binary_file(fn + ".png", d.data(), d.size());
+		auto d = img->png_data();
+		save_binary_file(fn + ".png", d.data(), d.size());
 #endif
 			});
 	}
@@ -4141,7 +4191,7 @@ namespace hz
 		int linegap = 0;
 		tt_info* rfont = this;
 		Bitmap bitmap[1] = {};
-		std::vector<char> bitbuf[2];
+		std::vector<char> bitbuf[1];
 		glm::ivec4 rc;
 		std::vector<ft_item>  ps;
 		glm::ivec3 rets;
@@ -4151,22 +4201,58 @@ namespace hz
 		if (rfont && glyph_index)
 		{
 			auto rp = rfont->get_gcache(glyph_index, fns);
-			if (!rp)
-			{
-				auto bit = rfont->get_glyph_image(glyph_index, fns, &rc, bitmap, &bitbuf[0], lcd_type, unicode_codepoint);
+			do {
+				if (rp)break;
+
+				auto bit = rfont->get_glyph_image(glyph_index, fns, &rc, bitmap, 0, lcd_type, unicode_codepoint);
+				if (colorinfo && bit)
+				{
+					glm::ivec4 bs = { rc.x, rc.y, bitmap->width, bitmap->rows };
+					std::vector<uint32_t> ag;
+					std::vector<uint32_t> cols;
+					if (get_gcolor(glyph_index, ag, cols))
+					{
+						glm::ivec2 pos;
+						Image* img = 0;
+						img = ctx->push_cache_bitmap(bitmap, &pos, 0, img);
+						for (size_t i = 0; i < ag.size(); i++)
+						{
+							bitbuf->clear();
+							auto bit = rfont->get_glyph_image(ag[i], fns, &rc, bitmap, bitbuf, lcd_type, unicode_codepoint);
+							if (bit)
+							{
+								auto ps1 = pos;
+								ps1.x += bitmap->x - bs.x, ps1.y += bitmap->y + abs(bs.y);
+								img = ctx->push_cache_bitmap(bitmap, &ps1, cols[i], img);
+							}
+						}
+						glm::ivec4 rc4 = { pos.x, pos.y, bs.z,bs.w };
+						if (img)
+						{
+							rp = rfont->push_gcache(glyph_index, fns, img, rc4, { bs.x,bs.y });
+							if (rp)
+							{
+								rp->color = -1;
+								rp->advance = bitmap->advance;
+							}
+						}
+						break;
+					}
+				}
+				bit = rfont->get_glyph_image(glyph_index, fns, &rc, bitmap, bitbuf, lcd_type, unicode_codepoint);
 				if (bit)
 				{
 					glm::ivec2 pos;
-					int width = bitmap->width + linegap, height = bitmap->rows + linegap;
-					auto img = ctx->push_cache_bitmap(bitmap, &pos);
+					auto img = ctx->push_cache_bitmap(bitmap, &pos, linegap, col);
 					glm::ivec4 rc4 = { pos.x, pos.y, bitmap->width, bitmap->rows };
 					if (img)
 					{
 						rp = rfont->push_gcache(glyph_index, fns, img, rc4, { rc.x, rc.y });
+						rp->color = 0;
 						if (rp)rp->advance = bitmap->advance;
 					}
 				}
-			}
+			} while (0);
 			if (rp)
 				ret = *rp;
 		}
@@ -5162,20 +5248,22 @@ namespace hz
 
 	tt_info::tt_info()
 	{
-		bitinfo = dc.ac<bitmap_ttinfo>();
-		_font = dc.ac<font_impl_info>();
+		bitinfo = new bitmap_ttinfo();
+		_font = new font_impl_info();
 		bitinfo->_t = this;
 	}
 
 	tt_info::~tt_info()
 	{
-		//for (auto& [k, v] : _detail)
-		//{
-		//	for (auto it : v)
-		//	{
-		//		delete it;
-		//	}
-		//}
+		for (auto& [k, v] : _detail)
+		{
+			for (auto it : v)
+			{
+				delete it;
+			}
+		}
+		delop(bitinfo);
+		delop(_font);
 		bitinfo = 0;
 		_font = 0;
 	}
@@ -5199,7 +5287,8 @@ namespace hz
 
 	void tt_info::add_info(int platform, int encoding, int language, int nameid, const char* name, int length)
 	{
-		info_one* e = dc.ac<info_one>(platform, encoding, language, nameid, name, length);
+		//info_one* e = dc.ac<info_one>(platform, encoding, language, nameid, name, length);
+		info_one* e = new info_one(platform, encoding, language, nameid, name, length);
 		_detail[language].push_back(e);
 	}
 
@@ -5285,19 +5374,24 @@ namespace hz
 
 		if (get_index(decoder, gidx, x_pos, y_pos))
 		{
-			out->resize((uint64_t)bitmap->rows * bitmap->pitch);
-			memcpy(out->data(), bitmap->buffer, out->size());
-			ot->x = metrics->horiBearingX;
-			ot->y = -metrics->horiBearingY;
+			if (out) {
+				out->resize((uint64_t)bitmap->rows * bitmap->pitch);
+				memcpy(out->data(), bitmap->buffer, out->size());
+			}
+			if (ot) {
+				ot->x = metrics->horiBearingX;
+				ot->y = -metrics->horiBearingY;
+				ot->z = bitmap->width;
+				ot->w = bitmap->rows;
+			}
 			auto ha = metrics->horiAdvance;
 			bitmap->advance = std::max(metrics->horiAdvance, metrics->vertAdvance);
-			ot->z = bitmap->width;
-			ot->w = bitmap->rows;
 			if (out_bitmap)
 			{
 				*out_bitmap = *bitmap;
 				//out_bitmap->data = out;
-				out_bitmap->buffer = (unsigned char*)out->data();
+				if (out)
+					out_bitmap->buffer = (unsigned char*)out->data();
 			}
 			ret = 2;
 			// 灰度图转RGBA
@@ -5354,30 +5448,35 @@ namespace hz
 				// RGBA
 				out_bitmap->pitch = bc.y * 4;
 				out_bitmap->advance = bc.y;
-				ot->x = 0;
-				ot->y = -bc.x + inc;
-				ot->z = bc.y;
-				ot->w = bc.x;
+				if (ot) {
+					ot->x = 0;
+					ot->y = -bc.x + inc;
+					ot->z = bc.y;
+					ot->w = bc.x;
+				}
+
 				size_t size = out_bitmap->rows * (uint64_t)out_bitmap->pitch;
-				if (size > out->size())
-				{
-					out->resize(size);
-				}
-				out_bitmap->buffer = (unsigned char*)out->data();
-				Image tem[1] = {};
-				img->getBox({ px, py, bc.y, bc.x }, tem);
-				auto td = tem->data();
-				auto ti = tem->dsize();
-				for (size_t i = 0; i < ti; i++)
-				{
-					if (*td == 0xff000000)
+				if (out) {
+					if (size > out->size())
 					{
-						*td = 0;
+						out->resize(size);
 					}
-					td++;
+					out_bitmap->buffer = (unsigned char*)out->data();
+					Image tem[1] = {};
+					img->getBox({ px, py, bc.y, bc.x }, tem);
+					auto td = tem->data();
+					auto ti = tem->dsize();
+					for (size_t i = 0; i < ti; i++)
+					{
+						if (*td == 0xff000000)
+						{
+							*td = 0;
+						}
+						td++;
+					}
+					//tem->saveImage("temadfd.png");
+					memcpy(out_bitmap->buffer, tem->data(), size);
 				}
-				//tem->saveImage("temadfd.png");
-				memcpy(out_bitmap->buffer, tem->data(), size);
 				ret = 1;
 			}
 		}
@@ -5411,7 +5510,7 @@ namespace hz
 
 	Glyph* tt_info::alloc_glyph()
 	{
-		Glyph* p = dc.ac<Glyph>();
+		Glyph* p = uac.new_mem<Glyph>(1);
 		return p;
 	}
 
@@ -5677,7 +5776,7 @@ namespace hz
 		auto& pt = _cache_glyphidx[k.u];
 		if (!pt)
 		{
-			pt = _cdc.ac<ftg_item>();
+			pt = _cdc.new_mem<ftg_item>(1);
 		}
 		pt->_glyph_index = glyph_index;
 		pt->_image = img;
@@ -5698,8 +5797,11 @@ namespace hz
 	}
 	void tt_info::clear_gcache()
 	{
+		for (auto& [k, v] : _cache_glyphidx)
+		{
+			_cdc.free_mem(v, 1);
+		}
 		_cache_glyphidx.clear();
-		_cdc.clear();
 	}
 
 	int tt_info::get_glyph_index(unsigned int codepoint, tt_info** renderFont, std::vector<tt_info*>* fallbacks)
@@ -5895,6 +5997,114 @@ namespace hz
 		return ns.size();
 	}
 
+	typedef struct  LayerIterator_
+	{
+		uint32_t   num_layers;
+		uint32_t   layer;
+		uint8_t* p;
+
+	} LayerIterator;
+	typedef struct  Palette_Data_ {
+		uint16_t         num_palettes;
+		const uint16_t* palette_name_ids;
+		const uint16_t* palette_flags;
+
+		uint16_t         num_palette_entries;
+		const uint16_t* palette_entry_name_ids;
+
+	} Palette_Data;
+
+	union Color_2
+	{
+		uint32_t c;
+		struct {
+			uint8_t r, g, b, a;
+		};
+		struct {
+			uint8_t red, green, blue, alpha;
+		};
+	};
+	struct Cpal;
+	struct Colr;
+	struct gcolors_t
+	{
+		Cpal* cpal;
+		Colr* colr;
+		/* glyph colors */
+		Palette_Data palette_data;         /* since 2.10 */
+		uint16_t palette_index;
+		Color_2* palette;
+		Color_2 foreground_color;
+		bool have_foreground_color;
+	};
+	struct GlyphSlot;
+	int tt_face_load_colr(tt_info* face, uint8_t* b, sfnt_header* sp);
+
+	void tt_face_free_colr(tt_info*);
+
+	bool tt_face_get_colr_layer(tt_info* face,
+		uint32_t            base_glyph,
+		uint32_t* aglyph_index,
+		uint32_t* acolor_index,
+		LayerIterator* iterator);
+	// 获取颜色
+	Color_2 get_c2(tt_info* face1, uint32_t color_index);
+
+	int tt_face_colr_blend_layer(tt_info* face,
+		uint32_t       color_index,
+		GlyphSlot* dstSlot,
+		GlyphSlot* srcSlot);
+
+
+	int tt_face_load_cpal(tt_info* face, uint8_t* b,
+		sfnt_header* sp);
+
+	void tt_face_free_cpal(tt_info* face);
+
+	int tt_face_palette_set(tt_info* face,
+		uint32_t  palette_index);
+	// 初始化颜色
+	int tt_info::init_color()
+	{
+		font_impl_info* font_i = _font;
+		const stbtt_fontinfo* font = &font_i->font;
+		int i, count, stringOffset;
+		uint8_t* fc = font->data;
+		uint32_t offset = font->fontstart, table_size = 0, sbit_num_strikes = 0;
+		uint32_t ebdt_start = 0, ebdt_size = 0;
+		sfnt_header* ebdt_table = 0;
+		auto cpal_table = get_tag(font_i, TAG_CPAL);
+		auto colr_table = get_tag(font_i, TAG_COLR);
+		if (!cpal_table || !colr_table)
+			return 0;
+		if (!colorinfo)
+			uac.new_mem(1, colorinfo);
+		tt_info* ttp = (tt_info*)font->userdata;
+		uint8_t* b = fc + cpal_table->offset;
+		uint8_t* b1 = fc + colr_table->offset;
+		tt_face_load_cpal(this, b, cpal_table);
+		tt_face_load_colr(this, b1, colr_table);
+
+		return 0;
+	}
+
+	int tt_info::get_gcolor(uint32_t base_glyph, std::vector<uint32_t>& ag, std::vector<uint32_t>& col)
+	{
+		uint32_t aglyph_index = base_glyph;
+		uint32_t acolor_index = 0;
+		LayerIterator it = {};
+		for (;;)
+		{
+			if (!tt_face_get_colr_layer(this, aglyph_index, &aglyph_index, &acolor_index, &it))
+			{
+				break;
+			}
+			ag.push_back(aglyph_index);
+			col.push_back(get_c2(this, acolor_index).c);
+		}
+		return it.num_layers;
+	}
+
 	/*
 	输入
 	int gidx			字符索引号
@@ -5942,7 +6152,8 @@ namespace hz
 					double hed = ceil(scale * he);
 					double hedf = ceil(scale * hef);
 					double lg = ceil(scale * hhea.lineGap);
-					bitmap->buffer = (unsigned char*)out->data();
+					if (out)
+						bitmap->buffer = (unsigned char*)out->data();
 					bitmap->width = bitmap->pitch = ot->z;
 					bitmap->rows = ot->w;
 					bitmap->advance = advance;
@@ -5951,6 +6162,11 @@ namespace hz
 					Fonts::init_bitmap_bitdepth(bitmap, 8);
 					ret = 1;
 				}
+			}
+			if (bitmap)
+			{
+				bitmap->x = ot->x;
+				bitmap->y = ot->y;
 			}
 		}
 		return ret;
@@ -6541,7 +6757,7 @@ namespace hz
 
 	/*
 	新宋体ascii 94个符号位图数据
-
+	// 12号像素是6*14宽高
 	char r[2] = { 0x21, 0x7e };
 	12：6*14=564
 	14：7*16=658
@@ -6557,6 +6773,7 @@ namespace hz
 			if (!img)
 			{
 				img = Image::create_mem((char*)fdata, 2180);
+				//img->saveImage("font_en.png");
 				obt->_buf = img;
 			}
 			else
@@ -6575,5 +6792,767 @@ namespace hz
 			obt->_unicode_rang = { {0x21, 0x7e}, {0x21, 0x7e}, {0x21, 0x7e} };
 		}
 	}
+
+
+
+
+#ifndef NO_COLOR_FONT
+
+	/**************************************************************************
+	 *
+	 * `COLR' table specification:
+	 *
+	 *   https://www.microsoft.com/typography/otspec/colr.htm
+	 *
+	 */
+
+
+
+	 /* NOTE: These are the table sizes calculated through the specs. */
+#define BASE_GLYPH_SIZE            6
+#define LAYER_SIZE                 4
+#define COLR_HEADER_SIZE          14
+
+
+	struct BaseGlyphRecord
+	{
+		uint16_t  gid;
+		uint16_t  first_layer_index;
+		uint16_t  num_layers;
+
+	};
+
+
+	struct Colr
+	{
+		uint16_t  version;
+		uint16_t  num_base_glyphs;
+		uint16_t  num_layers;
+
+		uint8_t* base_glyphs;
+		uint8_t* layers;
+
+		/* The memory which backs up the `COLR' table. */
+		void* table;
+		unsigned long  table_size;
+
+	};
+
+
+
+	int	tt_face_load_colr(tt_info* face, uint8_t* b, sfnt_header* sp)
+	{
+		int   error = 0;
+		//FT_Memory  memory = face->root.memory;
+
+		uint8_t* table = b;
+		uint8_t* p = NULL;
+
+		Colr* colr = NULL;
+
+		uint32_t  base_glyph_offset, layer_offset;
+		uint32_t  table_size = sp->logicalLength;
+		auto cp = face->colorinfo;
+
+		/* `COLR' always needs `CPAL' */
+		//if (!face->cpal)
+		//	return FT_THROW(Invalid_File_Format);
+
+		//error = face->goto_table(face, TTAG_COLR, stream, &table_size);
+		//if (error)
+		//	goto NoColr;
+		do {
+
+			if (table_size < COLR_HEADER_SIZE)break;
+			//	goto InvalidTable;
+
+			//if (FT_FRAME_EXTRACT(table_size, table))
+			//	goto NoColr;
+
+			p = table;
+			face->uac.new_mem(1, colr);
+			if (!(colr))
+				break;
+
+			colr->version = NEXT_USHORT(p);
+			if (colr->version != 0)
+			{
+				error = -1; break;
+			}
+
+			colr->num_base_glyphs = NEXT_USHORT(p);
+			base_glyph_offset = NEXT_ULONG(p);
+
+			if (base_glyph_offset >= table_size)
+			{
+				error = -1; break;
+			}
+			if (colr->num_base_glyphs * BASE_GLYPH_SIZE >
+				table_size - base_glyph_offset)
+			{
+				error = -1; break;
+			}
+
+			layer_offset = NEXT_ULONG(p);
+			colr->num_layers = NEXT_USHORT(p);
+
+			if (layer_offset >= table_size)
+			{
+				error = -1; break;
+			}
+			if (colr->num_layers * LAYER_SIZE > table_size - layer_offset)
+			{
+				error = -1; break;
+			}
+
+			colr->base_glyphs = (uint8_t*)(table + base_glyph_offset);
+			colr->layers = (uint8_t*)(table + layer_offset);
+			colr->table = table;
+			colr->table_size = table_size;
+
+			cp->colr = colr;
+
+
+		} while (0);
+
+		return error;
+	}
+
+
+	void tt_face_free_colr(tt_info* p)
+	{
+		//sfnt_header* sp = face->root.stream;
+		////FT_Memory  memory = face->root.memory;
+
+		//Colr* colr = (Colr*)face->colr;
+
+
+		//if (colr)
+		//{
+		//	FT_FRAME_RELEASE(colr->table);
+		//	FT_FREE(colr);
+		//}
+	}
+
+
+	static bool find_base_glyph_record(uint8_t* base_glyph_begin,
+		int            num_base_glyph,
+		uint32_t           glyph_id,
+		BaseGlyphRecord* record)
+	{
+		int  min = 0;
+		int  max = num_base_glyph - 1;
+
+
+		while (min <= max)
+		{
+			int    mid = min + (max - min) / 2;
+			uint8_t* p = base_glyph_begin + mid * BASE_GLYPH_SIZE;
+
+			uint16_t  gid = NEXT_USHORT(p);
+
+
+			if (gid < glyph_id)
+				min = mid + 1;
+			else if (gid > glyph_id)
+				max = mid - 1;
+			else
+			{
+				record->gid = gid;
+				record->first_layer_index = NEXT_USHORT(p);
+				record->num_layers = NEXT_USHORT(p);
+
+				return 1;
+			}
+		}
+
+		return 0;
+	}
+
+
+	bool tt_face_get_colr_layer(tt_info* face,
+		uint32_t            base_glyph,
+		uint32_t* aglyph_index,
+		uint32_t* acolor_index,
+		LayerIterator* iterator)
+	{
+		Colr* colr = (Colr*)face->colorinfo->colr;
+		BaseGlyphRecord  glyph_record = {};
+		auto cp = face->colorinfo;
+
+		if (!colr)
+			return 0;
+
+		if (!iterator->p)
+		{
+			uint32_t  offset;
+
+
+			/* first call to function */
+			iterator->layer = 0;
+
+			if (!find_base_glyph_record(colr->base_glyphs,
+				colr->num_base_glyphs,
+				base_glyph,
+				&glyph_record))
+				return 0;
+
+			if (glyph_record.num_layers)
+				iterator->num_layers = glyph_record.num_layers;
+			else
+				return 0;
+
+			offset = LAYER_SIZE * glyph_record.first_layer_index;
+			if (offset + LAYER_SIZE * glyph_record.num_layers > colr->table_size)
+				return 0;
+
+			iterator->p = colr->layers + offset;
+		}
+
+		if (iterator->layer >= iterator->num_layers)
+			return 0;
+
+		*aglyph_index = NEXT_USHORT(iterator->p);
+		*acolor_index = NEXT_USHORT(iterator->p);
+
+		if (*aglyph_index >= (uint32_t)(face->num_glyphs) ||
+			(*acolor_index != 0xFFFF &&
+				*acolor_index >= cp->palette_data.num_palette_entries))
+			return 0;
+
+		iterator->layer++;
+
+		return 1;
+	}
+
+#define PALETTE_FOR_LIGHT_BACKGROUND  0x01
+#define PALETTE_FOR_DARK_BACKGROUND   0x02
+	Color_2 get_c2(tt_info* face1, uint32_t color_index)
+	{
+		Color_2 c = {};
+		auto face = face1->colorinfo;
+		if (color_index == 0xFFFF)
+		{
+			if (face->have_foreground_color)
+			{
+				c.b = face->foreground_color.blue;
+				c.g = face->foreground_color.green;
+				c.r = face->foreground_color.red;
+				c.alpha = face->foreground_color.alpha;
+			}
+			else
+			{
+				if (face->palette_data.palette_flags &&
+					(face->palette_data.palette_flags[face->palette_index] &
+						PALETTE_FOR_DARK_BACKGROUND))
+				{
+					/* white opaque */
+					c.b = 0xFF;
+					c.g = 0xFF;
+					c.r = 0xFF;
+					c.alpha = 0xFF;
+				}
+				else
+				{
+					/* black opaque */
+					c.b = 0x00;
+					c.g = 0x00;
+					c.r = 0x00;
+					c.alpha = 0xFF;
+				}
+			}
+		}
+		else
+		{
+			c = face->palette[color_index];
+		}
+		return c;
+	}
+	int tt_face_colr_blend_layer(tt_info* face1,
+		uint32_t       color_index,
+		GlyphSlot* dstSlot,
+		GlyphSlot* srcSlot)
+	{
+		int  error = 0;
+		auto face = face1->colorinfo;
+		uint32_t  x, y;
+		uint8_t  b, g, r, alpha;
+
+		uint32_t  size;
+		uint8_t* src;
+		uint8_t* dst;
+#if 0
+
+		if (!dstSlot->bitmap.buffer)
+		{
+			/* Initialize destination of color bitmap */
+			/* with the size of first component.      */
+			dstSlot->bitmap_left = srcSlot->bitmap_left;
+			dstSlot->bitmap_top = srcSlot->bitmap_top;
+
+			dstSlot->bitmap.width = srcSlot->bitmap.width;
+			dstSlot->bitmap.rows = srcSlot->bitmap.rows;
+			dstSlot->bitmap.pixel_mode = FT_PIXEL_MODE_BGRA;
+			dstSlot->bitmap.pitch = (int)dstSlot->bitmap.width * 4;
+			dstSlot->bitmap.num_grays = 256;
+
+			size = dstSlot->bitmap.rows * (unsigned int)dstSlot->bitmap.pitch;
+
+			error = ft_glyphslot_alloc_bitmap(dstSlot, size);
+			if (error)
+				return error;
+
+			FT_MEM_ZERO(dstSlot->bitmap.buffer, size);
+		}
+		else
+		{
+			/* Resize destination if needed such that new component fits. */
+			int  x_min, x_max, y_min, y_max;
+
+
+			x_min = FT_MIN(dstSlot->bitmap_left, srcSlot->bitmap_left);
+			x_max = FT_MAX(dstSlot->bitmap_left + (int)dstSlot->bitmap.width,
+				srcSlot->bitmap_left + (int)srcSlot->bitmap.width);
+
+			y_min = FT_MIN(dstSlot->bitmap_top - (int)dstSlot->bitmap.rows,
+				srcSlot->bitmap_top - (int)srcSlot->bitmap.rows);
+			y_max = FT_MAX(dstSlot->bitmap_top, srcSlot->bitmap_top);
+
+			if (x_min != dstSlot->bitmap_left ||
+				x_max != dstSlot->bitmap_left + (int)dstSlot->bitmap.width ||
+				y_min != dstSlot->bitmap_top - (int)dstSlot->bitmap.rows ||
+				y_max != dstSlot->bitmap_top)
+			{
+				FT_Memory  memory = face->root.memory;
+
+				uint32_t  width = (uint32_t)(x_max - x_min);
+				uint32_t  rows = (uint32_t)(y_max - y_min);
+				uint32_t  pitch = width * 4;
+
+				uint8_t* buf = NULL;
+				uint8_t* p;
+				uint8_t* q;
+
+
+				size = rows * pitch;
+				if (FT_ALLOC(buf, size))
+					return error;
+
+				p = dstSlot->bitmap.buffer;
+				q = buf +
+					(int)pitch * (y_max - dstSlot->bitmap_top) +
+					4 * (dstSlot->bitmap_left - x_min);
+
+				for (y = 0; y < dstSlot->bitmap.rows; y++)
+				{
+					FT_MEM_COPY(q, p, dstSlot->bitmap.width * 4);
+
+					p += dstSlot->bitmap.pitch;
+					q += pitch;
+				}
+
+				ft_glyphslot_set_bitmap(dstSlot, buf);
+
+				dstSlot->bitmap_top = y_max;
+				dstSlot->bitmap_left = x_min;
+
+				dstSlot->bitmap.width = width;
+				dstSlot->bitmap.rows = rows;
+				dstSlot->bitmap.pitch = (int)pitch;
+
+				dstSlot->internal->flags |= FT_GLYPH_OWN_BITMAP;
+				dstSlot->format = FT_GLYPH_FORMAT_BITMAP;
+			}
+		}
+
+		if (color_index == 0xFFFF)
+		{
+			if (face->have_foreground_color)
+			{
+				b = face->foreground_color.blue;
+				g = face->foreground_color.green;
+				r = face->foreground_color.red;
+				alpha = face->foreground_color.alpha;
+			}
+			else
+			{
+				if (face->palette_data.palette_flags &&
+					(face->palette_data.palette_flags[face->palette_index] &
+						FT_PALETTE_FOR_DARK_BACKGROUND))
+				{
+					/* white opaque */
+					b = 0xFF;
+					g = 0xFF;
+					r = 0xFF;
+					alpha = 0xFF;
+				}
+				else
+				{
+					/* black opaque */
+					b = 0x00;
+					g = 0x00;
+					r = 0x00;
+					alpha = 0xFF;
+				}
+			}
+		}
+		else
+		{
+			b = face->palette[color_index].blue;
+			g = face->palette[color_index].green;
+			r = face->palette[color_index].red;
+			alpha = face->palette[color_index].alpha;
+		}
+
+		/* XXX Convert if srcSlot.bitmap is not grey? */
+		src = srcSlot->bitmap.buffer;
+		dst = dstSlot->bitmap.buffer +
+			dstSlot->bitmap.pitch * (dstSlot->bitmap_top - srcSlot->bitmap_top) +
+			4 * (srcSlot->bitmap_left - dstSlot->bitmap_left);
+
+		for (y = 0; y < srcSlot->bitmap.rows; y++)
+		{
+			for (x = 0; x < srcSlot->bitmap.width; x++)
+			{
+				int  aa = src[x];
+				int  fa = alpha * aa / 255;
+
+				int  fb = b * fa / 255;
+				int  fg = g * fa / 255;
+				int  fr = r * fa / 255;
+
+				int  ba2 = 255 - fa;
+
+				int  bb = dst[4 * x + 0];
+				int  bg = dst[4 * x + 1];
+				int  br = dst[4 * x + 2];
+				int  ba = dst[4 * x + 3];
+
+
+				dst[4 * x + 0] = (uint8_t)(bb * ba2 / 255 + fb);
+				dst[4 * x + 1] = (uint8_t)(bg * ba2 / 255 + fg);
+				dst[4 * x + 2] = (uint8_t)(br * ba2 / 255 + fr);
+				dst[4 * x + 3] = (uint8_t)(ba * ba2 / 255 + fa);
+			}
+
+			src += srcSlot->bitmap.pitch;
+			dst += dstSlot->bitmap.pitch;
+		}
+#endif
+		return error;
+	}
+
+
+
+	/**************************************************************************
+	 *
+	 * `CPAL' table specification:
+	 *
+	 *   https://www.microsoft.com/typography/otspec/cpal.htm
+	 *
+	 */
+
+	 /* NOTE: These are the table sizes calculated through the specs. */
+#define CPAL_V0_HEADER_BASE_SIZE  12
+#define COLOR_SIZE                 4
+
+
+  /* all data from `CPAL' not covered in FT_Palette_Data */
+	struct Cpal
+	{
+		uint16_t  version;        /* Table version number (0 or 1 supported). */
+		uint16_t  num_colors;               /* Total number of color records, */
+		/* combined for all palettes.     */
+		uint8_t* colors;                              /* RGBA array of colors */
+		uint8_t* color_indices; /* Index of each palette's first color record */
+		/* in the combined color record array.        */
+
+/* The memory which backs up the `CPAL' table. */
+		void* table;
+		uint32_t  table_size;
+
+	};
+
+
+
+	int tt_face_load_cpal(tt_info* face1, uint8_t* b,
+		sfnt_header* sp)
+	{
+		int   error = 0;
+		//FT_Memory  memory = face->root.memory;
+		auto face = face1->colorinfo;
+		uint8_t* table = b;
+		uint8_t* p = NULL;
+
+		Cpal* cpal = NULL;
+
+		uint32_t  colors_offset = 0;
+		uint32_t  table_size = sp->logicalLength;
+
+#if 1
+		//error = face->goto_table(face, TTAG_CPAL, stream, &table_size);
+		//if (error)
+		//	goto NoCpal;
+		do {
+
+			if (table_size < CPAL_V0_HEADER_BASE_SIZE)
+				break;
+
+			//if (FT_FRAME_EXTRACT(table_size, table))
+			//	goto NoCpal;
+
+			p = table;
+			face1->uac.new_mem(1, cpal);
+			if (!cpal)
+				break;
+
+			cpal->version = NEXT_USHORT(p);
+			if (cpal->version > 1)
+			{
+				error = -1; break;
+			}
+
+			face->palette_data.num_palette_entries = NEXT_USHORT(p);
+			face->palette_data.num_palettes = NEXT_USHORT(p);
+
+			cpal->num_colors = NEXT_USHORT(p);
+			colors_offset = NEXT_ULONG(p);
+
+			if (CPAL_V0_HEADER_BASE_SIZE +
+				face->palette_data.num_palettes * 2U > table_size)
+			{
+				error = -1; break;
+			}
+
+			if (colors_offset >= table_size)
+			{
+				error = -1; break;
+			}
+			if (cpal->num_colors * COLOR_SIZE > table_size - colors_offset)
+			{
+				error = -1; break;
+			}
+
+			if (face->palette_data.num_palette_entries > cpal->num_colors)
+			{
+				error = -1; break;
+			}
+
+			cpal->color_indices = p;
+			cpal->colors = (uint8_t*)(table + colors_offset);
+
+			if (cpal->version == 1)
+			{
+				uint32_t    type_offset, label_offset, entry_label_offset;
+				uint16_t* array = NULL;
+				uint16_t* limit;
+				uint16_t* q;
+
+
+				if (CPAL_V0_HEADER_BASE_SIZE +
+					face->palette_data.num_palettes * 2U +
+					3U * 4 > table_size)
+				{
+					error = -1; break;
+				}
+
+				p += face->palette_data.num_palettes * 2;
+
+				type_offset = NEXT_ULONG(p);
+				label_offset = NEXT_ULONG(p);
+				entry_label_offset = NEXT_ULONG(p);
+
+				if (type_offset)
+				{
+					if (type_offset >= table_size)
+					{
+						error = -1; break;
+					}
+					if (face->palette_data.num_palettes * 2 >
+						table_size - type_offset)
+					{
+						error = -1; break;
+					}
+
+					if (!face1->uac.new_mem(array, face->palette_data.num_palettes))
+					{
+						error = -2; break;
+					}
+
+					p = table + type_offset;
+					q = array;
+					limit = q + face->palette_data.num_palettes;
+
+					while (q < limit)
+						*q++ = NEXT_USHORT(p);
+
+					face->palette_data.palette_flags = array;
+				}
+
+				if (label_offset)
+				{
+					if (label_offset >= table_size)
+					{
+						error = -1; break;
+					}
+					if (face->palette_data.num_palettes * 2 >
+						table_size - label_offset)
+					{
+						error = -1; break;
+					}
+
+					//if (FT_QNEW_ARRAY(array, face->palette_data.num_palettes))
+					if (!face1->uac.new_mem(array, face->palette_data.num_palettes))
+					{
+						error = -2; break;
+					}
+
+					p = table + label_offset;
+					q = array;
+					limit = q + face->palette_data.num_palettes;
+
+					while (q < limit)
+						*q++ = NEXT_USHORT(p);
+
+					face->palette_data.palette_name_ids = array;
+				}
+
+				if (entry_label_offset)
+				{
+					if (entry_label_offset >= table_size)
+					{
+						error = -1; break;
+					}
+					if (face->palette_data.num_palette_entries * 2 >
+						table_size - entry_label_offset)
+					{
+						error = -1; break;
+					}
+
+					if (!face1->uac.new_mem(array, face->palette_data.num_palette_entries))
+					{
+						error = -2; break;
+					}
+
+					p = table + entry_label_offset;
+					q = array;
+					limit = q + face->palette_data.num_palette_entries;
+
+					while (q < limit)
+						*q++ = NEXT_USHORT(p);
+
+					face->palette_data.palette_entry_name_ids = array;
+				}
+			}
+
+			cpal->table = table;
+			cpal->table_size = table_size;
+
+			face->cpal = cpal;
+
+			/* set up default palette */
+			if (!face1->uac.new_mem(face->palette,
+				face->palette_data.num_palette_entries))
+			{
+				error = -2; break;
+			}
+
+			if (tt_face_palette_set(face1, 0))
+			{
+				error = -1; break;
+			}
+			error = 0;
+			break;
+
+		} while (0);
+		if (error < 0)
+		{
+			//InvalidTable:
+			//	error = -1;// FT_THROW(Invalid_Table);
+
+			//NoCpal:
+				//FT_FRAME_RELEASE(table);
+			face1->uac.free_mem(cpal, 1);
+
+			face->cpal = NULL;
+
+		}
+		/* arrays in `face->palette_data' and `face->palette' */
+		/* are freed in `sfnt_done_face'                      */
+#endif
+		return error;
+	}
+
+
+	void tt_face_free_cpal(tt_info* face)
+	{
+		//sfnt_header* sp = face->colorinfo.;
+		//FT_Memory  memory = face->root.memory;
+
+		//Cpal* cpal = (Cpal*)face->cpal;
+
+
+		//if (cpal)
+		{
+			//	FT_FRAME_RELEASE(cpal->table);
+			//	FT_FREE(cpal);
+		}
+	}
+
+	int tt_face_palette_set(tt_info* face, uint32_t  palette_index)
+	{
+		Cpal* cpal = (Cpal*)face->colorinfo->cpal;
+		auto cp = face->colorinfo;
+		uint8_t* offset;
+		uint8_t* p;
+
+		Color_2* q;
+		Color_2* limit;
+
+		uint16_t  color_index;
+
+		if (!cpal || palette_index >= cp->palette_data.num_palettes)
+			return -6;// FT_THROW(Invalid_Argument);
+
+		offset = cpal->color_indices + 2 * palette_index;
+		color_index = PEEK_USHORT(offset);
+
+		if (color_index + cp->palette_data.num_palette_entries >
+			cpal->num_colors)
+			return -7;// FT_THROW(Invalid_Table);
+
+		p = cpal->colors + COLOR_SIZE * color_index;
+		q = (Color_2*)cp->palette;
+		limit = q + cp->palette_data.num_palette_entries;
+
+		while (q < limit)
+		{
+			q->blue = NEXT_BYTE(p);
+			q->green = NEXT_BYTE(p);
+			q->red = NEXT_BYTE(p);
+			q->alpha = NEXT_BYTE(p);
+
+			q++;
+		}
+
+		return 0;
+	}
+
+
+
+
+
+
+#endif // !NO_COLOR_FONT
+
+
+
+
+
+
+
+
+
+
 }
 //!hz

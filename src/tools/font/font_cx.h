@@ -123,6 +123,8 @@ namespace hz
 		glm::ivec2 _dwpos;
 		// 原始的advance
 		int advance = 0;
+		// 彩色字体时用
+		uint32_t color = 0;
 	};
 
 	class ttc_info
@@ -304,6 +306,7 @@ namespace hz
 		void* data = 0;
 		unsigned char   palette_mode;
 		void* palette;
+		int x, y;
 	} Bitmap;
 
 	union ft_key_s
@@ -351,11 +354,11 @@ namespace hz
 	{
 		TYPE_NONE = 0,
 		TYPE_EBLC, /* `EBLC' (Microsoft), */
-		 /* `bloc' (Apple)      */
-		 TYPE_CBLC, /* `CBLC' (Google)     */
-		 TYPE_SBIX, /* `sbix' (Apple)      */
-		 /* do not remove */
-		 TYPE_MAX
+		/* `bloc' (Apple)      */
+		TYPE_CBLC, /* `CBLC' (Google)     */
+		TYPE_SBIX, /* `sbix' (Apple)      */
+		/* do not remove */
+		TYPE_MAX
 	} sbit_table_type;
 
 #define DL_long(v) v=ttLONG(data);data+=4
@@ -405,6 +408,7 @@ namespace hz
 		std::string tag;
 		std::string v;
 	};
+	struct gcolors_t;
 	struct bitmap_ttinfo;
 	class tt_info;
 	struct familys_t {
@@ -456,6 +460,7 @@ namespace hz
 		std::string _style;
 		// 支持的语言
 		std::string _slng;
+		int64_t num_glyphs = 0;
 		unsigned int  _index = 0;
 		int isFixedPitch = 0;
 		int postFixedPitch, charFixedPitch;
@@ -477,7 +482,8 @@ namespace hz
 		int nglyphs = 0;
 		//int lut[256];
 		//std::vector<tt_info*> fallbacks;
-
+		// 分配内存
+		usp_ac uac;
 		std::unordered_map<int, Glyph*> _lut;
 		// 缩放缓存表
 		std::unordered_map<int, double> _scale_lut;
@@ -498,12 +504,13 @@ namespace hz
 		std::list<ft_item> _ft_item_data, _ft_item_data1;
 		// 索引缓存 unsigned int glyph_index;uint16_t height;
 		std::unordered_map<uint64_t, ftg_item*> _cache_glyphidx;
-		auto_destroy_cx _cdc;
-	private:
+		//auto_destroy_cx _cdc;
+		usp_ac _cdc;
+	public:
 		bitmap_ttinfo* bitinfo = 0;
-
+		gcolors_t* colorinfo = 0;
 		// 自动化析构
-		auto_destroy_cx dc;
+		//auto_destroy_cx dc;
 	public:
 		tt_info();
 
@@ -565,6 +572,8 @@ namespace hz
 		void clear_gcache();
 
 		ftg_item mk_glyph(unsigned int glyph_index, unsigned int unicode_codepoint, int fns);
+
+		int get_gcolor(uint32_t base_glyph, std::vector<uint32_t>& ag, std::vector<uint32_t>& col);
 	private:
 		//// 增加n个缓存
 		//size_t fit_reserve(int n)
@@ -587,6 +596,8 @@ namespace hz
 		void init_post_table();
 		// 初始化位图信息
 		int init_sbit();
+		// 初始化颜色信息
+		int init_color();
 		bool is_fixed_pitch()
 		{
 			return isFixedPitch;
@@ -1154,8 +1165,8 @@ namespace hz
 		void set_langid(int langid);
 		tt_info* get_font(int idx);
 		// 文件名，是否复制数据
-		int add_font_file(const std::string& fn);
-		int add_font_mem(const char* data, size_t len, bool iscp);
+		int add_font_file(const std::string& fn, njson* pname);
+		int add_font_mem(const char* data, size_t len, bool iscp, njson* pname);
 
 		njson get_font_info(int language_id = 2052);
 
@@ -1163,6 +1174,7 @@ namespace hz
 
 		void set_defontcss(tt_info* f1, tt_info* f2);
 		css_text* create_css_text();
+
 	public:
 
 		bool is_ttc(const char* data, std::vector<uint32_t>* outv);
@@ -1254,6 +1266,7 @@ namespace hz
 	public:
 		// TODO:push_cache_bitmap
 		Image* push_cache_bitmap(Bitmap* bitmap, glm::ivec2* pos, int linegap = 0, unsigned int col = -1);
+		Image* push_cache_bitmap(Bitmap* bitmap, glm::ivec2* pos, unsigned int col, Image* ret, int linegap = 0);
 	public:
 		std::vector<Image*> get_all_cacheimage();
 		void save_cache(std::string fdn);
@@ -1349,7 +1362,7 @@ namespace hz
 #endif // !__font_h__
 
 #if 0
-		// todo		文本渲染
+// todo		文本渲染
 glm::ivec2 draw_text(Fonts::css_text* csst, glm::ivec2 pos, const std::string& str, size_t count = -1, size_t first_idx = 0, draw_font_info* out = nullptr)
 {
 	auto ft = Fonts::s();
